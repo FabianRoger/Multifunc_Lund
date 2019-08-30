@@ -27,15 +27,20 @@ library(nlme) #Calls: lmeControl
 library(plotrix) #Calls: std.error
 library(plyr) #Calls: ddply, rbind.fill
 library(reshape2) #Calls: melt
+library(readxl)
 
-setwd("C:/Users/Jon/Dropbox/nceas_bdef/multifunctionality/Mutifunc meta-analysis/Analysis")
-load("2014-08-20 Multifunc Meta.RData")
+#setwd("C:/Users/Jon/Dropbox/nceas_bdef/multifunctionality/Mutifunc meta-analysis/Analysis")
+#load("2014-08-20 Multifunc Meta.RData")
 
 #######################################################################################################
 #                                IMPORTING AND FORMATTING THE DATA                                    #
 #######################################################################################################
 
 #Import from file: Monoculture meta-master ALL DATA.xlxs
+tmp = tempfile(fileext = ".xlsx")
+download.file(url = "https://media.nature.com/original/nature-assets/ncomms/2015/150424/ncomms7936/extref/ncomms7936-s2.xlsx", destfile = tmp, mode="wb")
+multifunc <- read_xlsx(tmp, sheet = "Data")
+
 multifunc=read.csv("Multifunctionality Meta MASTER V7.5 (Final).csv")
 
 #Remove large grassland studies for sensitivity analysis
