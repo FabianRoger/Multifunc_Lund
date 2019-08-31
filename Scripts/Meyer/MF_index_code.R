@@ -42,19 +42,30 @@
 
 #requirements
 library(vegan)
+library(readr)
+library(here)
 
-#Read in data
-PlotInfo <- read.table("PlotInformation.csv", header=TRUE, sep=";") #Explantory variables
+#Read in data from the online Suppl. 
+
+tmp = tempfile(fileext = ".csv")
+download.file(url = "https://static-content.springer.com/esm/art%3A10.1038%2Fs41559-017-0391-4/MediaObjects/41559_2017_391_MOESM3_ESM.csv", destfile = tmp, mode="wb")
+PlotInfo <- read_csv2(tmp)
+
 PlotInfo$div.col<-rainbow(6, start=0, end=0.88)[6:1][as.numeric(factor(PlotInfo$sowndiv))] # color-code for diversity levels
 
-DataProcess <- read.table("DATA_Processes.csv", header=TRUE, sep=";")
+tmp = tempfile(fileext = ".csv")
+download.file(url = "https://static-content.springer.com/esm/art%3A10.1038%2Fs41559-017-0391-4/MediaObjects/41559_2017_391_MOESM4_ESM.csv", destfile = tmp, mode="wb")
+DataProcess <- read_delim(tmp, col_types = paste(c("c", rep("d", 82)), collapse = ""), delim = ";")
+
 #Center the variables around zero and standardize to variance of one standard deviation to homogenize scales  
 DataProcessStand <- DataProcess
 DataProcessStand[,2:ncol(DataProcessStand)] <- decostand(DataProcessStand[,2:ncol(DataProcessStand)], meth="stand")
 depStand <- DataProcessStand[,2:ncol(DataProcessStand)]
 row.names(depStand) <- DataProcessStand$Plot
 
-VList <- read.table("VariableList.csv", header=TRUE, sep=";")
+tmp = tempfile(fileext = ".csv")
+download.file(url = "https://static-content.springer.com/esm/art%3A10.1038%2Fs41559-017-0391-4/MediaObjects/41559_2017_391_MOESM6_ESM.csv", destfile = tmp, mode="wb")
+VList <- read_csv2(tmp)
 
 #Calculate the PCA
 pca1<-rda(depStand)
@@ -76,16 +87,17 @@ for(i in 1:length(SiteSc[1,]))
     SpeciesSc[,i] <- SpeciesSc[,i]*-1
   }
 }
-#Check of new orientation
-#for (i in 1: ncol(pca1$CA$u)) {plot(pca1$CA$u[,i] ~ SiteSc[,i], main=i)
-#readline()}
+# Check of new orientation
+# for (i in 1: ncol(pca1$CA$u)) {plot(pca1$CA$u[,i] ~ SiteSc[,i], main=i)
+# readline()}
+
 #create new pca-pbject with biologically orientated axis scores
 pca2 <- pca1
 pca2$CA$u <- as.matrix(SiteSc)
 pca2$CA$v <- as.matrix(SpeciesSc)
 
 #plot the first two PCA-axes
-png(filename="Fig1A_V2.png", type="cairo", units="px", pointsize=20, width=2000, height=2000, res=200)
+png(filename=here("Figures", "Fig1A_V2.png"), type="cairo", units="px", pointsize=20, width=2000, height=2000, res=200)
 par(mai=c(2, 2, 0.2, 0.2), mgp=c(2,0.5,0), cex.lab=1.5, cex.axis=1.0, pch=21, cex=1.5, lwd=5, tck=0.015)
 pl <- biplot(pca2, scal=3, choices=1:2, col="grey", xlab="PCA-axis 1", ylab="PCA-axis 2")
 #points in gray
@@ -105,7 +117,7 @@ Index.wt$plotcode <- row.names(Index.wt)
 Index.wt <- merge(PlotInfo, Index.wt)
 
 #plot the multifunctionality index together with prediction of linear model for the multifunctionality-diversity relationship
-png(filename="Fig1B.png", type="cairo", units="px", pointsize=20, width=2000, height=2000, res=200)
+png(filename=here("Figures", "Fig1B.png"), type="cairo", units="px", pointsize=20, width=2000, height=2000, res=200)
 par(mai=c(2, 2, 0.2, 0.2), mgp=c(2,0.5,0), cex.lab=1.5, cex.axis=1.0, pch=21, cex=1.5, lwd=5, tck=0.015)
 color <- rainbow(6, start=0, end=0.88)[6:1][as.numeric(factor(Index.wt$sowndiv))]
 plot(Index.wt ~ log2(sowndiv), data=Index.wt, ylab="Index of multifunctionality", xlab="Plant species richness (log2)", pch=19, col=color)
@@ -122,5 +134,7 @@ lines(log2(new), rowMeans(cbind(
   predict(mod.wt, data.frame(block="B3", sowndiv=new), interval ="confidence", level=0.95)[,3], 
   predict(mod.wt, data.frame(block="B4", sowndiv=new), interval ="confidence", level=0.95)[,3])), lty=2)
 dev.off()
+
 #Effect of plant species richness on multifunctionality
 anova(mod.wt)
+
