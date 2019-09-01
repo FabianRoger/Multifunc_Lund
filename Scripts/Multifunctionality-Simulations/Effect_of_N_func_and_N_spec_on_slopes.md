@@ -1,37 +1,30 @@
----
-title: "Effect of varying number of functions and species on the slope of the multithreshold and the averaging approach "
-author: "Fabian Roger"
-date: "`r format(Sys.Date())`"
-output: github_document
----
+Effect of varying number of functions and species on the slope of the
+multithreshold and the averaging approach
+================
+Fabian Roger
+2019-09-01
 
 This script produces:
 
-+ Figure 2 b & c
+  - Figure 2 b & c
 
 (see `Effect on averaging approach` below for Figure 2 a)
 
-This script sets up the simulations to show the effect of including a varying number of functions and (separately) a varying number of species on the slope pattern produced by the multithreshold approach. 
+This script sets up the simulations to show the effect of including a
+varying number of functions and (separately) a varying number of species
+on the slope pattern produced by the multithreshold approach.
 
-For the **variable number of function simulation** we hold species richness constant at `specnum`. 
+For the **variable number of function simulation** we hold species
+richness constant at `specnum`.
 
-We then define a set number of functions of size `funcnum` from which we draw all possible (but max 50) subsets of variable size (3 subsets-sizes total). For each subset of functions we calculate the multithreshold approach. 
+We then define a set number of functions of size `funcnum` from which we
+draw all possible (but max 50) subsets of variable size (3 subsets-sizes
+total). For each subset of functions we calculate the multithreshold
+approach.
 
-For the **variable number of species simulation** we hold the number of functions constant at `funcnum` but calculate the multithreshold approach for the full species range and two smaller subsets.  
-
-
-```{r, echo = FALSE, warning=FALSE, message=FALSE, "load packages"}
-
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(cowplot)
-library(here)
-
-source(here("Scripts","Multifunctionality-Simulations", "Multifunc_simulations_functions.R"))
-source(here("Scripts", "MF_index_function.R"))
-source(here("Scripts", "MF_Hill_function.R"))
-```
+For the **variable number of species simulation** we hold the number of
+functions constant at `funcnum` but calculate the multithreshold
+approach for the full species range and two smaller subsets.
 
 # Effect on multithreshold approach
 
@@ -41,19 +34,23 @@ source(here("Scripts", "MF_Hill_function.R"))
 
 One can set the same parameters as in most other simulations:
 
-+ `distribution` : the distribution function. The names of the parameters must be changed accordingly in `FunctionValue()`
-+ `specnum` : the (maximum) number of species
-+ `funcnum` : the (maximum) number of functions 
-+ `method` : the method to use (with or without complementarity)
+  - `distribution` : the distribution function. The names of the
+    parameters must be changed accordingly in `FunctionValue()`
+  - `specnum` : the (maximum) number of species
+  - `funcnum` : the (maximum) number of functions
+  - `method` : the method to use (with or without complementarity)
 
 Additional parameters for `method = comp`:
 
-+ `CF` : maximum complementarity factor 
-+ `compfunc` : which functions should experience complementarity (`all` or any combination of `func.names`)
-+ `r` : the *growthrate* of the complementarity factor
+  - `CF` : maximum complementarity factor
+  - `compfunc` : which functions should experience complementarity
+    (`all` or any combination of `func.names`)
+  - `r` : the *growthrate* of the complementarity factor
 
-Here we use a maximum replication of 200 unique species combinations as otherwise the computation becomes tedious.
-```{r}
+Here we use a maximum replication of 200 unique species combinations as
+otherwise the computation becomes tedious.
+
+``` r
 set.seed(777)
 
 specnum <- 15
@@ -86,7 +83,8 @@ AvFunc_func <- AvFunc %>%
 ```
 
 ### Variable number of function - Multithreshold
-```{r}
+
+``` r
 # empty dataframe to store results
 RES_func <- tibble(thresholds = numeric(), 
                    Estimate = numeric(), 
@@ -125,13 +123,11 @@ for (i in c(ceiling(funcnum/3), 2*ceiling(funcnum/3), funcnum)) {
     RES_func <- rbind(RES_func, temp)
   }
   }
-
 ```
 
 ### Plot Multithreshold
 
-```{r, fig.height = 4, fig.width = 4}
-
+``` r
 FUNC <- RES_func %>% 
   group_by(thresholds, nfunc) %>% 
   summarise(mean_Estimate = mean(Estimate),
@@ -157,14 +153,13 @@ ggplot(., aes(x=thresholds*100, y=mean_Estimate), size = 0.5, alpha = 0.3)+
 FUNC
 ```
 
+![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
 ### Variable number of function - Averaging
 
-
 ### simulation of all possible slopes for 1:`funcnum` functions
 
-```{r}
-
+``` r
 # empty dataframe to store results
 Slope_res <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
@@ -226,12 +221,11 @@ for (i in seq_len(funcnum)) {
   }
 }
 }
-
-
 ```
 
-### Plot 
-```{r, warnings = F, fig.height= 4, fig.width= 4}
+### Plot
+
+``` r
 plot_av <- Slope_res %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
@@ -250,14 +244,17 @@ plot_av <- Slope_res %>%
   theme(legend.position = "bottom")
   
  plot_av 
-
 ```
 
+    ## `geom_smooth()` using method = 'loess' and formula 'y ~ x'
+
+    ## Warning: position_dodge requires non-overlapping x intervals
+
+![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
 ### Variable number of function - PCA multifunc
 
-```{r}
-
+``` r
 # empty dataframe to store results
 Slope_res <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
@@ -317,12 +314,11 @@ for (i in seq_len(funcnum)) {
   }
 }
 }
-
-
 ```
 
-### Plot 
-```{r, warnings = F, fig.height= 4, fig.width= 4}
+### Plot
+
+``` r
 plot_pca <- Slope_res %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
@@ -341,13 +337,17 @@ plot_pca <- Slope_res %>%
   theme(legend.position = "bottom")
   
  plot_pca 
-
 ```
+
+    ## `geom_smooth()` using method = 'loess' and formula 'y ~ x'
+
+    ## Warning: position_dodge requires non-overlapping x intervals
+
+![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
 
 ### Variable number of function - Sum multifunc
 
-```{r}
-
+``` r
 # empty dataframe to store results
 Slope_res <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
@@ -410,12 +410,11 @@ for (i in seq_len(funcnum)) {
   }
 }
 }
-
-
 ```
 
-### Plot 
-```{r, warnings = F, fig.height= 4, fig.width= 4}
+### Plot
+
+``` r
 plot_pca <- Slope_res %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
@@ -434,13 +433,17 @@ plot_pca <- Slope_res %>%
   theme(legend.position = "bottom")
   
  plot_pca 
-
 ```
+
+    ## `geom_smooth()` using method = 'loess' and formula 'y ~ x'
+
+    ## Warning: position_dodge requires non-overlapping x intervals
+
+![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ### Variable number of function - Hill multifunc
 
-```{r}
-
+``` r
 # empty dataframe to store results
 Slope_res <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
@@ -500,12 +503,11 @@ for (i in 2:funcnum) {
   }
 }
 }
-
-
 ```
 
-### Plot 
-```{r, warnings = F, fig.height= 4, fig.width= 4}
+### Plot
+
+``` r
 plot_hill <- Slope_res %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
@@ -524,5 +526,10 @@ plot_hill <- Slope_res %>%
   theme(legend.position = "bottom")
   
  plot_hill
-
 ```
+
+    ## `geom_smooth()` using method = 'loess' and formula 'y ~ x'
+
+    ## Warning: position_dodge requires non-overlapping x intervals
+
+![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
