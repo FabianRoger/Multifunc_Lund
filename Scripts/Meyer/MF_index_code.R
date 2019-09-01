@@ -44,6 +44,9 @@
 library(vegan)
 library(readr)
 library(here)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
 
 #Read in data from the online Suppl. 
 
@@ -97,14 +100,12 @@ pca2$CA$u <- as.matrix(SiteSc)
 pca2$CA$v <- as.matrix(SpeciesSc)
 
 #plot the first two PCA-axes
-png(filename=here("Figures", "Fig1A_V2.png"), type="cairo", units="px", pointsize=20, width=2000, height=2000, res=200)
-par(mai=c(2, 2, 0.2, 0.2), mgp=c(2,0.5,0), cex.lab=1.5, cex.axis=1.0, pch=21, cex=1.5, lwd=5, tck=0.015)
-pl <- biplot(pca2, scal=3, choices=1:2, col="grey", xlab="PCA-axis 1", ylab="PCA-axis 2")
+biplot(pca2, scal=3, choices=1:2, col="grey", xlab="PCA-axis 1", ylab="PCA-axis 2")
 #points in gray
 points(pca2, col="grey", pch=19, scal=3, choices=1:2)
 #points with color according to diversity gradient
 points(pca2, col=PlotInfo$div.col, pch=19, scal=3, choices=1:2)
-dev.off()
+
 
 #Calculate the mutivariate index of multifunctionality by summing the site scores of the PCA
 #To calculate the index the axes are weighted by their eigenvalues
@@ -117,23 +118,22 @@ Index.wt$plotcode <- row.names(Index.wt)
 Index.wt <- merge(PlotInfo, Index.wt)
 
 #plot the multifunctionality index together with prediction of linear model for the multifunctionality-diversity relationship
-png(filename=here("Figures", "Fig1B.png"), type="cairo", units="px", pointsize=20, width=2000, height=2000, res=200)
-par(mai=c(2, 2, 0.2, 0.2), mgp=c(2,0.5,0), cex.lab=1.5, cex.axis=1.0, pch=21, cex=1.5, lwd=5, tck=0.015)
-color <- rainbow(6, start=0, end=0.88)[6:1][as.numeric(factor(Index.wt$sowndiv))]
-plot(Index.wt ~ log2(sowndiv), data=Index.wt, ylab="Index of multifunctionality", xlab="Plant species richness (log2)", pch=19, col=color)
 mod.wt <- lm(Index.wt ~ block+log2(sowndiv), data=Index.wt)
-new=seq(1,60, by=0.5); lines(log2(new), rowMeans(cbind(predict(mod.wt, data.frame(block="B1", sowndiv=new)), predict(mod.wt, data.frame(block="B2", sowndiv=new)), predict(mod.wt, data.frame(block="B3", sowndiv=new)), predict(mod.wt, data.frame(block="B4", sowndiv=new)))))
-lines(log2(new), rowMeans(cbind(
-  predict(mod.wt, data.frame(block="B1", sowndiv=new), interval ="confidence", level=0.95)[,2], 
-  predict(mod.wt, data.frame(block="B2", sowndiv=new), interval ="confidence", level=0.95)[,2], 
-  predict(mod.wt, data.frame(block="B3", sowndiv=new), interval ="confidence", level=0.95)[,2], 
-  predict(mod.wt, data.frame(block="B4", sowndiv=new), interval ="confidence", level=0.95)[,2])), lty=2)
-lines(log2(new), rowMeans(cbind(
-  predict(mod.wt, data.frame(block="B1", sowndiv=new), interval ="confidence", level=0.95)[,3], 
-  predict(mod.wt, data.frame(block="B2", sowndiv=new), interval ="confidence", level=0.95)[,3], 
-  predict(mod.wt, data.frame(block="B3", sowndiv=new), interval ="confidence", level=0.95)[,3], 
-  predict(mod.wt, data.frame(block="B4", sowndiv=new), interval ="confidence", level=0.95)[,3])), lty=2)
-dev.off()
+
+Index.wt %>% 
+  mutate(pred = rowMeans(cbind(predict(mod.wt, data.frame(block="B1", sowndiv=.$sowndiv)),
+                               predict(mod.wt, data.frame(block="B2", sowndiv=.$sowndiv)),
+                               predict(mod.wt, data.frame(block="B3", sowndiv=.$sowndiv)),
+                               predict(mod.wt, data.frame(block="B4", sowndiv=.$sowndiv))))) %>% 
+  ggplot(aes(x = log2(sowndiv), y = Index.wt, colour = as.factor(sowndiv)))+
+  geom_point()+
+  geom_line(aes(y = pred), colour = "red")+
+  stat_smooth(method = "lm", colour = "black")+
+  theme_bw()+
+  labs(y = "Index of multifunctionality", x = "Plant species richness (log2)")+
+  scale_colour_viridis_d()+
+  theme(legend.position = "bottom")
+  NULL
 
 #Effect of plant species richness on multifunctionality
 anova(mod.wt)
