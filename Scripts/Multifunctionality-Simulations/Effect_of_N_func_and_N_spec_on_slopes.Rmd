@@ -25,7 +25,7 @@ For the **variable number of species simulation** we hold the number of function
 library(dplyr)
 library(tidyr)
 library(ggplot2)
-library(cowplot)
+#library(cowplot)
 library(here)
 
 source(here("Scripts","Multifunctionality-Simulations", "Multifunc_simulations_functions.R"))
