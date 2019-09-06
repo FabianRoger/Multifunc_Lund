@@ -73,15 +73,15 @@ SpecMat <- SpeciesMatrix(specnum = specnum, maxrep = maxrep)
 
 method = "av"
 
+compfunc <- func.names[1:3]
+
+
 AvFunc <- AverageFunction(SpecMat, FuncMat,
                           method = method, 
-                          CF = CF, 
-                          compfunc = compfunc,
-                          r = r)
+                          compfunc = compfunc)
 
 set.seed(563)
 errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
-hist(errM)
 
 #add variance
 AvFunc[,func.names] <- AvFunc[,func.names] + errM
@@ -93,10 +93,21 @@ AvFunc_func <- AvFunc %>%
 
 ```
 
+
+```{r}
+
+
+AvFunc %>%
+mutate(meanFunction = rowMeans(.[,func.names])) %>% 
+ggplot(., aes(x = Richness, y = meanFunction))+
+  geom_point()+
+  geom_smooth()
+```
+
 ### Variable number of function - Multithreshold
 ```{r}
 # empty dataframe to store results
-RES_func <- tibble(thresholds = numeric(), 
+RES_func_multi <- tibble(thresholds = numeric(), 
                    Estimate = numeric(), 
                    nfunc = numeric(),
                    func_comb = numeric())
@@ -130,7 +141,7 @@ for (i in c(ceiling(funcnum/3), 2*ceiling(funcnum/3), funcnum)) {
       mutate(nfunc = i) %>% 
       mutate(func_comb = k)
     
-    RES_func <- rbind(RES_func, temp)
+    RES_func_multi <- rbind(RES_func_multi, temp)
   }
   }
 
@@ -140,7 +151,7 @@ for (i in c(ceiling(funcnum/3), 2*ceiling(funcnum/3), funcnum)) {
 
 ```{r, fig.height = 4, fig.width = 4}
 
-FUNC <- RES_func %>% 
+FUNC_multi <- RES_func_multi %>% 
   group_by(thresholds, nfunc) %>% 
   summarise(mean_Estimate = mean(Estimate),
             CI_high = mean(Estimate) + 1.96 * (sd(Estimate)/sqrt(n())),
@@ -157,12 +168,13 @@ ggplot(., aes(x=thresholds*100, y=mean_Estimate), size = 0.5, alpha = 0.3)+
                                                               sep = ""), sep = "\n"),
                                           nrow=2,byrow=TRUE),
                      palette = "Set1")+
+  ggtitle("multiple thresholds") +
   theme_classic()+
   theme(legend.position = "bottom")+
   #scale_y_continuous(limits = c(-0.45, 0.45))+
   NULL
   
-FUNC
+FUNC_multi
 ```
 
 
@@ -174,7 +186,7 @@ FUNC
 ```{r}
 
 # empty dataframe to store results
-Slope_res <- data.frame(Estimate = numeric(),
+Slope_res_ave1 <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
                         `t value` = numeric(),    
                         `Pr(>|t|)` = numeric(),
@@ -198,6 +210,12 @@ set.seed(999)
 AvFunc <- AverageFunction(SpecMat, FuncMat,
                           method = method, 
                           compfunc = compfunc)
+
+set.seed(563)
+errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
+
+#add variance
+AvFunc[,func.names] <- AvFunc[,func.names] + errM
 
 # standardize functions
 AvFunc <- AvFunc %>% 
@@ -227,10 +245,10 @@ for (i in seq_len(funcnum)) {
     est <- summary(mod)$coefficients[2,]
     
     # store results
-    Slope_res <- data.frame(t(est)) %>% 
+    Slope_res_ave1 <- data.frame(t(est)) %>% 
       mutate(., nfunc = i) %>% 
       mutate(ncomp = l) %>% 
-      rbind(Slope_res, .)
+      rbind(Slope_res_ave1, .)
   }
 }
 }
@@ -240,7 +258,7 @@ for (i in seq_len(funcnum)) {
 
 ### Plot 
 ```{r, warnings = F, fig.height= 4, fig.width= 4}
-plot_av <- Slope_res %>% 
+plot_av1 <- Slope_res_ave1 %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
   geom_point(position = position_jitterdodge(jitter.width = 0.2, jitter.height = 0, dodge.width = 0.75),
@@ -254,10 +272,11 @@ plot_av <- Slope_res %>%
  # scale_y_continuous(limits = c(NA, 0.038))+
   labs(y = "Slope estimate",
        x = "Number of functions considered")+
+  ggtitle("averaging method") +
   theme_classic()+
   theme(legend.position = "bottom")
   
- plot_av 
+ plot_av1 
 
 ```
 
@@ -267,7 +286,7 @@ plot_av <- Slope_res %>%
 ```{r}
 
 # empty dataframe to store results
-Slope_res <- data.frame(Estimate = numeric(),
+Slope_res_pca1 <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
                         `t value` = numeric(),    
                         `Pr(>|t|)` = numeric(),
@@ -291,6 +310,12 @@ set.seed(999)
 AvFunc <- AverageFunction(SpecMat, FuncMat,
                           method = method, 
                           compfunc = compfunc)
+
+set.seed(563)
+errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
+
+#add variance
+AvFunc[,func.names] <- AvFunc[,func.names] + errM
 
 # standardize functions
 AvFunc <- AvFunc %>% 
@@ -318,10 +343,10 @@ for (i in seq_len(funcnum)) {
     est <- summary(mod)$coefficients[2,]
     
     # store results
-    Slope_res <- data.frame(t(est)) %>% 
+    Slope_res_pca1 <- data.frame(t(est)) %>% 
       mutate(., nfunc = i) %>% 
       mutate(ncomp = l) %>% 
-      rbind(Slope_res, .)
+      rbind(Slope_res_pca1, .)
   }
 }
 }
@@ -331,7 +356,7 @@ for (i in seq_len(funcnum)) {
 
 ### Plot 
 ```{r, warnings = F, fig.height= 4, fig.width= 4}
-plot_pca <- Slope_res %>% 
+plot_pca1 <- Slope_res_pca1 %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
   geom_point(position = position_jitterdodge(jitter.width = 0.2, jitter.height = 0, dodge.width = 0.75),
@@ -345,10 +370,11 @@ plot_pca <- Slope_res %>%
   #scale_y_continuous(limits = c(NA, 0.038))+
   labs(y = "Slope estimate",
        x = "Number of functions considered")+
+  ggtitle("pca approach") +
   theme_classic()+
   theme(legend.position = "bottom")
   
- plot_pca 
+ plot_pca1 
 
 ```
 
@@ -357,7 +383,7 @@ plot_pca <- Slope_res %>%
 ```{r}
 
 # empty dataframe to store results
-Slope_res <- data.frame(Estimate = numeric(),
+Slope_res_sum1 <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
                         `t value` = numeric(),    
                         `Pr(>|t|)` = numeric(),
@@ -381,6 +407,12 @@ set.seed(999)
 AvFunc <- AverageFunction(SpecMat, FuncMat,
                           method = method, 
                           compfunc = compfunc)
+
+set.seed(563)
+errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
+
+#add variance
+AvFunc[,func.names] <- AvFunc[,func.names] + errM
 
 # standardize functions
 AvFunc <- AvFunc %>% 
@@ -411,10 +443,10 @@ for (i in seq_len(funcnum)) {
     est <- summary(mod)$coefficients[2,]
     
     # store results
-    Slope_res <- data.frame(t(est)) %>% 
+    Slope_res_sum1 <- data.frame(t(est)) %>% 
       mutate(., nfunc = i) %>% 
       mutate(ncomp = l) %>% 
-      rbind(Slope_res, .)
+      rbind(Slope_res_sum1, .)
   }
 }
 }
@@ -424,7 +456,7 @@ for (i in seq_len(funcnum)) {
 
 ### Plot 
 ```{r, warnings = F, fig.height= 4, fig.width= 4}
-plot_pca <- Slope_res %>% 
+plot_sum1 <- Slope_res_sum1 %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
   geom_point(position = position_jitterdodge(jitter.width = 0.2, jitter.height = 0, dodge.width = 0.75),
@@ -438,10 +470,11 @@ plot_pca <- Slope_res %>%
   #scale_y_continuous(limits = c(NA, 0.038))+
   labs(y = "Slope estimate",
        x = "Number of functions considered")+
+  ggtitle("sum approach") +
   theme_classic()+
   theme(legend.position = "bottom")
   
- plot_pca 
+ plot_sum1 
 
 ```
 
@@ -450,7 +483,7 @@ plot_pca <- Slope_res %>%
 ```{r}
 
 # empty dataframe to store results
-Slope_res <- data.frame(Estimate = numeric(),
+Slope_res_hill1 <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
                         `t value` = numeric(),    
                         `Pr(>|t|)` = numeric(),
@@ -474,6 +507,12 @@ set.seed(999)
 AvFunc <- AverageFunction(SpecMat, FuncMat,
                           method = method, 
                           compfunc = compfunc)
+
+set.seed(563)
+errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
+
+#add variance
+AvFunc[,func.names] <- AvFunc[,func.names] + errM
 
 # standardize functions
 AvFunc <- AvFunc %>% 
@@ -502,10 +541,10 @@ for (i in 2:funcnum) {
     est <- summary(mod)$coefficients[2,]
     
     # store results
-    Slope_res <- data.frame(t(est)) %>% 
+    Slope_res_hill1 <- data.frame(t(est)) %>% 
       mutate(., nfunc = i) %>% 
       mutate(ncomp = l) %>% 
-      rbind(Slope_res, .)
+      rbind(Slope_res_hill1, .)
   }
 }
 }
@@ -514,7 +553,7 @@ for (i in 2:funcnum) {
 
 ### Plot 
 ```{r, warnings = F, fig.height= 4, fig.width= 4}
-plot_hill <- Slope_res %>% 
+plot_hill1 <- Slope_res_hill1 %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
   geom_point(position = position_jitterdodge(jitter.width = 0.2, jitter.height = 0, dodge.width = 0.75),
@@ -528,9 +567,13 @@ plot_hill <- Slope_res %>%
   #scale_y_continuous(limits = c(NA, 0.038))+
   labs(y = "Slope estimate",
        x = "Number of functions considered")+
+  ggtitle("hill approach") +
   theme_classic()+
   theme(legend.position = "bottom")
   
- plot_hill
+ plot_hill1
 
 ```
+
+
+
