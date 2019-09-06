@@ -519,7 +519,7 @@ plot_hill <- Slope_res_hill %>%
   #scale_y_continuous(limits = c(NA, 0.038))+
   labs(y = "Slope estimate",
        x = "Number of functions considered")+
-  ggtitle("Hill number")
+  ggtitle("Hill number")+
   theme_classic()+
   theme(legend.position = "bottom")
   
