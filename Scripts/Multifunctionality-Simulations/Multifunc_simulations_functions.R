@@ -199,8 +199,76 @@ FunctionValue <- function(specnum = NULL, funcnum = NULL,
 
 ##################################################
 
-AverageFunction <- function(SPM, FUNC, method = "average", selfunc = "F 1", selfac = 1,
-                            compfunc = "all", CF = 2, r = 0.25) {
+SpecComp <- function(specnum = NULL, funcnum = NULL,
+                     distribution = NULL, 
+                     spec_compfunc = NULL,...){
+  
+  #function to specify the complementarity factor for all
+  #pairwise species combinations for all functions
+  
+  # error handling
+  if (! distribution %in% ls("package:stats")) {
+    stop(" distribution must be one of the functions in the stats package.
+         see ?Distributions for options")
+  }
+  
+  distf <- get(distribution)
+  
+  Try <- try(distf(5,...))
+  
+  if(class(Try) == "try-error") {
+    stop ( paste("distribution parameters seem to be wrongly speciefied see ?",
+                 distribution," for help", sep=""))}
+  ###
+  
+  spec <- SpeciesList( specnum)
+  
+  func <- FunctionList( funcnum)
+  
+  comp_list <- vector("list", funcnum)
+  names(comp_list) <- func
+  
+  for (i in func){
+    
+    if(i %in% spec_compfunc) {
+      
+      #complementarity matrix
+      comp_mat <- matrix(ncol = specnum, nrow = specnum)
+      comp_val <- distf(specnum*(specnum-1)/2, ...)
+      comp_mat[lower.tri(comp_mat)] <- comp_val
+      comp_mat <- t(comp_mat)
+      comp_mat[lower.tri(comp_mat)] <- comp_val
+      diag(comp_mat) <- 1
+      comp_mat[comp_mat < 1] <- 1
+      colnames(comp_mat) <- spec
+      row.names(comp_mat) <- spec
+      
+      comp_list[[i]] <- comp_mat
+      
+    } else {
+      
+      #complementarity matrix
+      comp_mat <- matrix(ncol = specnum, nrow = specnum)
+      comp_mat[is.na(comp_mat)] <- 1
+      colnames(comp_mat) <- spec
+      row.names(comp_mat) <- spec
+      
+      comp_list[[i]] <- comp_mat
+        
+    }
+  }
+  
+  return(comp_list)
+}
+
+
+
+##################################################
+
+AverageFunction <- function(SPM, FUNC, method = "average", 
+                            selfunc = "F 1", selfac = 1, 
+                            compfunc = "all", CF = 2, r = 0.25,
+                            spec_comp = NULL) {
   # function to calculate the average function value of species
   # mixtures. 
   #
@@ -210,8 +278,10 @@ AverageFunction <- function(SPM, FUNC, method = "average", selfunc = "F 1", self
   #   FUNC: a dataframe as produced by FunctionValue() giving the function 
   #         values for each species in long format. Species names must match 
   #         colnames of SPM. 
-  #   method: one of "average", "complementarity", "selection" or "sum", specifying 
+  #   method: one of "average", "complementarity", 
+  #           "species_complementarity", "selection" or "sum", specifying 
   #           how the mixture function should be calculated
+  #   spec_comp: 2-species complementarity factors. 
   #   CF: "complementarity factor" for method "complementarity". each function
   #        value will be multiplied by CF * ( 1 - ( 1 - 1/CF ) * exp(1-Richness^r))
   #        the function grows to CF as Richness -> inf
@@ -272,6 +342,26 @@ AverageFunction <- function(SPM, FUNC, method = "average", selfunc = "F 1", self
       Com <- Com * (nrow(Com)/(2+nrow(Com)))
       return(colMeans(Com))
     } 
+  }
+  
+  # define function to be applied for method "species_complementarity" 
+  if (is.na(pmatch(method, c("species_complementarity"))) == FALSE) {
+   
+     MeanFunc <- function(x) {
+       
+       spec_p <- spec[which(x == 1)]
+       
+       sp_comp_fac <- 
+       sapply(spec_p, function(x){
+       lapply(spec_comp, function(y) prod(y[x, spec_p]))})
+       
+       sp_comp_fac <- t(sp_comp_fac)
+       sp_comp_fac <- matrix(unlist(sp_comp_fac), ncol = ncol(sp_comp_fac), byrow = FALSE)
+       
+       Com <- FUNC[FUNC$Species %in% spec_p, ][,-1]
+    
+       return(colMeans(sp_comp_fac * as.matrix(Com)))
+     }
   }
   
   
