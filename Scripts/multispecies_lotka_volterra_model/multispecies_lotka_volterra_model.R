@@ -1,18 +1,12 @@
 
-# Project: Examining the relationship between biodiversity and ecosystem functioning in experimental and observational data
+# Project: Mutifunctionality workshop (Lund 2019)
 
-# Title: Re-analysis of data extracted from Stachova and Leps (2010)
+# Title: Multispecies Lotka-Volterra model from Stachova and Leps (2010)
 
 # load relevant libraries
-library(readr)
 library(dplyr)
 library(gtools)
 library(tidyr)
-library(ggplot2)
-library(broom)
-library(viridis)
-library(vegan)
-library(ggpubr)
 library(truncnorm)
 
 # create customised plotting theme
