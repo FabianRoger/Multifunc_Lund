@@ -1,5 +1,5 @@
 ---
-title: "Effect of varying number of functions and species on the slope of the multithreshold and the averaging approach "
+title: "Effect of varying number of functions and species on the slope - using species specific complementarities"
 author: "Fabian Roger"
 date: "`r format(Sys.Date())`"
 output: github_document
@@ -71,20 +71,21 @@ maxrep <- 100 #using the full replications is prohibitive
 
 SpecMat <- SpeciesMatrix(specnum = specnum, maxrep = maxrep)
 
-method = "av"
+method = "species_complementarity"
 
-compfunc <- func.names[1:3]
-
+spec_comp <- SpecComp(specnum = specnum, funcnum = funcnum,
+                     distribution = "rnorm", mean = 1, sd = 0.2,
+                     spec_compfunc = func.names[1:3])
 
 AvFunc <- AverageFunction(SpecMat, FuncMat,
                           method = method, 
-                          compfunc = compfunc)
+                          spec_comp = spec_comp)
 
-set.seed(563)
-errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
+# set.seed(563)
+# errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
 
 #add variance
-AvFunc[,func.names] <- AvFunc[,func.names] + errM
+#AvFunc[,func.names] <- AvFunc[,func.names] + errM
 
 # standardize functions 
 AvFunc_func <- AvFunc %>% 
@@ -93,90 +94,13 @@ AvFunc_func <- AvFunc %>%
 
 ```
 
-
 ```{r}
-
-
 AvFunc %>%
 mutate(meanFunction = rowMeans(.[,func.names])) %>% 
 ggplot(., aes(x = Richness, y = meanFunction))+
   geom_point()+
   geom_smooth()
 ```
-
-### Variable number of function - Multithreshold
-```{r}
-# empty dataframe to store results
-RES_func_multi <- tibble(thresholds = numeric(), 
-                   Estimate = numeric(), 
-                   nfunc = numeric(),
-                   func_comb = numeric())
-
-#loop over chosen subsets of all function of varying size
-for (i in c(ceiling(funcnum/3), 2*ceiling(funcnum/3), funcnum)) { 
-
-  # all poosibel combination of i out of funcnum functions
-  func_comb <- combn(func.names, i)
-  
-  # sample 50 random function combinations if more than 50 possible combinations
-  if(ncol(func_comb) > 50) {
-    func_comb <- func_comb[, sample(c(1:ncol(func_comb)), 50)]
-  }
-
-  #loop over all function combinations of size i
-  for ( k  in seq_len(ncol(func_comb))) { 
-    
-    # number of functions above threshold
-    mixedThresh <- getFuncsMaxed(AvFunc, func_comb[ ,k], threshmin=0.01,
-                                 threshmax=0.99, threshstep=0.05, prepend=c("Richness"), maxN=1)
-    # slopes  
-    mixedLinearSlopes<-getCoefTab(funcMaxed ~ Richness, fun = lm, 
-                                  data=mixedThresh, coefVar="Richness")
-    
-    colnames(mixedLinearSlopes) <- c("thresholds", "Estimate",
-                                     "Std. Error", "t value", "Pr(>|t|)")
-    
-    temp <- mixedLinearSlopes %>% 
-      select(thresholds, Estimate) %>% 
-      mutate(nfunc = i) %>% 
-      mutate(func_comb = k)
-    
-    RES_func_multi <- rbind(RES_func_multi, temp)
-  }
-  }
-
-```
-
-### Plot Multithreshold
-
-```{r, fig.height = 4, fig.width = 4}
-
-FUNC_multi <- RES_func_multi %>% 
-  group_by(thresholds, nfunc) %>% 
-  summarise(mean_Estimate = mean(Estimate),
-            CI_high = mean(Estimate) + 1.96 * (sd(Estimate)/sqrt(n())),
-            CI_low = mean(Estimate) - 1.96 * (sd(Estimate)/sqrt(n()))) %>% 
-ggplot(., aes(x=thresholds*100, y=mean_Estimate), size = 0.5, alpha = 0.3)+
-  geom_ribbon(aes(ymin = CI_low, ymax = CI_high, fill = as.factor(nfunc)), colour = NA, alpha = 0.4)+
-  geom_line( aes(colour = as.factor(nfunc)), lwd = 0.8) +
-  ylab("Slope estimate") + xlab("Threshold (%)") +
-  geom_abline(intercept=0, slope=0, lwd=0.5, linetype=2) + 
-  theme_bw(base_size=15)+
-  scale_fill_brewer(guide = FALSE, palette = "Set1")+
-  scale_color_brewer(guide = guide_legend(title = paste("Number of functions", 
-                                                        paste("(", specnum, " species)", 
-                                                              sep = ""), sep = "\n"),
-                                          nrow=2,byrow=TRUE),
-                     palette = "Set1")+
-  ggtitle("multiple thresholds") +
-  theme_classic()+
-  theme(legend.position = "bottom")+
-  #scale_y_continuous(limits = c(-0.45, 0.45))+
-  NULL
-  
-FUNC_multi
-```
-
 
 ### Variable number of function - Averaging
 
@@ -186,7 +110,7 @@ FUNC_multi
 ```{r}
 
 # empty dataframe to store results
-Slope_res_ave1 <- data.frame(Estimate = numeric(),
+Slope_res_ave <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
                         `t value` = numeric(),    
                         `Pr(>|t|)` = numeric(),
@@ -202,15 +126,22 @@ set.seed(999)
   if(l == 0) {
     method = "av"
   }  else {
-    method = "comp"
-    compfunc = func.names[1:l]
+    method = "species_complementarity"
+    spec_compfunc = func.names[1:l]
   }
 
-# draw function values and calculate mean function for all richness levels
-AvFunc <- AverageFunction(SpecMat, FuncMat,
-                          method = method, 
-                          compfunc = compfunc)
+# draw complementarity
+if(l > 0) {
+  set.seed(78956)
+spec_comp <- SpecComp(specnum = specnum, funcnum = funcnum,
+                     distribution = "rnorm", mean = 1, sd = 0.2,
+                     spec_compfunc = spec_compfunc)}
 
+# draw function values and calculate mean function for all richness levels  
+AvFunc <- AverageFunction(SpecMat, FuncMat,
+                          method = method,
+                          spec_comp = spec_comp)
+  
 set.seed(563)
 errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
 
@@ -245,10 +176,10 @@ for (i in seq_len(funcnum)) {
     est <- summary(mod)$coefficients[2,]
     
     # store results
-    Slope_res_ave1 <- data.frame(t(est)) %>% 
+    Slope_res_ave <- data.frame(t(est)) %>% 
       mutate(., nfunc = i) %>% 
       mutate(ncomp = l) %>% 
-      rbind(Slope_res_ave1, .)
+      rbind(Slope_res_ave, .)
   }
 }
 }
@@ -258,7 +189,7 @@ for (i in seq_len(funcnum)) {
 
 ### Plot 
 ```{r, warnings = F, fig.height= 4, fig.width= 4}
-plot_av1 <- Slope_res_ave1 %>% 
+plot_av <- Slope_res_ave %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
   geom_point(position = position_jitterdodge(jitter.width = 0.2, jitter.height = 0, dodge.width = 0.75),
@@ -272,11 +203,11 @@ plot_av1 <- Slope_res_ave1 %>%
  # scale_y_continuous(limits = c(NA, 0.038))+
   labs(y = "Slope estimate",
        x = "Number of functions considered")+
-  ggtitle("averaging method") +
+  ggtitle("Averaging method") +
   theme_classic()+
   theme(legend.position = "bottom")
   
- plot_av1 
+ plot_av 
 
 ```
 
@@ -286,7 +217,7 @@ plot_av1 <- Slope_res_ave1 %>%
 ```{r}
 
 # empty dataframe to store results
-Slope_res_pca1 <- data.frame(Estimate = numeric(),
+Slope_res_pca <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
                         `t value` = numeric(),    
                         `Pr(>|t|)` = numeric(),
@@ -302,15 +233,22 @@ set.seed(999)
   if(l == 0) {
     method = "av"
   }  else {
-    method = "comp"
-    compfunc = func.names[1:l]
+    method = "species_complementarity"
+    spec_compfunc = func.names[1:l]
   }
 
-# draw function values and calculate mean function for all richness levels
-AvFunc <- AverageFunction(SpecMat, FuncMat,
-                          method = method, 
-                          compfunc = compfunc)
+# draw complementarity
+if(l > 0) {
+  set.seed(78956)
+spec_comp <- SpecComp(specnum = specnum, funcnum = funcnum,
+                     distribution = "rnorm", mean = 1, sd = 0.2,
+                     spec_compfunc = spec_compfunc)}
 
+# draw function values and calculate mean function for all richness levels  
+AvFunc <- AverageFunction(SpecMat, FuncMat,
+                          method = method,
+                          spec_comp = spec_comp)
+  
 set.seed(563)
 errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
 
@@ -335,7 +273,7 @@ for (i in seq_len(funcnum)) {
   
     # calculate pca multifunc index
     AvFunc_temp <- pca_multifunc(AvFunc, vars = func_comb[ ,k]) 
-  
+    
     # fit linear model
     mod <- lm(multifunc_pca_ind ~ Richness, data = AvFunc_temp)
   
@@ -343,10 +281,10 @@ for (i in seq_len(funcnum)) {
     est <- summary(mod)$coefficients[2,]
     
     # store results
-    Slope_res_pca1 <- data.frame(t(est)) %>% 
+    Slope_res_pca <- data.frame(t(est)) %>% 
       mutate(., nfunc = i) %>% 
       mutate(ncomp = l) %>% 
-      rbind(Slope_res_pca1, .)
+      rbind(Slope_res_pca, .)
   }
 }
 }
@@ -356,7 +294,7 @@ for (i in seq_len(funcnum)) {
 
 ### Plot 
 ```{r, warnings = F, fig.height= 4, fig.width= 4}
-plot_pca1 <- Slope_res_pca1 %>% 
+plot_pca <- Slope_res_pca %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
   geom_point(position = position_jitterdodge(jitter.width = 0.2, jitter.height = 0, dodge.width = 0.75),
@@ -370,11 +308,11 @@ plot_pca1 <- Slope_res_pca1 %>%
   #scale_y_continuous(limits = c(NA, 0.038))+
   labs(y = "Slope estimate",
        x = "Number of functions considered")+
-  ggtitle("pca approach") +
+  ggtitle("PCA method")+
   theme_classic()+
   theme(legend.position = "bottom")
   
- plot_pca1 
+ plot_pca 
 
 ```
 
@@ -383,7 +321,7 @@ plot_pca1 <- Slope_res_pca1 %>%
 ```{r}
 
 # empty dataframe to store results
-Slope_res_sum1 <- data.frame(Estimate = numeric(),
+Slope_res_sum <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
                         `t value` = numeric(),    
                         `Pr(>|t|)` = numeric(),
@@ -399,15 +337,22 @@ set.seed(999)
   if(l == 0) {
     method = "av"
   }  else {
-    method = "comp"
-    compfunc = func.names[1:l]
+    method = "species_complementarity"
+    spec_compfunc = func.names[1:l]
   }
 
-# draw function values and calculate mean function for all richness levels
-AvFunc <- AverageFunction(SpecMat, FuncMat,
-                          method = method, 
-                          compfunc = compfunc)
+# draw complementarity
+if(l > 0) {
+  set.seed(78956)
+spec_comp <- SpecComp(specnum = specnum, funcnum = funcnum,
+                     distribution = "rnorm", mean = 1, sd = 0.2,
+                     spec_compfunc = spec_compfunc)}
 
+# draw function values and calculate mean function for all richness levels  
+AvFunc <- AverageFunction(SpecMat, FuncMat,
+                          method = method,
+                          spec_comp = spec_comp)
+  
 set.seed(563)
 errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
 
@@ -443,10 +388,10 @@ for (i in seq_len(funcnum)) {
     est <- summary(mod)$coefficients[2,]
     
     # store results
-    Slope_res_sum1 <- data.frame(t(est)) %>% 
+    Slope_res_sum <- data.frame(t(est)) %>% 
       mutate(., nfunc = i) %>% 
       mutate(ncomp = l) %>% 
-      rbind(Slope_res_sum1, .)
+      rbind(Slope_res_sum, .)
   }
 }
 }
@@ -456,7 +401,7 @@ for (i in seq_len(funcnum)) {
 
 ### Plot 
 ```{r, warnings = F, fig.height= 4, fig.width= 4}
-plot_sum1 <- Slope_res_sum1 %>% 
+plot_sum <- Slope_res_sum %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
   geom_point(position = position_jitterdodge(jitter.width = 0.2, jitter.height = 0, dodge.width = 0.75),
@@ -470,11 +415,11 @@ plot_sum1 <- Slope_res_sum1 %>%
   #scale_y_continuous(limits = c(NA, 0.038))+
   labs(y = "Slope estimate",
        x = "Number of functions considered")+
-  ggtitle("sum approach") +
+  ggtitle("Summing approach") +
   theme_classic()+
   theme(legend.position = "bottom")
   
- plot_sum1 
+ plot_sum
 
 ```
 
@@ -483,7 +428,7 @@ plot_sum1 <- Slope_res_sum1 %>%
 ```{r}
 
 # empty dataframe to store results
-Slope_res_hill1 <- data.frame(Estimate = numeric(),
+Slope_res_hill <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
                         `t value` = numeric(),    
                         `Pr(>|t|)` = numeric(),
@@ -499,15 +444,22 @@ set.seed(999)
   if(l == 0) {
     method = "av"
   }  else {
-    method = "comp"
-    compfunc = func.names[1:l]
+    method = "species_complementarity"
+    spec_compfunc = func.names[1:l]
   }
 
-# draw function values and calculate mean function for all richness levels
-AvFunc <- AverageFunction(SpecMat, FuncMat,
-                          method = method, 
-                          compfunc = compfunc)
+# draw complementarity
+if(l > 0) {
+  set.seed(78956)
+spec_comp <- SpecComp(specnum = specnum, funcnum = funcnum,
+                     distribution = "rnorm", mean = 1, sd = 0.2,
+                     spec_compfunc = spec_compfunc)}
 
+# draw function values and calculate mean function for all richness levels  
+AvFunc <- AverageFunction(SpecMat, FuncMat,
+                          method = method,
+                          spec_comp = spec_comp)
+  
 set.seed(563)
 errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
 
@@ -532,7 +484,7 @@ for (i in 2:funcnum) {
   
     # calculate sum of functions
     AvFunc_temp <- hill_multifunc(AvFunc, vars = func_comb[ ,k],
-                                  scale = 1, HILL = FALSE)
+                                  scale = 1, HILL = TRUE)
   
     # fit linear model
     mod <- lm(multifunc_effN ~ Richness, data = AvFunc_temp)
@@ -541,10 +493,10 @@ for (i in 2:funcnum) {
     est <- summary(mod)$coefficients[2,]
     
     # store results
-    Slope_res_hill1 <- data.frame(t(est)) %>% 
+    Slope_res_hill <- data.frame(t(est)) %>% 
       mutate(., nfunc = i) %>% 
       mutate(ncomp = l) %>% 
-      rbind(Slope_res_hill1, .)
+      rbind(Slope_res_hill, .)
   }
 }
 }
@@ -553,12 +505,12 @@ for (i in 2:funcnum) {
 
 ### Plot 
 ```{r, warnings = F, fig.height= 4, fig.width= 4}
-plot_hill1 <- Slope_res_hill1 %>% 
+plot_hill <- Slope_res_hill %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
   geom_point(position = position_jitterdodge(jitter.width = 0.2, jitter.height = 0, dodge.width = 0.75),
              alpha = 0.5, shape = 21)+
-  geom_smooth( se = F, size = 0.5, 
+  geom_smooth( se = F, size = 0.5, method ="lm",
               position = position_dodge(width = 0.5))+
   scale_color_brewer(guide = guide_legend(title = "Number of functions\nwith complementarity",
                                           nrow=2,byrow=TRUE),
@@ -567,13 +519,10 @@ plot_hill1 <- Slope_res_hill1 %>%
   #scale_y_continuous(limits = c(NA, 0.038))+
   labs(y = "Slope estimate",
        x = "Number of functions considered")+
-  ggtitle("hill approach") +
+  ggtitle("Hill number")+
   theme_classic()+
   theme(legend.position = "bottom")
   
- plot_hill1
+ plot_hill
 
 ```
-
-
-

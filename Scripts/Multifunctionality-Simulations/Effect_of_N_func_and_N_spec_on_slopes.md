@@ -2,7 +2,7 @@ Effect of varying number of functions and species on the slope of the
 multithreshold and the averaging approach
 ================
 Fabian Roger
-2019-09-01
+2019-09-06
 
 This script produces:
 
@@ -53,12 +53,12 @@ otherwise the computation becomes tedious.
 ``` r
 set.seed(777)
 
-specnum <- 15
-funcnum <- 9
+specnum <- 10
+funcnum <- 10
 
 distribution = "runif"
 
-FuncMat <- FunctionValue(specnum,funcnum, distribution, min = 0, max = 1)
+FuncMat <- FunctionValue(specnum,funcnum, distribution, min = 0.1, max = 0.9)
 
 func.names <- as.character( unique( FuncMat$Functions))
 spec.names <- as.character( unique( FuncMat$Species))
@@ -70,11 +70,18 @@ SpecMat <- SpeciesMatrix(specnum = specnum, maxrep = maxrep)
 
 method = "av"
 
+compfunc <- func.names[1:3]
+
+
 AvFunc <- AverageFunction(SpecMat, FuncMat,
                           method = method, 
-                          CF = CF, 
-                          compfunc = compfunc,
-                          r = r)
+                          compfunc = compfunc)
+
+set.seed(563)
+errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
+
+#add variance
+AvFunc[,func.names] <- AvFunc[,func.names] + errM
 
 # standardize functions 
 AvFunc_func <- AvFunc %>% 
@@ -82,11 +89,23 @@ AvFunc_func <- AvFunc %>%
   #mutate_at(vars(one_of(func.names)), function(x) {(x - min(x)) / (max(x) - min(x))})
 ```
 
+``` r
+AvFunc %>%
+mutate(meanFunction = rowMeans(.[,func.names])) %>% 
+ggplot(., aes(x = Richness, y = meanFunction))+
+  geom_point()+
+  geom_smooth()
+```
+
+    ## `geom_smooth()` using method = 'loess' and formula 'y ~ x'
+
+![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+
 ### Variable number of function - Multithreshold
 
 ``` r
 # empty dataframe to store results
-RES_func <- tibble(thresholds = numeric(), 
+RES_func_multi <- tibble(thresholds = numeric(), 
                    Estimate = numeric(), 
                    nfunc = numeric(),
                    func_comb = numeric())
@@ -120,7 +139,7 @@ for (i in c(ceiling(funcnum/3), 2*ceiling(funcnum/3), funcnum)) {
       mutate(nfunc = i) %>% 
       mutate(func_comb = k)
     
-    RES_func <- rbind(RES_func, temp)
+    RES_func_multi <- rbind(RES_func_multi, temp)
   }
   }
 ```
@@ -128,7 +147,7 @@ for (i in c(ceiling(funcnum/3), 2*ceiling(funcnum/3), funcnum)) {
 ### Plot Multithreshold
 
 ``` r
-FUNC <- RES_func %>% 
+FUNC_multi <- RES_func_multi %>% 
   group_by(thresholds, nfunc) %>% 
   summarise(mean_Estimate = mean(Estimate),
             CI_high = mean(Estimate) + 1.96 * (sd(Estimate)/sqrt(n())),
@@ -145,15 +164,16 @@ ggplot(., aes(x=thresholds*100, y=mean_Estimate), size = 0.5, alpha = 0.3)+
                                                               sep = ""), sep = "\n"),
                                           nrow=2,byrow=TRUE),
                      palette = "Set1")+
+  ggtitle("multiple thresholds") +
   theme_classic()+
   theme(legend.position = "bottom")+
   #scale_y_continuous(limits = c(-0.45, 0.45))+
   NULL
   
-FUNC
+FUNC_multi
 ```
 
-![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 ### Variable number of function - Averaging
 
@@ -161,7 +181,7 @@ FUNC
 
 ``` r
 # empty dataframe to store results
-Slope_res <- data.frame(Estimate = numeric(),
+Slope_res_ave1 <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
                         `t value` = numeric(),    
                         `Pr(>|t|)` = numeric(),
@@ -185,6 +205,12 @@ set.seed(999)
 AvFunc <- AverageFunction(SpecMat, FuncMat,
                           method = method, 
                           compfunc = compfunc)
+
+set.seed(563)
+errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
+
+#add variance
+AvFunc[,func.names] <- AvFunc[,func.names] + errM
 
 # standardize functions
 AvFunc <- AvFunc %>% 
@@ -214,10 +240,10 @@ for (i in seq_len(funcnum)) {
     est <- summary(mod)$coefficients[2,]
     
     # store results
-    Slope_res <- data.frame(t(est)) %>% 
+    Slope_res_ave1 <- data.frame(t(est)) %>% 
       mutate(., nfunc = i) %>% 
       mutate(ncomp = l) %>% 
-      rbind(Slope_res, .)
+      rbind(Slope_res_ave1, .)
   }
 }
 }
@@ -226,7 +252,7 @@ for (i in seq_len(funcnum)) {
 ### Plot
 
 ``` r
-plot_av <- Slope_res %>% 
+plot_av1 <- Slope_res_ave1 %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
   geom_point(position = position_jitterdodge(jitter.width = 0.2, jitter.height = 0, dodge.width = 0.75),
@@ -240,23 +266,24 @@ plot_av <- Slope_res %>%
  # scale_y_continuous(limits = c(NA, 0.038))+
   labs(y = "Slope estimate",
        x = "Number of functions considered")+
+  ggtitle("averaging method") +
   theme_classic()+
   theme(legend.position = "bottom")
   
- plot_av 
+ plot_av1 
 ```
 
-    ## `geom_smooth()` using method = 'loess' and formula 'y ~ x'
+    ## `geom_smooth()` using method = 'gam' and formula 'y ~ s(x, bs = "cs")'
 
     ## Warning: position_dodge requires non-overlapping x intervals
 
-![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
 ### Variable number of function - PCA multifunc
 
 ``` r
 # empty dataframe to store results
-Slope_res <- data.frame(Estimate = numeric(),
+Slope_res_pca1 <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
                         `t value` = numeric(),    
                         `Pr(>|t|)` = numeric(),
@@ -280,6 +307,12 @@ set.seed(999)
 AvFunc <- AverageFunction(SpecMat, FuncMat,
                           method = method, 
                           compfunc = compfunc)
+
+set.seed(563)
+errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
+
+#add variance
+AvFunc[,func.names] <- AvFunc[,func.names] + errM
 
 # standardize functions
 AvFunc <- AvFunc %>% 
@@ -307,10 +340,10 @@ for (i in seq_len(funcnum)) {
     est <- summary(mod)$coefficients[2,]
     
     # store results
-    Slope_res <- data.frame(t(est)) %>% 
+    Slope_res_pca1 <- data.frame(t(est)) %>% 
       mutate(., nfunc = i) %>% 
       mutate(ncomp = l) %>% 
-      rbind(Slope_res, .)
+      rbind(Slope_res_pca1, .)
   }
 }
 }
@@ -319,7 +352,7 @@ for (i in seq_len(funcnum)) {
 ### Plot
 
 ``` r
-plot_pca <- Slope_res %>% 
+plot_pca1 <- Slope_res_pca1 %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
   geom_point(position = position_jitterdodge(jitter.width = 0.2, jitter.height = 0, dodge.width = 0.75),
@@ -333,23 +366,24 @@ plot_pca <- Slope_res %>%
   #scale_y_continuous(limits = c(NA, 0.038))+
   labs(y = "Slope estimate",
        x = "Number of functions considered")+
+  ggtitle("pca approach") +
   theme_classic()+
   theme(legend.position = "bottom")
   
- plot_pca 
+ plot_pca1 
 ```
 
-    ## `geom_smooth()` using method = 'loess' and formula 'y ~ x'
+    ## `geom_smooth()` using method = 'gam' and formula 'y ~ s(x, bs = "cs")'
 
     ## Warning: position_dodge requires non-overlapping x intervals
 
-![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 ### Variable number of function - Sum multifunc
 
 ``` r
 # empty dataframe to store results
-Slope_res <- data.frame(Estimate = numeric(),
+Slope_res_sum1 <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
                         `t value` = numeric(),    
                         `Pr(>|t|)` = numeric(),
@@ -373,6 +407,12 @@ set.seed(999)
 AvFunc <- AverageFunction(SpecMat, FuncMat,
                           method = method, 
                           compfunc = compfunc)
+
+set.seed(563)
+errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
+
+#add variance
+AvFunc[,func.names] <- AvFunc[,func.names] + errM
 
 # standardize functions
 AvFunc <- AvFunc %>% 
@@ -403,10 +443,10 @@ for (i in seq_len(funcnum)) {
     est <- summary(mod)$coefficients[2,]
     
     # store results
-    Slope_res <- data.frame(t(est)) %>% 
+    Slope_res_sum1 <- data.frame(t(est)) %>% 
       mutate(., nfunc = i) %>% 
       mutate(ncomp = l) %>% 
-      rbind(Slope_res, .)
+      rbind(Slope_res_sum1, .)
   }
 }
 }
@@ -415,7 +455,7 @@ for (i in seq_len(funcnum)) {
 ### Plot
 
 ``` r
-plot_pca <- Slope_res %>% 
+plot_sum1 <- Slope_res_sum1 %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
   geom_point(position = position_jitterdodge(jitter.width = 0.2, jitter.height = 0, dodge.width = 0.75),
@@ -429,23 +469,24 @@ plot_pca <- Slope_res %>%
   #scale_y_continuous(limits = c(NA, 0.038))+
   labs(y = "Slope estimate",
        x = "Number of functions considered")+
+  ggtitle("sum approach") +
   theme_classic()+
   theme(legend.position = "bottom")
   
- plot_pca 
+ plot_sum1 
 ```
 
-    ## `geom_smooth()` using method = 'loess' and formula 'y ~ x'
+    ## `geom_smooth()` using method = 'gam' and formula 'y ~ s(x, bs = "cs")'
 
     ## Warning: position_dodge requires non-overlapping x intervals
 
-![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 ### Variable number of function - Hill multifunc
 
 ``` r
 # empty dataframe to store results
-Slope_res <- data.frame(Estimate = numeric(),
+Slope_res_hill1 <- data.frame(Estimate = numeric(),
                         `Std. Error` = numeric(),
                         `t value` = numeric(),    
                         `Pr(>|t|)` = numeric(),
@@ -470,6 +511,12 @@ AvFunc <- AverageFunction(SpecMat, FuncMat,
                           method = method, 
                           compfunc = compfunc)
 
+set.seed(563)
+errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
+
+#add variance
+AvFunc[,func.names] <- AvFunc[,func.names] + errM
+
 # standardize functions
 AvFunc <- AvFunc %>% 
   select(Richness, one_of(func.names)) %>% 
@@ -487,7 +534,8 @@ for (i in 2:funcnum) {
   for ( k  in seq_len(ncol(func_comb))) { 
   
     # calculate sum of functions
-    AvFunc_temp <- hill_multifunc(AvFunc, vars = func_comb[ ,k], scale = 1)
+    AvFunc_temp <- hill_multifunc(AvFunc, vars = func_comb[ ,k],
+                                  scale = 1, HILL = FALSE)
   
     # fit linear model
     mod <- lm(multifunc_effN ~ Richness, data = AvFunc_temp)
@@ -496,10 +544,10 @@ for (i in 2:funcnum) {
     est <- summary(mod)$coefficients[2,]
     
     # store results
-    Slope_res <- data.frame(t(est)) %>% 
+    Slope_res_hill1 <- data.frame(t(est)) %>% 
       mutate(., nfunc = i) %>% 
       mutate(ncomp = l) %>% 
-      rbind(Slope_res, .)
+      rbind(Slope_res_hill1, .)
   }
 }
 }
@@ -508,7 +556,7 @@ for (i in 2:funcnum) {
 ### Plot
 
 ``` r
-plot_hill <- Slope_res %>% 
+plot_hill1 <- Slope_res_hill1 %>% 
   filter(ncomp %in% c(0,ceiling(funcnum/3),2*ceiling(funcnum/3),funcnum)) %>% 
   ggplot(aes(x = nfunc, y = Estimate, colour = as.factor(ncomp)))+
   geom_point(position = position_jitterdodge(jitter.width = 0.2, jitter.height = 0, dodge.width = 0.75),
@@ -522,14 +570,16 @@ plot_hill <- Slope_res %>%
   #scale_y_continuous(limits = c(NA, 0.038))+
   labs(y = "Slope estimate",
        x = "Number of functions considered")+
+  ggtitle("hill approach") +
   theme_classic()+
   theme(legend.position = "bottom")
   
- plot_hill
+ plot_hill1
 ```
 
-    ## `geom_smooth()` using method = 'loess' and formula 'y ~ x'
+    ## `geom_smooth()` using method = 'gam' and formula 'y ~ s(x, bs = "cs")'
 
-    ## Warning: position_dodge requires non-overlapping x intervals
+    ## Warning: Computation failed in `stat_smooth()`:
+    ## x has insufficient unique values to support 10 knots: reduce k.
 
-![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+![](Effect_of_N_func_and_N_spec_on_slopes_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
