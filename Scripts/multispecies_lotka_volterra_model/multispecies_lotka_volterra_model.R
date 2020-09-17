@@ -219,6 +219,7 @@ mf_sim_dat %>%
 
 # write this into a .csv file
 library(readr)
+library(here)
 
 readr::write_csv(x = mf_sim_dat,
                  path = here("/Scripts/multispecies_lotka_volterra_model/lv_mf_sim_dat.csv"))
