@@ -65,7 +65,7 @@ manning_multifunc <- function(adf, vars,
             
             y <- z/max(z)
             
-            (ifelse(y > thresh, 1, 0))
+            ifelse(y > thresh, 1, 0)
             
           } )
   
@@ -129,15 +129,6 @@ manning_multifunc(adf = AvFunc,
                   met = "ward.D2",
                   dis = "euclidean",
                   thresh = 0.5)
-
-
-
-
-
-
-
-
-
 
 
 
