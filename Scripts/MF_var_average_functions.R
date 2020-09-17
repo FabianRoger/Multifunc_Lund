@@ -1,16 +1,16 @@
 
 # function to calculate three multifunctionality metric proposed in the literature:
-# (1) Pasari et al. (2013) multifunctionality metric
-# (2) Dooley (2018) Scaled Average Multifunctionality (SAM)
-# (3) Jing et al. (2020) Scaling Mulifunctionality Metric
+# Pasari et al. (2013) multifunctionality metric
+# Dooley (2018) Scaled Average Multifunctionality (SAM)
+# Jing et al. (2020) Scaling Mulifunctionality Metric
 
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
 # stand is the method of standardisation. Two methods are supported: (1) z-score standardisation ("z_score") and (2) by the maximum ("max")
 # metric is the metric to be calculated: there are (3) options to choose from:
-# (1) Jing et al. (2020) : "scaling_mf"
-# (2) Pasari et al. (2013): "unique_mf"
-# (3) Dooley (2018): "sam_mf"
+# 1. Jing et al. (2020) : "scaling_mf"
+# 2. Pasari et al. (2013): "unique_mf"
+# 3. Dooley (2018): "sam_mf"
 
 MF_scale_funcs <- function(adf, vars, 
                            stand = "z_score", 
@@ -18,6 +18,7 @@ MF_scale_funcs <- function(adf, vars,
   
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars] 
+  
   
   # standardise the functions using: (1) the z-score ("z_score") or (2) by the maximum ("max")
   
@@ -36,6 +37,8 @@ MF_scale_funcs <- function(adf, vars,
     
   }
   
+  
+  # calculate the multifunctionality metric
   
   if (metric == "scaling_mf") {
     
@@ -65,11 +68,6 @@ MF_scale_funcs <- function(adf, vars,
   
 }
 
-
-# test this function on simulated data
-MF_scale_funcs(adf = AvFunc, vars = func.names, 
-              stand = "max", 
-              metric = "sam_mf")
 
 
 
