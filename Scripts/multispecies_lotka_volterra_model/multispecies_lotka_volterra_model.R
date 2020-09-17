@@ -192,19 +192,36 @@ s_l_2010_mod(reg_pool = 30,
 
 # generate a sample dataset to use in multifunctionality simulations
 mf_sim_dat <- 
-  s_l_2010_mod(reg_pool = 12,
-               t_steps = 100, 
+  s_l_2010_mod(reg_pool = 20,
+               t_steps = 500, 
                n0 = 3,
                a_mean = 1, a_sd = 0.2, a_min = 0.2, a_max = 1.2, a_spp = 1,
                k_min = 3, k_max = 150,
                r_min = 0.01, r_max = 0.5, 
-               lsp = c(2, 4, 6, 8, 10),
-               reps = 20)
+               lsp = c(1, 2, 4, 6, 8, 10),
+               reps = 10)
 
+# how many species are there?
+mf_sim_dat$species %>%
+  unique() %>%
+  length()
 
+# plot the relationship between biodiversity and ecosystem function
+mf_sim_dat %>%
+  filter(time == last(time) ) %>%
+  group_by(replicate, species_pool) %>%
+  summarise(biomass = sum(abundance)) %>%
+  ggplot(data = .,
+         mapping = aes(x = species_pool, y = biomass)) +
+  geom_point() +
+  geom_smooth() +
+  theme_classic()
 
+# write this into a .csv file
+library(readr)
 
-
+readr::write_csv(x = mf_sim_dat,
+                 path = here("/Scripts/multispecies_lotka_volterra_model/lv_mf_sim_dat.csv"))
 
 
 
