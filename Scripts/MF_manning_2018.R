@@ -1,7 +1,7 @@
 
 # function to calculate multifunctionality as proposed by Manning et al. (2018, Nature Ecology and Evolution)
 
-# adf, is dataframe with plots in rows, and functions in columns
+# adf is a dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
 # ind is the index used to determine the optimal number of clusters using NbClust function (if multiple are included, the median of all of them is used)
 # met is the method used for clustering. This functions supports all methods in hclust() besides "kmeans"
