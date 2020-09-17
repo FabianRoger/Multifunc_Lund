@@ -52,27 +52,72 @@ AvFunc_func <-
 # get a matrix of functions
 func_matrix <- AvFunc_func[ , func.names]
 
+
 # cluster analysis of the functions
+
+# first, we transpose the data matrix because we want to examine similarity among functions
 func_matrix_inv <- as.data.frame(t((func_matrix[ , ])))
 
-d <- dist(func_matrix_inv, method = "euclidean")
+# create a distance matrix of the functions
+func_dist <- dist(func_matrix_inv, method = "euclidean")
 
-dendrogram <- hclust(d, method = "complete" )
+# we can plot these in a dendrogram
 
-grp <- cutree(dendrogram, k = 4)
-grp
+# start the function
 
-NbClust(diss = d, distance = NULL, min.nc = 2, max.nc = 9, 
-        method = "complete", index = "mcclain")
+# can use any method except: "kmeans" as this requires all the data
 
-NbClust(diss = d, distance = NULL, min.nc = 2, max.nc = 9, 
-        method = "ward.D2", index = "cindex")
+# index = "frey" doesn't work for some reason
 
-NbClust(diss = d, distance = NULL, min.nc = 2, max.nc = 9, 
-        method = "ward.D2", index = "silhouette")
 
-NbClust(diss = d, distance = NULL, min.nc = 2, max.nc = 9, 
-        method = "ward.D2", index = "dunn")
+adf <- func_matrix
+
+vars <- names(func_matrix)
+
+ind <- c("mcclain", "cindex", "silhouette", "dunn")
+
+met <- "ward.D2"
+
+dis <- "euclidean"
+
+
+# get functions from the adf matrix
+adf_mat <- adf[, vars]
+
+# transpose the adf_mat data
+adf_mat_t <- as.data.frame(t((adf_mat[ , ])))
+
+# generate a dissimilarity matrix from adf_mat_t
+adf_dist <- dist(adf_mat_t, method = dis)
+
+# use the dissimilarity matrix to determine optimum group number for cluster analysis
+
+opt_clus <- vector(length = length(ind))
+  
+for(i in 1:length(ind)) {
+  
+  x <- NbClust(diss = adf_dist, 
+               distance = NULL, 
+               min.nc = 2, max.nc = (ncol(adf_mat) - 1), 
+               method = met, index = ind[i])
+  
+  opt_clus[i] <- x$Best.nc[1]
+  
+}
+
+clus_n <- round(x = median(opt_clus), digits = 0)
+
+adf_den <- hclust(func_dist, method = met )
+
+adf_groups <- cutree(adf_den, k = clus_n)
+adf_groups
+
+# function loadings
+func_loads <- 
+  unlist(lapply(adf_groups, FUN = function(x) { ( (1)/length(adf_groups[adf_groups == x]) ) } ))
+
+
+
 
 
 
