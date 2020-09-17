@@ -13,14 +13,18 @@ vars <- func.names
 
 stand <- "z_score"
 
+
+### start the function
+
 # extract functions from input matrix: adf
 adf_mat <- adf[, vars] 
+
 
 # standardise the functions using: (1) the z-score ("z_score") or (2) by the maximum ("max")
 
 if (stand == "z_score") {
   
-  adf_mat <- as.matrix(scale(x = adf_mat, center = FALSE, scale = TRUE))
+  adf_mat <- as.matrix(scale(x = adf_mat, center = TRUE, scale = TRUE))
   
 } else if (stand == "max") {
   
@@ -34,8 +38,15 @@ if (stand == "z_score") {
   }
 
 
+# Jing et al. (2020, Journal of Plant Ecology): Scaling Multifunctionality Metric
 
+scale(rowSums(adf_mat), center = TRUE, scale = TRUE)[1:5] 
 
+# Pasari et al. (2013, Proceedings of the National Academy of Sciences: Unique Multifunctionality Metric
+
+apply(adf_mat, MARGIN = 1, function(x) mean(x) ) - apply(adf_mat, MARGIN = 1, function(x) sd(x) )
+
+# Dooley (2018): Scaled Average Multifunctionality
 
 
 
