@@ -9,23 +9,6 @@ library(gtools)
 library(tidyr)
 library(truncnorm)
 
-# create customised plotting theme
-theme_meta <- function(base_size = 12, base_family = "") {
-  theme(panel.background =  element_rect(fill = "white"), 
-        panel.border =      element_rect(fill="NA", color="black", size=0.75, linetype="solid"),
-        axis.line.x = element_line(color="black", size = 0.2),
-        axis.line.y = element_line(color="black", size = 0.2),
-        panel.grid.major =  element_blank(),
-        panel.grid.minor =  element_blank(),
-        axis.ticks.length = unit(-0.16, "cm"),
-        axis.title.x = element_text(colour ="black", size = 12, face = "plain", margin=margin(5,0,0,0,"pt")),
-        axis.title.y = element_text(colour = "black", size = 12, face = "plain", margin=margin(0,5,0,0,"pt")),
-        axis.text.x = element_text(colour = "black", size=12, face = "plain",  margin=margin(10,0,0,0,"pt")),
-        axis.text.y = element_text(colour ="black", size=12, face = "plain", margin=margin(0,10,0,0,"pt")),
-        axis.ticks.x = element_line(colour = "black", size = 0.4),
-        axis.ticks.y = element_line(colour = "black", size = 0.4))
-}
-
 
 ### code the Stachova and Leps (2010) simulation model (function = s_l_2010_mod)
 
@@ -158,7 +141,7 @@ s_l_2010_mod <- function(reg_pool = 100,
       
       # collapse this into a dataframe
       df_n_t <- as.data.frame(do.call(rbind, n_t))
-      names(df_n_t) <- paste("sp_", 1:lsp[s])
+      names(df_n_t) <- paste0("sp_", sp_sub)
       
       # add a column for the time-point
       df_n_t$time <- seq(from = 1, to = t_steps, by = 1)
@@ -169,17 +152,20 @@ s_l_2010_mod <- function(reg_pool = 100,
         tidyr::pivot_longer(cols = starts_with(match = "sp_"),
                             names_to = "species",
                             values_to = "abundance") %>%
-        dplyr::arrange(time, species)
+        dplyr::arrange(time, species) %>%
+        dplyr::mutate(species_pool = lsp[s]) %>%
+        dplyr::select(species_pool, species, time, abundance) %>%
+        dplyr::arrange(species_pool, species, time)
       
-      # summarise these data
-      n_t_sum <- 
-        df_n_t %>%
-        dplyr::group_by(time) %>%
-        dplyr::summarise(realised_richness = sum(dplyr::if_else(abundance > 0, 1, 0)),
-                         community_biomass = sum(abundance), .groups = "drop") %>%
-        dplyr::mutate(species_pool = lsp[s])
+      # summarise these data (we want to keep the individual species abundances at each time-step for these data)
+      # n_t_sum <- 
+        # df_n_t %>%
+        # dplyr::group_by(time) %>%
+        # dplyr::summarise(realised_richness = sum(dplyr::if_else(abundance > 0, 1, 0)),
+                         #community_biomass = sum(abundance), .groups = "drop") %>%
+        # dplyr::mutate(species_pool = lsp[s])
       
-      lsp_out[[s]] <- n_t_sum
+      lsp_out[[s]] <- df_n_t
       
     }
     
@@ -194,14 +180,32 @@ s_l_2010_mod <- function(reg_pool = 100,
 
 # test this function
 
-s_l_2010_mod(reg_pool = 100,
+s_l_2010_mod(reg_pool = 30,
              t_steps = 10, 
              n0 = 3,
              a_mean = 1, a_sd = 0.2, a_min = 0.2, a_max = 1.2, a_spp = 1,
              k_min = 3, k_max = 150,
              r_min = 0.01, r_max = 0.5, 
-             lsp = c(10, 20, 30, 40, 50, 60),
+             lsp = c(2, 4, 6, 8, 10),
              reps = 10)
+
+
+# generate a sample dataset to use in multifunctionality simulations
+mf_sim_dat <- 
+  s_l_2010_mod(reg_pool = 12,
+               t_steps = 100, 
+               n0 = 3,
+               a_mean = 1, a_sd = 0.2, a_min = 0.2, a_max = 1.2, a_spp = 1,
+               k_min = 3, k_max = 150,
+               r_min = 0.01, r_max = 0.5, 
+               lsp = c(2, 4, 6, 8, 10),
+               reps = 20)
+
+
+
+
+
+
 
 
 
