@@ -14,8 +14,6 @@ library(here)
 lv_dat <- 
   read_csv(file = here("Scripts/multispecies_lotka_volterra_model/lv_mf_sim_dat.csv"))
 
-View(lv_dat)
-
 # check dimensions of the data
 nrow(lv_dat)
 
@@ -63,6 +61,9 @@ bio_funcs <-
   group_by(replicate, species_pool) %>%
   summarise( across(.cols = c("abundance", func_names) , ~sum(.) ), .groups = "drop" )
 
+bio_funcs %>%
+  select(abundance, contains("F")) %>%
+  cor()
 
 
 
