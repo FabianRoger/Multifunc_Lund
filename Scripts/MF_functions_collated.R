@@ -34,8 +34,8 @@ hill_multifunc <- function(adf, vars, scale = 1, HILL = TRUE){
   if(!HILL) effN <- effN/length(vars)
   meanFunc <- rowMeans(adf_mat) 
   
-  adf$multifunc_effN <-  effN*meanFunc
-  return(adf)
+  multifunc_effN <-  effN*meanFunc
+  return(multifunc_effN)
   
 }
 
@@ -116,9 +116,9 @@ manning_multifunc <- function(adf, vars,
   adf_thres <- sweep(adf_thres, MARGIN = 2, func_loads, `*`)
   
   # add the multifunctionality score to the input data
-  adf$manning_mf <-  rowSums(adf_thres)/ncol(adf_mat)
+  manning_mf <-  rowSums(adf_thres)/ncol(adf_mat)
   
-  return(adf)
+  return(manning_mf)
   
 }
 
@@ -146,8 +146,8 @@ pca_multifunc <- function(adf, vars, standardise = FALSE){
   eig<-summary(pca2)$cont$importance[1,]
   for(i in 1:length(eig)) temp2[,i] <- temp2[,i] * eig[i]
   Index.wt <- rowSums(temp2)
-  adf$multifunc_pca_ind <-  Index.wt
-  return(adf)
+  multifunc_pca_ind <-  Index.wt
+  return(multifunc_pca_ind)
   
 }
 
@@ -185,9 +185,9 @@ MF_pasari <- function(adf, vars, stand = "none") {
     
   }
   
-  adf$mf_pasari <- apply(adf_mat, MARGIN = 1, function(x) mean(x) ) - apply(adf_mat, MARGIN = 1, function(x) sd(x) ) 
+  mf_pasari <- apply(adf_mat, MARGIN = 1, function(x) mean(x) ) - apply(adf_mat, MARGIN = 1, function(x) sd(x) ) 
   
-  return(adf)
+  return(mf_pasari)
   
 }
 
@@ -225,9 +225,9 @@ MF_dooley <- function(adf, vars, stand = "none") {
     
   }
   
-  adf$mf_dooley <- apply(adf_mat, MARGIN = 1, function(x) mean(x) )/apply(adf_mat, MARGIN = 1, function(x) sd(x) )
+  mf_dooley <- apply(adf_mat, MARGIN = 1, function(x) mean(x) )/apply(adf_mat, MARGIN = 1, function(x) sd(x) )
   
-  return(adf)
+  return(mf_dooley)
   
 }
 
@@ -265,66 +265,8 @@ MF_jing <- function(adf, vars, stand = "none") {
     
   }
   
-  adf$mf_jing <- as.numeric(scale(rowSums(adf_mat), center = TRUE, scale = TRUE))
+  mf_jing <- as.numeric(scale(rowSums(adf_mat), center = TRUE, scale = TRUE))
   
-  return(adf) 
+  return(mf_jing) 
   
 }
-
-
-# test these functions
-
-# generate the simulated data
-set.seed(777)
-specnum <- 10
-funcnum <- 10
-distribution = "runif"
-FuncMat <- FunctionValue(specnum,funcnum, distribution, min = 0.1, max = 0.9)
-func.names <- as.character( unique( FuncMat$Functions))
-spec.names <- as.character( unique( FuncMat$Species))
-maxrep <- 100 
-SpecMat <- SpeciesMatrix(specnum = specnum, maxrep = maxrep)
-method = "av"
-compfunc <- func.names[1:3]
-AvFunc <- AverageFunction(SpecMat, FuncMat,
-                          method = method, 
-                          compfunc = compfunc)
-set.seed(563)
-errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
-AvFunc[,func.names] <- AvFunc[,func.names] + errM
-
-# simulated dataset
-AvFunc
-
-
-# Hill approach
-hill_multifunc(adf = AvFunc, vars = func.names, scale = 1, HILL = TRUE)
-
-# Manning approach
-manning_multifunc(adf = AvFunc, vars = func.names, 
-                  ind = c("mcclain", "cindex", "silhouette", "dunn"), 
-                  met = "ward.D2",
-                  dis = "euclidean",
-                  thresh = 0.5)
-
-# Meyer approach
-pca_multifunc(adf = AvFunc, vars = func.names, standardise = FALSE)
-
-# Pasari approach 
-MF_pasari(adf = AvFunc, vars = func.names, stand = "none")
-
-# Dooley approach
-MF_dooley(adf = AvFunc, vars = func.names, stand = "max") 
-
-# Jing approach
-MF_jing(adf = AvFunc, vars = func.names, stand = "max") 
-
-
-
-
-
-
-
-
-
-
