@@ -312,7 +312,7 @@ MF_av <- function(adf, vars) {
 
 # note that I re-wrote the functions below in order to not rely on plyr
 
-getFuncMaxed <- function(adf, vars = NA, thresh = 0.7, prepend = "Diversity", maxN = 1){
+single_threshold_mf <- function(adf, vars = NA, thresh = 0.7, prepend = "Diversity", maxN = 1){
   
   if(is.na(vars)[1]) stop("You need to specify some response variable names")
   
