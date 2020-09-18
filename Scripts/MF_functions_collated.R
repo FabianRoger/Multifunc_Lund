@@ -302,6 +302,37 @@ MF_av <- function(adf, vars) {
 }
 
 
+# single threshold approach
+
+# The function below taken from the multifunc package and written by Jarret Byrnes (https://github.com/jebyrnes/multifunc)
+
+# They are included here in a modified form as 
+# 1) the package is not available on CRAN for the moment
+# 2) the package loads plyr which conflicts with dplyr if loaded afterwards
+
+# note that I re-wrote the functions below in order to not rely on plyr
+
+getFuncMaxed <- function(adf, vars = NA, thresh = 0.7, prepend = "Diversity", maxN = 1){
+  
+  if(is.na(vars)[1]) stop("You need to specify some response variable names")
+  
+  getMaxValue <- function(x){
+    l <- length(x)    
+    mean( sort(x, na.last=F)[l:(l-maxN+1)], na.rm=T)
+  }
+  
+  funcMaxed <- rowSums(apply(adf[,which(names(adf)%in%vars)], 2, function(x) x >= thresh*getMaxValue(x)))
+  
+  funcMaxed
+  
+}
+
+
+
+
+
+
+
 
 
 
