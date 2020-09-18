@@ -270,3 +270,33 @@ MF_jing <- function(adf, vars, stand = "none") {
   return(mf_jing) 
   
 }
+
+
+# summing method
+MF_sum <- function(adf, vars) {
+  
+  adf_mat <- adf[, vars]
+  
+  mf_sum <- rowSums(adf_mat)
+  
+  return(mf_sum)
+  
+}
+
+# average method
+MF_av <- function(adf, vars) {
+  
+  adf_mat <- adf[, vars]
+  
+  mf_av <- rowSums(adf_mat)/length(vars)
+  
+  return(mf_av)
+  
+}
+
+
+
+
+
+
+
