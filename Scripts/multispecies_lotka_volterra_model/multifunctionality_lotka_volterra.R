@@ -9,6 +9,7 @@ library(readr)
 library(tidyr)
 library(ggplot2)
 library(here)
+library(corrplot)
 
 # load the Lotka-Volterra simulated data
 lv_dat <- 
@@ -36,7 +37,8 @@ Funcs <-
   dimnames = list(sp_names, func_names))
 
 # fill this empty data matrix with values from the uniform distribution
-Funcs[1:nrow(Funcs), 1:ncol(Funcs)] <- runif( n = prod( dim( Funcs ) ), 0, 1 )
+Funcs[1:nrow(Funcs), 1:ncol(Funcs)] <- 
+  runif( n = prod( dim( Funcs ) ), 0, 1 )
 
 # convert the Funcs data to a dataframe
 Funcs <- as.data.frame(Funcs)
@@ -44,9 +46,6 @@ Funcs <- as.data.frame(Funcs)
 # add a species column
 Funcs$species <- row.names(Funcs)
 row.names(Funcs) <- NULL
-
-# View the Funcs data
-View(Funcs)
 
 
 # extract the abundance of each species in the last time point
@@ -59,11 +58,17 @@ bio_funcs <-
             by = "species") %>%
   mutate( across(.cols = func_names, ~(.*abundance) ) ) %>%
   group_by(replicate, species_pool) %>%
-  summarise( across(.cols = c("abundance", func_names) , ~sum(.) ), .groups = "drop" )
+  summarise( across(.cols = c("abundance", all_of(func_names) ) , ~sum(.) ), .groups = "drop" )
 
 bio_funcs %>%
   select(abundance, contains("F")) %>%
-  cor()
+  cor() %>%
+  corrplot(method = "ellipse")
+
+
+
+
+
 
 
 
