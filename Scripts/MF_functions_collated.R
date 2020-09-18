@@ -116,7 +116,7 @@ manning_multifunc <- function(adf, vars,
   adf_thres <- sweep(adf_thres, MARGIN = 2, func_loads, `*`)
   
   # add the multifunctionality score to the input data
-  manning_mf <-  rowSums(adf_thres)/ncol(adf_mat)
+  manning_mf <-  rowSums(adf_thres)/clus_n
   
   return(manning_mf)
   
