@@ -154,8 +154,7 @@ pca_multifunc <- function(adf, vars, standardise = FALSE){
 
 # Pasari et al. (2013) approach
 
-# function to calculate three multifunctionality metric proposed in the literature:
-# Pasari et al. (2013) multifunctionality metric
+# function to calculate Pasari et al.'s (2013) multifunctionality metric
 
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
@@ -194,8 +193,7 @@ MF_pasari <- function(adf, vars, stand = "none") {
 
 # Dooley et al. (2018) approach
 
-# function to calculate three multifunctionality metric proposed in the literature:
-# Dooley (2018) Scaled Average Multifunctionality (SAM)
+# function to calculate Dooley's (2018) Scaled Average Multifunctionality (SAM)
 
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
@@ -234,8 +232,7 @@ MF_dooley <- function(adf, vars, stand = "none") {
 
 # Jing et al. (2020) approach
 
-# function to calculate three multifunctionality metric proposed in the literature:
-# Jing et al. (2020) Scaling Mulifunctionality Metric
+# function to calculate Jing et al.'s (2020) Scaling Mulifunctionality Metric
 
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
@@ -272,7 +269,12 @@ MF_jing <- function(adf, vars, stand = "none") {
 }
 
 
-# summing method
+# summing approach
+
+# function to calculate summed multifunctionality
+
+# adf, is dataframe with plots in rows, and functions in columns
+# vars has to bee a named vector of functions to include which has to correspond to column names
 MF_sum <- function(adf, vars) {
   
   adf_mat <- adf[, vars]
@@ -283,7 +285,12 @@ MF_sum <- function(adf, vars) {
   
 }
 
-# average method
+# average approach
+
+# function to calculate average multifunctionality
+
+# adf, is dataframe with plots in rows, and functions in columns
+# vars has to bee a named vector of functions to include which has to correspond to column names
 MF_av <- function(adf, vars) {
   
   adf_mat <- adf[, vars]
@@ -293,8 +300,6 @@ MF_av <- function(adf, vars) {
   return(mf_av)
   
 }
-
-
 
 
 
