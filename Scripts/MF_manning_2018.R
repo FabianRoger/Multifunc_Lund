@@ -80,56 +80,6 @@ manning_multifunc <- function(adf, vars,
 }
 
 
-### test this function on the simulated data
-
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(here)
-
-# where to get scripts for the simulated diversity experiment
-source(here("Scripts","Multifunctionality-Simulations", "Multifunc_simulations_functions.R"))
-
-# simulate full diversity experiment
-set.seed(777)
-
-specnum <- 10
-funcnum <- 10
-
-distribution = "runif"
-
-FuncMat <- FunctionValue(specnum,funcnum, distribution, min = 0.1, max = 0.9)
-
-func.names <- as.character( unique( FuncMat$Functions))
-spec.names <- as.character( unique( FuncMat$Species))
-
-
-maxrep <- 100 # using the full replications is prohibitive
-
-SpecMat <- SpeciesMatrix(specnum = specnum, maxrep = maxrep)
-
-method = "av"
-
-compfunc <- func.names[1:3]
-
-AvFunc <- AverageFunction(SpecMat, FuncMat,
-                          method = method, 
-                          compfunc = compfunc)
-
-set.seed(563)
-errM <- matrix(rnorm(n = nrow(AvFunc)*funcnum, mean = 0, sd = 0.01), ncol = funcnum)
-
-#add variance
-AvFunc[,func.names] <- AvFunc[, func.names] + errM
-
-# run the function on these simulated data
-manning_multifunc(adf = AvFunc,
-                  vars = func.names,
-                  ind = c("mcclain", "cindex", "silhouette", "dunn"), 
-                  met = "ward.D2",
-                  dis = "euclidean",
-                  thresh = 0.5)
-
 
 
 
