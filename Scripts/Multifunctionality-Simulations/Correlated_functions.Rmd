@@ -17,7 +17,7 @@ In this script we set up simulations with correlated function values as in van d
 
 ```{r, "load packages", eval = FALSE}
 library(ggplot2)
-library(Cairo)
+#library(Cairo)
 library(grid)
 library(cowplot)
 library(dplyr)
@@ -57,9 +57,9 @@ COR <- 0
 Sigma <- matrix(COR, ncol = funcnum, nrow = funcnum)
 
 # make three 'cluster' of correlated functions
-Sigma[1:3,1:3] <- 0.7
-Sigma[4:6,4:6] <- 0.7
-Sigma[7:9,7:9] <- 0.7
+Sigma[1:2,1:2] <- 0.7
+Sigma[4:6,4:6] <- 0.5
+#Sigma[7:9,7:9] <- 0.7
 
 diag(Sigma) <- 1
 
@@ -176,19 +176,24 @@ There are two main ways to standardize the function values:
 AvFunc_MF <- 
 AvFunc %>% 
   mutate(Hill_mf = hill_multifunc(adf = AvFunc, vars = func.names, scale = 1, HILL = TRUE),
-         Manning_mf = manning_multifunc(adf = AvFunc, vars = func.names, thresh = 0.6),
+         Manning30_mf = manning_multifunc(adf = AvFunc, vars = func.names, thresh = 0.3),
+         Manning50_mf = manning_multifunc(adf = AvFunc, vars = func.names, thresh = 0.5),
+         Manning70_mf = manning_multifunc(adf = AvFunc, vars = func.names, thresh = 0.7),
          Meyer_mf = pca_multifunc(adf = AvFunc, vars = func.names, standardise = FALSE),
          Pasari_mf = MF_pasari(adf = AvFunc, vars = func.names),
          Dooley_mf = MF_dooley(adf = AvFunc, vars = func.names),
          Jing_mf = MF_jing(adf = AvFunc, vars = func.names),
          Sum_mf = MF_sum(adf = AvFunc, vars = func.names),
-         Av_mf = MF_av(adf = AvFunc, vars = func.names))
+         Av_mf = MF_av(adf = AvFunc, vars = func.names),
+         Thresh30_mf = single_threshold_mf(adf = AvFunc, vars = func.names, thresh = 0.3),
+         Thresh50_mf = single_threshold_mf(adf = AvFunc, vars = func.names, thresh = 0.5),
+         Thresh70_mf = single_threshold_mf(adf = AvFunc, vars = func.names, thresh = 0.7))
 
 ```
 
 Meyer
 
-```{r}
+```{r, eval = FALSE}
 rda(AvFunc_MF[func.names], scale = FALSE) %>% 
   summary
 ```
@@ -220,7 +225,7 @@ AvFunc_MF %>%
 
 correlate metrics
 
-```{r}
+```{r, eval=FALSE}
 
 AvFunc_MF %>% 
   select(ends_with("_mf")) %>% 
@@ -237,16 +242,48 @@ AvFunc_MF %>%
   select(ends_with("_mf")) %>% 
   mutate_all(function(x){scale(x)}) %>% 
   cor %>% 
-  corrplot(method = "ellipse")
-
+  corrplot(method = "ellipse", type = "lower")
 
 ```
 
 
 
 
+hclust
+
+```{r}
+
+AvFunc_MF %>% 
+  select(ends_with("_mf")) %>% 
+  mutate_all(function(x){scale(x)}) %>% 
+  as.matrix() %>% 
+  t() %>% 
+  dist() %>% 
+  hclust() %>% 
+  plot()
+
+```
 
 
+```{r}
+MDS <- 
+AvFunc_MF %>% 
+  select(ends_with("_mf")) %>% 
+  mutate_all(function(x){scale(x)}) %>% 
+  as.matrix() %>% 
+  t() %>% 
+  dist() %>% 
+  metaMDS() 
+
+MDS$points %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column(var = "MF_metrics") %>% 
+  ggplot(aes(x = MDS1, y = MDS2))+
+  geom_point()+
+  ggrepel::geom_label_repel(aes(label = MF_metrics))+
+  theme_bw()
+
+```
 
 
 
