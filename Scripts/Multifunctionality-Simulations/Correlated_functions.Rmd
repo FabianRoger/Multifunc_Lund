@@ -187,7 +187,9 @@ AvFunc %>%
          Av_mf = MF_av(adf = AvFunc, vars = func.names),
          Thresh30_mf = single_threshold_mf(adf = AvFunc, vars = func.names, thresh = 0.3),
          Thresh50_mf = single_threshold_mf(adf = AvFunc, vars = func.names, thresh = 0.5),
-         Thresh70_mf = single_threshold_mf(adf = AvFunc, vars = func.names, thresh = 0.7))
+         Thresh70_mf = single_threshold_mf(adf = AvFunc, vars = func.names, thresh = 0.7),
+         Mesli_mf = MF_mesli(adf = AvFunc, vars = func.names),
+         Simpson_mf = MF_simpsons_div(adf = AvFunc, vars = func.names) )
 
 ```
 
