@@ -143,7 +143,7 @@ pca_mf <- bind_rows(pca_mf, .id = "run")
 
 ggplot(data = pca_mf,
        mapping = aes(x = Av_mf, y = Meyer_mf, colour = run)) +
-  geom_point(alpha = 0.3, shape = 16) +
+  geom_point(alpha = 0.2, shape = 16) +
   geom_smooth(method = "lm", se = FALSE, size = 0.75) +
   scale_colour_viridis_d(option = "C", end = 0.9) +
   theme_meta() +

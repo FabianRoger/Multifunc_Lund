@@ -38,7 +38,7 @@ set the average correlation with the `COR` argument. Note that not all correlati
 
 ```{r, "funcmat"}
 # set seed to replicate analysis:
-#set.seed(1600436230)
+# set.seed(1600436230)
 
 # number of species
 specnum <- 10
@@ -59,7 +59,7 @@ Sigma <- matrix(COR, ncol = funcnum, nrow = funcnum)
 # make three 'cluster' of correlated functions
 Sigma[1:2,1:2] <- 0.7
 Sigma[4:6,4:6] <- 0.5
-#Sigma[7:9,7:9] <- 0.7
+# Sigma[7:9,7:9] <- 0.7
 
 diag(Sigma) <- 1
 
@@ -69,13 +69,13 @@ FuncMat <- FunctionValue(specnum,funcnum, distribution, min = 0, max = 1)
 # replace function values with correlated function values
 FuncMat_long <- FuncMat %>% spread(Functions, Funcval)
 
-#draw correlated functions (with mean 0)
+# draw correlated functions (with mean 0)
 corF <- mvrnorm(n = specnum, mu = rep(0, funcnum), Sigma = Sigma)
 
-#shift to positive
+# shift to positive
 corF <- apply(corF, 2, function(x){x + abs(min(x))})
 
-#backtransform to long dataset
+# backtransform to long dataset
 FuncMat_long[,2:(funcnum+1)] <- corF
 
 FuncMat <-

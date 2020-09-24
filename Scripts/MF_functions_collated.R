@@ -1,7 +1,6 @@
 
 # functions to calculate multifunctionality
 
-
 # key arguments for all functions:
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to be a named vector

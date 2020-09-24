@@ -8,9 +8,11 @@ library(dplyr)
 library(tidyr)
 library(corrplot)
 library(here)
+library(dendextend)
 
 source(here("Scripts/Multifunctionality-Simulations/Multifunc_simulations_functions.R"))
 source(here("Scripts/MF_functions_collated.R"))
+source(here("Scripts/function_plotting_theme.R"))
 
 
 # set seed to replicate analysis: set.seed(1600436230)
@@ -154,7 +156,19 @@ AvFunc_MF <-
 
 )
 
-AvFunc_MF
+
+clu_func[[3]] %>% 
+  select(all_of(func.names)) %>% 
+  mutate_all(function(x){ scale(x) } ) %>% 
+  cor(.) %>% 
+  corrplot(method = "ellipse", type = "lower")
+
+
+
+
+
+
+
 
 
 
