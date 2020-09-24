@@ -1,10 +1,6 @@
 
 # functions to calculate multifunctionality
 
-# load the relevant libraries
-library(vegan)
-library(NbClust)
-
 
 # key arguments for all functions:
 # adf, is dataframe with plots in rows, and functions in columns
@@ -328,11 +324,64 @@ single_threshold_mf <- function(adf, vars = NA, thresh = 0.7, prepend = "Diversi
 }
 
 
+# Simpson's diversity index: Raudsepp-Hearne et al. (2009)
+
+# adf, is dataframe with plots in rows, and functions in columns
+# vars has to bee a named vector of functions to include which has to correspond to column names
+
+MF_simpsons_div <- function(adf, vars) {
+  
+  if(! "vegan" %in% installed.packages()[,1]) stop(
+    "this function requires vegan to be installed"
+  )
+  
+  adf_mat <- adf[, vars]
+  
+  mf_simp <- vegan::diversity(x = adf_mat, index = "simpson", MARGIN = 1)
+  
+  z <- 
+    sapply(adf_mat, function(x) {
+    
+    ifelse(sum(x) == 0, 1, 0)
+    
+  })
+  
+  if (sum(z) == length(vars)) {
+    
+    warning(x = "all functions are zero which leads to maximum Simpson diversity")
+    
+    mf_simp
+    
+  } else {
+    
+    mf_simp
+    
+  }
+  
+}
 
 
+# MESLI approach Rodríguez-Loinaz et al. (2015)
 
+# adf, is dataframe with plots in rows, and functions in columns
+# vars has to bee a named vector of functions to include which has to correspond to column names
 
+MF_mesli <- function(adf, vars) {
+  
+  adf_mat <- adf[, vars]
+  
+  y <- 
+    apply(adf_mat, MARGIN = 2, FUN = function(x) {
+      
+      (x - min(x))/(max(x) - min(x))
+      
+    } )
+  
+  mf_mesli <- rowSums(y)
+  
+  return(mf_mesli)
 
+}
 
 
 
