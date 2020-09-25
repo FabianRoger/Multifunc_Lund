@@ -8,7 +8,8 @@ library(dplyr)
 library(tidyr)
 library(corrplot)
 library(here)
-library(dendextend)
+library(vegan)
+library(ggpubr)
 
 source(here("Scripts/Multifunctionality-Simulations/Multifunc_simulations_functions.R"))
 source(here("Scripts/MF_functions_collated.R"))
@@ -136,32 +137,83 @@ AvFunc_MF <-
   lapply(clu_func, function(x) {
   
     mutate(x, 
-           Hill_mf = hill_multifunc(adf = x, vars = func.names, scale = 1, HILL = TRUE),
-           Manning30_mf = manning_multifunc(adf = x, vars = func.names, thresh = 0.3),
-           Manning50_mf = manning_multifunc(adf = x, vars = func.names, thresh = 0.5),
-           Manning70_mf = manning_multifunc(adf = x, vars = func.names, thresh = 0.7),
-           Meyer_mf = pca_multifunc(adf = x, vars = func.names, standardise = FALSE),
-           Pasari_mf = MF_pasari(adf = x, vars = func.names),
-           Dooley_mf = MF_dooley(adf = x, vars = func.names),
-           Jing_mf = MF_jing(adf = x, vars = func.names),
-           Sum_mf = MF_sum(adf = x, vars = func.names),
-           Av_mf = MF_av(adf = x, vars = func.names),
-           Thresh30_mf = single_threshold_mf(adf = x, vars = func.names, thresh = 0.3),
-           Thresh50_mf = single_threshold_mf(adf = x, vars = func.names, thresh = 0.5),
-           Thresh70_mf = single_threshold_mf(adf = x, vars = func.names, thresh = 0.7),
-           Mesli_mf = MF_mesli(adf = x, vars = func.names),
-           Simpson_mf = MF_simpsons_div(adf = x, vars = func.names) )
+           `scal. MF` = MF_jing(adf = x, vars = func.names),
+           `sum MF` = MF_sum(adf = x, vars = func.names),
+           `ave. MF` = MF_av(adf = x, vars = func.names),
+           `mesli MF` = MF_mesli(adf = x, vars = func.names),
+           `Pasari MF` = MF_pasari(adf = x, vars = func.names),
+           `SAM MF` = MF_dooley(adf = x, vars = func.names),
+           `ENF MF` = hill_multifunc(adf = x, vars = func.names, scale = 1, HILL = TRUE),
+           `Simp. MF` = MF_simpsons_div(adf = x, vars = func.names),
+           `Manning.30 MF` = manning_multifunc(adf = x, vars = func.names, thresh = 0.3),
+           `Manning.50 MF` = manning_multifunc(adf = x, vars = func.names, thresh = 0.5),
+           `Manning.70 MF` = manning_multifunc(adf = x, vars = func.names, thresh = 0.7),
+           `thresh.30 MF` = single_threshold_mf(adf = x, vars = func.names, thresh = 0.3),
+           `thresh.50 MF` = single_threshold_mf(adf = x, vars = func.names, thresh = 0.5),
+           `thresh.70 MF` = single_threshold_mf(adf = x, vars = func.names, thresh = 0.7),
+           `PCA MF` = pca_multifunc(adf = x, vars = func.names, standardise = FALSE))
   
 }
 
 )
 
+# MF metric groups
+MF_groups <- 
+  c(rep("sum/ave.", 4),
+    rep("evenness", 4),
+    rep("threshold", 6),
+    rep("other", 1))
 
-clu_func[[3]] %>% 
-  select(all_of(func.names)) %>% 
-  mutate_all(function(x){ scale(x) } ) %>% 
-  cor(.) %>% 
-  corrplot(method = "ellipse", type = "lower")
+
+# Run an nMDS to cluster the different multifunctionality metrics
+
+nmds_clust <- 
+  
+  lapply(AvFunc_MF, function(x) {
+  
+  mds_out <- 
+    x %>% 
+    select(ends_with(" MF")) %>% 
+    mutate(across(.cols = everything(), ~scale(.) ) ) %>% 
+    as.matrix(.) %>% 
+    t() %>% 
+    dist(x = ., method = "euclidean") %>% 
+    metaMDS(comm = .) 
+  
+  mds_out$points %>% 
+    as.data.frame(.) %>% 
+    tibble::rownames_to_column(var = "MF_metrics") %>% 
+    mutate(group = factor(as.factor(MF_groups), 
+                          levels = c("sum/ave.", "evenness", "threshold", "other")) ) %>%
+    ggplot(data = .,
+           mapping = aes(x = MDS1, y = MDS2, colour = group)) +
+    geom_point() +
+    ggrepel::geom_label_repel(mapping = aes(label = MF_metrics),
+                              show.legend = FALSE,
+                              size = 3,
+                              segment.alpha = 0.5,
+                              label.size = NA, fill = "white") +
+    scale_colour_viridis_d(option = "C", end = 0.9) +
+    guides(label = FALSE) +
+    theme_meta() +
+    theme(legend.position = "bottom",
+          legend.key = element_blank())
+  
+  
+})
+
+# combine these nmds plots
+p1 <- 
+  ggarrange(plotlist = nmds_clust, 
+            labels = letters[1:length(nmds_clust)],
+            font.label = list(size = 12, color = "black", face = "plain", family = NULL),
+            common.legend = TRUE,
+            legend = "bottom")
+
+ggsave(filename = here("Figures/pca_clust_fig.png"), plot = p1,
+       width = 19, height = 20, units = "cm", dpi = 300)
+
+
 
 
 
