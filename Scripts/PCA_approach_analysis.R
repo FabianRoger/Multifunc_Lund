@@ -149,9 +149,6 @@ pca_mf_plot <-
          `PCA MF` = Meyer_mf,
          `Pasari MF` = Pasari_mf)
 
-pca_mf_plot %>%
-  filter(run == 1) %>%
-  select(all_of(c("Richness", func.names) ))
 
 # plot the correlation matrix
 cor_out <-

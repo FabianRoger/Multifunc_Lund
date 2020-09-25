@@ -137,9 +137,21 @@ pca_multifunc <- function(adf, vars, standardise = FALSE){
   adf_mat <- adf[,vars]
   pca2<-vegan::rda(adf_mat, scale = standardise)
   
+  pc_load <- prcomp(x = adf_mat)
+  pc_load <- pc_load$rotation %*% diag(pc_load$sdev) 
+  inv <- 
+    apply(X = pc_load, MARGIN = 2, function(z) { 
+      
+      ifelse(z[(max(abs(z)) == z | max(abs(z)) == -z)] > 0, 1, -1)
+      
+    })
+  
   temp2 <- vegan::scores(pca2, choices=1:length(vars), display=c("sites")) 
   eig<-summary(pca2)$cont$importance[1,]
   for(i in 1:length(eig)) temp2[,i] <- temp2[,i] * eig[i]
+  
+  sweep(temp2, MARGIN = 2, inv, `*`)
+  
   Index.wt <- rowSums(temp2)
   multifunc_pca_ind <-  Index.wt
   return(multifunc_pca_ind)
