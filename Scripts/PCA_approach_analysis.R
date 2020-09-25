@@ -194,12 +194,16 @@ hist_slopes.df <-
                values_to = "est.")
   
 # plot the histograms
-ggplot(data = hist_slopes.df,
+ph <- 
+  ggplot(data = hist_slopes.df,
        mapping = aes(x = est.)) +
   geom_histogram(colour = "white", alpha = 0.8, fill = "grey") +
   facet_wrap(~metric) +
   geom_vline(xintercept = 0, colour = "red", linetype = "dashed", size = 1) +
   theme_meta()
+
+ggsave(filename = here("Figures/pca_hist.png"), plot = ph,
+       width = 19, height = 10, units = "cm", dpi = 300)
 
 
 # plot average multifunctionality versus pca multifunctionality
@@ -226,6 +230,7 @@ ggsave(filename = here("Figures/pca_fig_2.png"), plot = p2,
 # plot richness-function plots for average and pca multifunctionality
 p3 <- 
   pca_mf_plot %>%
+  filter(run %in% sample((1:n), size = 50 ) ) %>%
   pivot_longer(cols = c(`average MF`, `PCA MF`, `Pasari MF`),
                names_to = "metric",
                values_to = "MF") %>%
