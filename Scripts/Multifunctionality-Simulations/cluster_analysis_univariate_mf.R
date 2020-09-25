@@ -194,13 +194,18 @@ nmds_clust <-
                               segment.alpha = 0.5,
                               label.size = NA, fill = "white") +
     scale_colour_viridis_d(option = "C", end = 0.9) +
-    guides(label = FALSE) +
+    guides(label = FALSE,
+           colour = guide_legend(override.aes = list(size = 3))) +
     theme_meta() +
     theme(legend.position = "bottom",
-          legend.key = element_blank())
+          legend.key = element_blank(),
+          legend.text = element_text(colour = "black", size = 14, face = "plain"),
+          legend.title = element_blank())
   
   
 })
+
+nmds_clust[[1]]
 
 # combine these nmds plots
 p1 <- 
