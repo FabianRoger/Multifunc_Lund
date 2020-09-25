@@ -7,22 +7,22 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(here)
+library(corrplot)
+library(grid)
+library(gridExtra)
 
 source(here("Scripts/Multifunctionality-Simulations/Multifunc_simulations_functions.R"))
 source(here("Scripts/MF_functions_collated.R"))
 source(here("Scripts/function_plotting_theme.R"))
 
 
-# set seed to replicate analysis: set.seed(1600436230)
-
-
 # set number of runs to do
-n <- 10
+n <- 9
 
 # set up a blank list to fill
 pca_func <- vector("list", length = n)
 
-# run the loop to generate three datasets with different correlation structures
+# run the loop to generate 10 datasets with different seeds
 for (i in (1:n) ) {
   
   set.seed(1555 + i)
@@ -44,9 +44,9 @@ for (i in (1:n) ) {
   Sigma <- matrix(COR, ncol = funcnum, nrow = funcnum)
   
   # make three 'cluster' of correlated functions
-  Sigma[1:2,1:2] <- 0.7
-  Sigma[4:6,4:6] <- 0.5
-  Sigma[7:9,7:9] <- 0.7
+  # Sigma[1:2,1:2] <- 0.7
+  # Sigma[4:6,4:6] <- 0.5
+  # Sigma[7:9,7:9] <- 0.7
   
   diag(Sigma) <- 1
   
@@ -133,7 +133,8 @@ pca_mf <-
     
     mutate(x, 
            Meyer_mf = pca_multifunc(adf = x, vars = func.names, standardise = FALSE),
-           Av_mf = MF_av(adf = x, vars = func.names) )
+           Av_mf = MF_av(adf = x, vars = func.names),
+           Pasari_mf = MF_pasari(adf = x, vars = func.names) )
     
   }
   
@@ -141,12 +142,79 @@ pca_mf <-
 
 pca_mf <- bind_rows(pca_mf, .id = "run")
 
-ggplot(data = pca_mf,
-       mapping = aes(x = Av_mf, y = Meyer_mf, colour = run)) +
+# rename the functions for plotting
+pca_mf_plot <- 
+  pca_mf %>%
+  rename(`average MF` = Av_mf,
+         `PCA MF` = Meyer_mf,
+         `Pasari MF` = Pasari_mf)
+
+pca_mf_plot %>%
+  filter(run == 1) %>%
+  select(all_of(c("Richness", func.names) ))
+
+# plot the correlation matrix
+cor_out <-
+  lapply(split(select(pca_mf, all_of(func.names)), pca_mf$run), function(x) {
+  
+    corrplot(cor(x), method = "ellipse", diag = FALSE, type = "lower")
+    gridGraphics::grid.echo()
+    grid::grid.grab()
+    
+  })
+
+p1 <- do.call(grid.arrange, 
+              cor_out)
+
+ggsave(filename = here("Figures/pca_fig_1.png"), plot = p1,
+       width = 21, height = 22, units = "cm", dpi = 300)
+
+# plot average multifunctionality versus pca multifunctionality
+p2 <- 
+  pca_mf_plot %>%
+  pivot_longer(cols = c(`PCA MF`, `Pasari MF`),
+               names_to = "metric",
+               values_to = "MF") %>%
+  ggplot(data = .,
+       mapping = aes(x = `average MF`, y = MF, colour = run)) +
   geom_point(alpha = 0.2, shape = 16) +
   geom_smooth(method = "lm", se = FALSE, size = 0.75) +
   scale_colour_viridis_d(option = "C", end = 0.9) +
+  facet_wrap(~metric, scales = "free") +
   theme_meta() +
   theme(legend.position = "none")
 
+ggsave(filename = here("Figures/pca_fig_2.png"), plot = p2,
+       width = 19, height = 10, units = "cm", dpi = 300)
+
+# plot richness-function plots for average and pca multifunctionality
+p3 <- 
+  pca_mf_plot %>%
+  pivot_longer(cols = c(`average MF`, `PCA MF`, `Pasari MF`),
+               names_to = "metric",
+               values_to = "MF") %>%
+  ggplot(data = .,
+       mapping = aes(x = Richness, y = MF, colour = run)) +
+  geom_point(alpha = 0.2, shape = 16) +
+  geom_smooth(method = "lm", se = FALSE, size = 0.75) +
+  scale_colour_viridis_d(option = "C", end = 0.9) +
+  facet_wrap(~metric, scales = "free") +
+  theme_meta() +
+  theme(legend.position = "none")
+
+ggsave(filename = here("Figures/pca_fig_3.png"), plot = p3,
+       width = 19, height = 10, units = "cm", dpi = 300)
+
+
+p4 <- 
+  ggplot(data = pca_mf_plot,
+         mapping = aes(x = Richness, y = `PCA MF`, colour = `average MF`)) +
+  geom_jitter(width = 0.5, alpha = 0.5, shape = 16) +
+  geom_smooth(method = "lm", se = FALSE, size = 0.75) +
+  scale_colour_viridis_c(option = "C", end = 0.9) +
+  facet_wrap(~run) +
+  theme_meta()
+
+ggsave(filename = here("Figures/pca_fig_4.png"), plot = p4,
+       width = 19, height = 19, units = "cm", dpi = 300)
 
