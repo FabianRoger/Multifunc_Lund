@@ -17,7 +17,7 @@ source(here("Scripts/function_plotting_theme.R"))
 
 
 # set number of runs to do
-n <- 9
+n <- 500
 
 # set up a blank list to fill
 pca_func <- vector("list", length = n)
@@ -151,24 +151,61 @@ pca_mf_plot <-
 
 
 # plot the correlation matrix
-cor_out <-
-  lapply(split(select(pca_mf, all_of(func.names)), pca_mf$run), function(x) {
+# cor_out <-
+  # lapply(split(select(pca_mf, all_of(func.names)), pca_mf$run), function(x) {
   
-    corrplot(cor(x), method = "ellipse", diag = FALSE, type = "lower")
-    gridGraphics::grid.echo()
-    grid::grid.grab()
+    # corrplot(cor(x), method = "ellipse", diag = FALSE, type = "lower")
+    # gridGraphics::grid.echo()
+    # grid::grid.grab()
     
-  })
+  # })
 
-p1 <- do.call(grid.arrange, 
-              cor_out)
+#p1 <- do.call(grid.arrange, cor_out)
 
-ggsave(filename = here("Figures/pca_fig_1.png"), plot = p1,
-       width = 21, height = 22, units = "cm", dpi = 300)
+# ggsave(filename = here("Figures/pca_fig_1.png"), plot = p1,
+       # width = 21, height = 22, units = "cm", dpi = 300)
+
+
+# plot a histogram of slopes of the relationship between average...
+hist_slopes <- 
+  lapply(split(pca_mf, pca_mf$run), function(x) {
+  
+  z <- 
+    x %>%
+    mutate(across(.cols = c("Av_mf", "Pasari_mf", "Meyer_mf"),
+                  ~as.numeric( scale(., center = TRUE, scale = TRUE) )) )
+  
+  lm_1 <- lm(Pasari_mf ~ Av_mf, data = z)
+  
+  lm_2 <- lm(Meyer_mf ~ Av_mf, data = z)
+  
+  c("pasari_mf" = lm_1$coefficients["Av_mf"], 
+    "pca_mf" = lm_2$coefficients["Av_mf"])
+  
+}
+)
+
+hist_slopes.df <- 
+  bind_rows(hist_slopes) %>%
+  rename(`Pasari MF` = pasari_mf.Av_mf,
+         `PCA MF` = pca_mf.Av_mf) %>%
+  pivot_longer(cols = everything(),
+               names_to = "metric",
+               values_to = "est.")
+  
+# plot the histograms
+ggplot(data = hist_slopes.df,
+       mapping = aes(x = est.)) +
+  geom_histogram(colour = "white", alpha = 0.8, fill = "grey") +
+  facet_wrap(~metric) +
+  geom_vline(xintercept = 0, colour = "red", linetype = "dashed", size = 1) +
+  theme_meta()
+
 
 # plot average multifunctionality versus pca multifunctionality
 p2 <- 
   pca_mf_plot %>%
+  filter(run %in% sample((1:n), size = 50 ) ) %>%
   pivot_longer(cols = c(`PCA MF`, `Pasari MF`),
                names_to = "metric",
                values_to = "MF") %>%
@@ -180,6 +217,8 @@ p2 <-
   facet_wrap(~metric, scales = "free") +
   theme_meta() +
   theme(legend.position = "none")
+
+p2
 
 ggsave(filename = here("Figures/pca_fig_2.png"), plot = p2,
        width = 19, height = 10, units = "cm", dpi = 300)

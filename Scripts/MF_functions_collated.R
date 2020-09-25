@@ -139,6 +139,7 @@ pca_multifunc <- function(adf, vars, standardise = FALSE){
   
   pc_load <- prcomp(x = adf_mat)
   pc_load <- pc_load$rotation %*% diag(pc_load$sdev) 
+  
   inv <- 
     apply(X = pc_load, MARGIN = 2, function(z) { 
       
@@ -150,7 +151,7 @@ pca_multifunc <- function(adf, vars, standardise = FALSE){
   eig<-summary(pca2)$cont$importance[1,]
   for(i in 1:length(eig)) temp2[,i] <- temp2[,i] * eig[i]
   
-  sweep(temp2, MARGIN = 2, inv, `*`)
+  temp2 <- sweep(temp2, MARGIN = 2, inv, `*`)
   
   Index.wt <- rowSums(temp2)
   multifunc_pca_ind <-  Index.wt
