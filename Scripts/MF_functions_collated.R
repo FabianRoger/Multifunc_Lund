@@ -396,4 +396,135 @@ MF_mesli <- function(adf, vars) {
 }
 
 
+# Slade et al. (2017) desirability function approach
+
+# function to calculate multifunctional desirability sensu Slade et al. (2017)
+
+# adf, is dataframe with plots in rows, and functions in columns
+# vars has to bee a named vector of functions to include which has to correspond to column names
+# A is the lower limit of function deemed acceptable
+# B is the upper limit of the function
+# s is a shape parameter describing how multifunctional desirability changes between A and B
+# when s = 1 (default), multifunctional desirability increases linearly from A to B
+# when s < 1,  multifunctional desirability is higher at lower levels of the response
+# when s > 1 it is more important to be as close as possible to higher multifunctional desirability
+# weights are direct weightings applied to each function
+
+# A, B, s and weights must be defined for each function and must be inputted as vectors (one number for each function)
+# if vectors are not inputted for these quantities the defaults are:
+# A: for each function, the mean of all values below the 10th quantile is used
+# B: for each function, the mean of all values above the 90th quantile is used
+# s: by default, s is 1 which means there is a linear relationship
+# weights: equal weights (i.e. weights = 1 for all functions) are assigned by default
+
+MF_slade <- function(adf, vars, 
+                     A = "min", 
+                     B = "max", 
+                     s = "linear",
+                     weights = "equal") {
+  
+  
+  adf_mat <- adf[, vars]
+  
+  # set up the A values
+  if ( ((is.vector(A) == TRUE) & (length(A) == length(vars)))  ) {
+    
+    a <- A
+    
+  } else if (A == "min") {
+    
+    a <- apply(X = adf_mat, MARGIN = 2, function(x) { mean(x[x < quantile(x, probs = 0.10)], na.rm = TRUE)   })
+    
+  } else {
+    
+    stop("this function requires correct specification of A values, see Documentation")
+    
+  }
+  
+  # set up the B values
+  if ( ((is.vector(B) == TRUE) & (length(B) == length(vars)))  ) {
+    
+    b <- B
+    
+  } else if (B == "max") {
+    
+    b <- apply(X = adf_mat, MARGIN = 2, function(x) { mean(x[x > quantile(x, probs = 0.90)], na.rm = TRUE) })
+    
+  } else {
+    
+    stop("this function requires correct specification of B values, see Documentation")
+    
+  }
+  
+  
+  # set up the s-values
+  if ( ((is.vector(s) == TRUE) & (length(s) == length(vars)))  ) {
+    
+    S <- s
+    
+  } else if (s == "linear") {
+    
+    S <- rep(x = 1, times = length(vars))
+    
+  } else {
+    
+    stop("this function requires correct specification of s values, see Documentation")
+    
+  }
+  
+  d_out <- vector("list", length = length(vars))
+  
+  for (i in 1:length(vars)) {
+    
+    y <- ( ( adf_mat[ , i] - a[i] )/( b[i] - a[i] ) )^S[i]
+    
+    z <- ifelse( adf_mat[ , i] < a[i], 0, y)
+    
+    w <- ifelse( adf_mat[ , i] > b[i], 1, z )
+    
+    d_out[[i]] <- w
+    
+  }
+  
+  d_out <- do.call("cbind", d_out)
+  
+  
+  # apply weights to each function
+  weights = "equal"
+  if ( ((is.vector(weights) == TRUE) & (length(weights) == length(vars)))  ) {
+    
+    ws <- weights
+    
+  } else if (weights == "equal") {
+    
+    ws <- rep(x = 1, times = length(vars))
+    
+  } else {
+    
+    stop("this function requires correct specification of function weights, see Documentation")
+    
+  }
+  
+  # apply the weights by adding it as an exponent
+  d_out <- sweep(d_out, MARGIN = 2, ws, `^`)
+  
+  d_mf <- 
+    apply(d_out, MARGIN = 1, function(x) {
+      
+      exp( mean(log(x)) )
+      
+    })
+  
+  d_mf <- (d_mf)^(1/sum(ws))
+  
+  return(d_mf)
+  
+}
+
+
+
+
+
+
+
 
