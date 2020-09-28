@@ -11,6 +11,10 @@ library(ggplot2)
 library(here)
 library(corrplot)
 
+# choose scripts to draw functions from
+source(here("Scripts/MF_functions_collated.R"))
+source(here("Scripts/function_plotting_theme.R"))
+
 # load the Lotka-Volterra simulated data
 lv_dat <- 
   read_csv(file = here("Scripts/multispecies_lotka_volterra_model/lv_mf_sim_dat.csv"))
@@ -22,7 +26,7 @@ nrow(lv_dat)
 sp_names <- unique(lv_dat$species)
 
 # choose the number of functions to simulate
-func_n <- 5
+func_n <- 9
 
 # set the function names
 func_names <- paste0("F_", 1:func_n)
@@ -56,14 +60,118 @@ bio_funcs <-
   left_join(filter(lv_dat, time == last(time)),
             Funcs,
             by = "species") %>%
-  mutate( across(.cols = func_names, ~(.*abundance) ) ) %>%
+  mutate( across(.cols = all_of(func_names), ~(.*abundance) ) ) %>%
   group_by(replicate, species_pool) %>%
   summarise( across(.cols = c("abundance", all_of(func_names) ) , ~sum(.) ), .groups = "drop" )
+
+# z-score standardise the different functions
+# translate them to make sure they are positive
+bio_funcs <- 
+  bio_funcs %>%
+  mutate(across(.cols = all_of(func_names), ~as.numeric(scale(.x, center = TRUE, scale = TRUE)) )) %>%
+  mutate(across(.cols = all_of(func_names), ~(.x + abs(min(.x)))  ))
 
 bio_funcs %>%
   select(abundance, contains("F")) %>%
   cor() %>%
   corrplot(method = "ellipse")
+
+
+# 
+
+# write a function to output a slope between richness and function for different numbers of functions
+est_n_func <- function(data, funcs, n_functions) {
+  
+  # set up combinations for each number of functions
+  comb_f <- gtools::combinations(n = length(funcs), r = n_functions)
+  
+  # set up an output vector
+  y <- vector("list", length = nrow(comb_f))
+  
+  for (i in 1:nrow(comb_f)) {
+    
+    v <- funcs[comb_f[i, ]]
+    
+    df <- data[, v]
+    
+    lm_df <- 
+      data %>%
+      mutate(species_pool = as.numeric(scale(species_pool, scale = TRUE, center = TRUE)),
+             ave_mf = MF_av(adf = df, vars = v),
+             pasari_mf = MF_pasari(adf = df, vars = v),
+             enf_mf = hill_multifunc(adf = df, vars = v, scale = 1, HILL = TRUE),
+             thresh_30_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.3),
+             thresh_50_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.5),
+             thresh_70_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.7))
+    
+    mf_names <- names(select(lm_df, ends_with("mf")))
+    
+    s_cof <- vector(length = length(mf_names))
+    
+    for(s in 1:length(mf_names)) {
+      
+      lm1 <- lm(as.formula(paste0(mf_names[s], "~ species_pool")),
+                data = lm_df)
+      
+      s_cof[s] <- lm1$coefficients[2]
+      
+    }
+    
+    names(s_cof) <- mf_names
+    
+    y[[i]] <- s_cof
+    
+  } 
+  
+  y <- bind_rows(y, .id = "run")
+  
+  y$number_functions <- n_functions
+  
+  y
+  
+}
+
+# test this function
+est_n_func(data = bio_funcs, funcs = func_names, n_functions = 2)
+
+
+# loop over this function for all possible numbers of functions
+slopes_n_func <- vector("list", length = length(func_names))
+
+for(j in 2:length(func_names)) {
+  
+  slopes_n_func[[j]] <- est_n_func(data = bio_funcs, funcs = func_names, n_functions = j)
+  
+}
+
+slopes_n_func <- bind_rows(slopes_n_func, .id = "n_func")
+
+slopes_n_func <- 
+  slopes_n_func %>%
+  pivot_longer(cols = ends_with("mf"),
+               names_to = "mf_metric",
+               values_to = "mf_value")
+
+ggplot(data = slopes_n_func, 
+       mapping = aes(x = number_functions, mf_value)) +
+  geom_jitter(width = 0.5, alpha = 0.25) +
+  facet_wrap(~mf_metric, scales = "free") +
+  theme_meta()
+
+
+bio_funcs %>%
+  pivot_longer(cols = starts_with("F"),
+               names_to = "eco_function",
+               values_to = "value") %>%
+  ggplot(data = .,
+         mapping = aes(x = species_pool, y = value)) +
+  geom_jitter(width = 0.5) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~eco_function, scales = "free") +
+  theme_meta()
+
+ggplot(data = bio_funcs,
+       mapping = aes(x = species_pool))
 
 
 

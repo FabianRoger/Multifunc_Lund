@@ -412,14 +412,16 @@ MF_mesli <- function(adf, vars) {
 
 # A, B, s and weights must be defined for each function and must be inputted as vectors (one number for each function)
 # if vectors are not inputted for these quantities the defaults are:
-# A: for each function, the mean of all values below the 10th quantile is used
-# B: for each function, the mean of all values above the 90th quantile is used
+# A: for each function, the mean of all values below a certain quantile is used (argument = A_quant)
+# B: for each function, the mean of all values above a certain quantile is used (argument = B_quant)
 # s: by default, s is 1 which means there is a linear relationship
 # weights: equal weights (i.e. weights = 1 for all functions) are assigned by default
 
 MF_slade <- function(adf, vars, 
                      A = "min", 
+                     A_quant = 0.10,
                      B = "max", 
+                     B_quant = 0.90,
                      s = "linear",
                      weights = "equal") {
   
@@ -433,7 +435,7 @@ MF_slade <- function(adf, vars,
     
   } else if (A == "min") {
     
-    a <- apply(X = adf_mat, MARGIN = 2, function(x) { mean(x[x < quantile(x, probs = 0.10)], na.rm = TRUE)   })
+    a <- apply(X = adf_mat, MARGIN = 2, function(x) { mean(x[x < quantile(x, probs = A_quant)], na.rm = TRUE)   })
     
   } else {
     
@@ -448,7 +450,7 @@ MF_slade <- function(adf, vars,
     
   } else if (B == "max") {
     
-    b <- apply(X = adf_mat, MARGIN = 2, function(x) { mean(x[x > quantile(x, probs = 0.90)], na.rm = TRUE) })
+    b <- apply(X = adf_mat, MARGIN = 2, function(x) { mean(x[x > quantile(x, probs = B_quant)], na.rm = TRUE) })
     
   } else {
     

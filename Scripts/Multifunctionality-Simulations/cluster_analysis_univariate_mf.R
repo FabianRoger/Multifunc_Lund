@@ -119,7 +119,7 @@ for (i in 1:length(clu_func) ) {
     
       y <- (x - mean(x))/sd(x)
       
-      return(y+abs(min(y)))
+      return(y + abs(min(y)))
   }
   
   )
@@ -140,7 +140,7 @@ AvFunc_MF <-
            `scal. MF` = MF_jing(adf = x, vars = func.names),
            `sum MF` = MF_sum(adf = x, vars = func.names),
            `ave. MF` = MF_av(adf = x, vars = func.names),
-           `mesli MF` = MF_mesli(adf = x, vars = func.names),
+           `MESLI MF` = MF_mesli(adf = x, vars = func.names),
            `Pasari MF` = MF_pasari(adf = x, vars = func.names),
            `SAM MF` = MF_dooley(adf = x, vars = func.names),
            `ENF MF` = hill_multifunc(adf = x, vars = func.names, scale = 1, HILL = TRUE),
@@ -151,7 +151,9 @@ AvFunc_MF <-
            `thresh.30 MF` = single_threshold_mf(adf = x, vars = func.names, thresh = 0.3),
            `thresh.50 MF` = single_threshold_mf(adf = x, vars = func.names, thresh = 0.5),
            `thresh.70 MF` = single_threshold_mf(adf = x, vars = func.names, thresh = 0.7),
-           `PCA MF` = pca_multifunc(adf = x, vars = func.names, standardise = FALSE))
+           `Slade.10.90 MF` = MF_slade(adf = x, vars = func.names, A_quant = 0.10, B_quant = 0.90),
+           `Slade.40.60 MF` = MF_slade(adf = x, vars = func.names, A_quant = 0.40, B_quant = 0.60),
+           `PCA MF` = pca_multifunc(adf = x, vars = func.names, standardise = FALSE) )
   
 }
 
@@ -161,7 +163,7 @@ AvFunc_MF <-
 MF_groups <- 
   c(rep("sum/ave.", 4),
     rep("evenness", 4),
-    rep("threshold", 6),
+    rep("threshold", 8),
     rep("other", 1))
 
 
@@ -205,8 +207,6 @@ nmds_clust <-
   
 })
 
-nmds_clust[[1]]
-
 # combine these nmds plots
 p1 <- 
   ggarrange(plotlist = nmds_clust, 
@@ -214,6 +214,8 @@ p1 <-
             font.label = list(size = 12, color = "black", face = "plain", family = NULL),
             common.legend = TRUE,
             legend = "bottom")
+
+p1
 
 ggsave(filename = here("Figures/pca_clust_fig.png"), plot = p1,
        width = 19, height = 20, units = "cm", dpi = 300)
