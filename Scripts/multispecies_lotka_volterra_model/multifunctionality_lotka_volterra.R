@@ -14,6 +14,7 @@ library(corrplot)
 # choose scripts to draw functions from
 source(here("Scripts/MF_functions_collated.R"))
 source(here("Scripts/function_plotting_theme.R"))
+source(here("Scripts/Multifunctionality-Simulations/Multifunc_simulations_functions.R"))
 
 # load the Lotka-Volterra simulated data
 lv_dat <- 
@@ -40,9 +41,48 @@ Funcs <-
   ncol = func_n,
   dimnames = list(sp_names, func_names))
 
-# fill this empty data matrix with values from the uniform distribution
+
+# we can fill this empty matrix in different ways:
+
+# 1. fill this empty data matrix with values from the uniform distribution
 Funcs[1:nrow(Funcs), 1:ncol(Funcs)] <- 
   runif( n = prod( dim( Funcs ) ), 0, 1 )
+
+# 2. fill this with function values with different correlation levels among species
+# number of species
+specnum <- length(sp_names)
+
+# choose pairwise correlation strength
+COR <- 0
+
+# make correlation matrix (strictly speaking a covariance matrix but for these simulations it does not matter)
+Sigma <- matrix(COR, ncol = func_n, nrow = func_n)
+
+# make three 'cluster' of correlated functions
+Sigma[1:4,1:4] <- -2
+Sigma[5:6,5:6] <- -2
+Sigma[7:9,7:9] <- -1.5
+
+diag(Sigma) <- rnorm(n = length(diag(Sigma)), mean = 10, sd = 2)
+
+Sigma
+
+# draw correlated functions (with mean 0)
+corF <- mvrnorm(n = specnum, mu = rep(0, func_n), Sigma = Sigma)
+
+# shift to positive
+corF <- apply(corF, 2, function(x){ x + abs(min(x)) })
+
+# fill the function matrix
+Funcs[1:nrow(Funcs), 1:ncol(Funcs)] <- 
+  as.vector(corF)
+
+Funcs
+
+Funcs %>%
+  cor() %>%
+  corrplot(method = "ellipse")
+
 
 # convert the Funcs data to a dataframe
 Funcs <- as.data.frame(Funcs)
@@ -77,8 +117,6 @@ bio_funcs %>%
   corrplot(method = "ellipse")
 
 
-# 
-
 # write a function to output a slope between richness and function for different numbers of functions
 est_n_func <- function(data, funcs, n_functions) {
   
@@ -97,12 +135,12 @@ est_n_func <- function(data, funcs, n_functions) {
     lm_df <- 
       data %>%
       mutate(species_pool = as.numeric(scale(species_pool, scale = TRUE, center = TRUE)),
-             ave_mf = MF_av(adf = df, vars = v),
-             pasari_mf = MF_pasari(adf = df, vars = v),
-             enf_mf = hill_multifunc(adf = df, vars = v, scale = 1, HILL = TRUE),
-             thresh_30_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.3),
-             thresh_50_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.5),
-             thresh_70_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.7))
+             ave_mf = as.numeric(scale(MF_av(adf = df, vars = v))),
+             pasari_mf = as.numeric(scale(MF_pasari(adf = df, vars = v))),
+             enf_mf = as.numeric(scale(hill_multifunc(adf = df, vars = v, scale = 1, HILL = TRUE))),
+             thresh_30_mf = as.numeric(scale(single_threshold_mf(adf = df, vars = v, thresh = 0.3))),
+             thresh_50_mf = as.numeric(scale(single_threshold_mf(adf = df, vars = v, thresh = 0.5))),
+             thresh_70_mf = as.numeric(scale(single_threshold_mf(adf = df, vars = v, thresh = 0.7))) )
     
     mf_names <- names(select(lm_df, ends_with("mf")))
     
@@ -146,19 +184,7 @@ for(j in 2:length(func_names)) {
 
 slopes_n_func <- bind_rows(slopes_n_func, .id = "n_func")
 
-slopes_n_func <- 
-  slopes_n_func %>%
-  pivot_longer(cols = ends_with("mf"),
-               names_to = "mf_metric",
-               values_to = "mf_value")
-
-ggplot(data = slopes_n_func, 
-       mapping = aes(x = number_functions, mf_value)) +
-  geom_jitter(width = 0.5, alpha = 0.25) +
-  facet_wrap(~mf_metric, scales = "free") +
-  theme_meta()
-
-
+# plot the diversity-function relationship
 bio_funcs %>%
   pivot_longer(cols = starts_with("F"),
                names_to = "eco_function",
@@ -170,8 +196,24 @@ bio_funcs %>%
   facet_wrap(~eco_function, scales = "free") +
   theme_meta()
 
-ggplot(data = bio_funcs,
-       mapping = aes(x = species_pool))
+# plot the standardised effect size between species pool diversity and function
+slopes_n_func <- 
+  slopes_n_func %>%
+  pivot_longer(cols = ends_with("mf"),
+               names_to = "mf_metric",
+               values_to = "mf_value")
+
+ggplot(data = slopes_n_func, 
+       mapping = aes(x = number_functions, mf_value)) +
+  geom_jitter(width = 0.5, alpha = 0.1) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~mf_metric, scales = "free") +
+  theme_meta()
+
+
+
+
+
 
 
 
