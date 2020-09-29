@@ -44,11 +44,8 @@ Funcs <-
 
 # we can fill this empty matrix in different ways:
 
-# 1. fill this empty data matrix with values from the uniform distribution
-Funcs[1:nrow(Funcs), 1:ncol(Funcs)] <- 
-  runif( n = prod( dim( Funcs ) ), 0, 1 )
+# fill this with function values with different correlation levels among species
 
-# 2. fill this with function values with different correlation levels among species
 # number of species
 specnum <- length(sp_names)
 
@@ -61,7 +58,7 @@ Sigma <- matrix(COR, ncol = func_n, nrow = func_n)
 # make three 'cluster' of correlated functions
 Sigma[1:4,1:4] <- -2
 Sigma[5:6,5:6] <- -2
-Sigma[7:9,7:9] <- -1.5
+Sigma[7:9,7:9] <- -2
 
 diag(Sigma) <- rnorm(n = length(diag(Sigma)), mean = 10, sd = 2)
 
@@ -134,13 +131,15 @@ est_n_func <- function(data, funcs, n_functions) {
     
     lm_df <- 
       data %>%
-      mutate(species_pool = as.numeric(scale(species_pool, scale = TRUE, center = TRUE)),
-             ave_mf = as.numeric(scale(MF_av(adf = df, vars = v))),
-             pasari_mf = as.numeric(scale(MF_pasari(adf = df, vars = v))),
-             enf_mf = as.numeric(scale(hill_multifunc(adf = df, vars = v, scale = 1, HILL = TRUE))),
-             thresh_30_mf = as.numeric(scale(single_threshold_mf(adf = df, vars = v, thresh = 0.3))),
-             thresh_50_mf = as.numeric(scale(single_threshold_mf(adf = df, vars = v, thresh = 0.5))),
-             thresh_70_mf = as.numeric(scale(single_threshold_mf(adf = df, vars = v, thresh = 0.7))) )
+      mutate(species_pool = scale(species_pool, scale = TRUE, center = TRUE),
+             ave_mf = MF_av(adf = df, vars = v),
+             pasari_mf = MF_pasari(adf = df, vars = v),
+             enf_mf = hill_multifunc(adf = df, vars = v, scale = 1, HILL = TRUE),
+             thresh_30_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.3)/length(v),
+             thresh_50_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.5)/length(v),
+             thresh_70_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.7)/length(v)) %>%
+      mutate(sd_ave = sd(ave_mf),
+             mean_ave = mean(ave_mf))
     
     mf_names <- names(select(lm_df, ends_with("mf")))
     
@@ -155,7 +154,9 @@ est_n_func <- function(data, funcs, n_functions) {
       
     }
     
-    names(s_cof) <- mf_names
+    s_cof <- c(s_cof, lm_df$sd_ave[1], lm_df$mean_ave[1])
+    
+    names(s_cof) <- c(mf_names, "sd_ave", "mean_ave")
     
     y[[i]] <- s_cof
     
@@ -210,7 +211,15 @@ ggplot(data = slopes_n_func,
   facet_wrap(~mf_metric, scales = "free") +
   theme_meta()
 
-
+ggplot(data = slopes_n_func %>%
+         pivot_longer(cols = c("sd_ave", "mean_ave"),
+                      names_to = "met",
+                      values_to = "val"),
+       mapping = aes(x = number_functions, y = val)) +
+  geom_jitter() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~met, scales = "free") +
+  theme_meta()
 
 
 
