@@ -18,7 +18,7 @@ source(here("Scripts/Multifunctionality-Simulations/Multifunc_simulations_functi
 
 # load the Lotka-Volterra simulated data
 lv_dat <- 
-  read_csv(file = here("Scripts/multispecies_lotka_volterra_model/lv_mf_sim_dat.csv"))
+  read_csv(file = here("data/stachova_leps_model_data_mf.csv"))
 
 # check dimensions of the data
 nrow(lv_dat)
