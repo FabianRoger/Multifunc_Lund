@@ -41,9 +41,6 @@ Funcs <-
   ncol = func_n,
   dimnames = list(sp_names, func_names))
 
-
-# fill this with function values with different correlation levels among species
-
 # number of species
 specnum <- length(sp_names)
 
@@ -54,21 +51,18 @@ COR <- 0
 Sigma <- matrix(COR, ncol = func_n, nrow = func_n)
 
 # make three 'cluster' of correlated functions
-Sigma[1:3,1:3] <- -0.4
-Sigma[8:9,8:9] <- -0.3
-Sigma[6:7,6:7] <- -0.5
+lc <- 
+  list(c1 = c(0, 0, 0),
+       c2 = c(-0.4, -0.3, -0.5),
+       c3 = c(0.1, 0.4, 0.4))
+
+Sigma[1:3,1:3] <- lc[[2]][1]
+Sigma[8:9,8:9] <- lc[[2]][2]
+Sigma[6:7,6:7] <- lc[[2]][3]
 
 diag(Sigma) <- 1
 
 is.positive.definite(x = Sigma)
-
-# or generate clusters randomly
-Sigma <- matrix( runif(func_n^2, min = -1, max = 1), ncol = func_n)
-Sigma <- t(Sigma) %*% Sigma
-Sigma
-
-is.positive.definite(x = Sigma)
-
 
 # draw correlated functions (with mean 0)
 corF <- mvrnorm(n = specnum, mu = rep(0, func_n), Sigma = Sigma)
@@ -79,8 +73,6 @@ corF <- apply(corF, 2, function(x){ x + abs(min(x)) })
 # fill the function matrix
 Funcs[1:nrow(Funcs), 1:ncol(Funcs)] <- 
   as.vector(corF)
-
-Funcs
 
 Funcs %>%
   cor() %>%
@@ -99,12 +91,14 @@ row.names(Funcs) <- NULL
 # calculate function scores for each species
 
 bio_funcs <- 
-  left_join(filter(lv_dat, run == 3),
+  left_join(filter(lv_dat, run == 1),
             Funcs,
             by = "species") %>%
+  filter(abundance > 0) %>%
   mutate( across(.cols = all_of(func_names), ~(.*abundance) ) ) %>%
   group_by(replicate, species_pool) %>%
-  summarise( across(.cols = c("abundance", all_of(func_names) ) , ~sum(.) ), .groups = "drop" )
+  summarise( across(.cols = c("abundance", all_of(func_names) ) , ~sum(.) ),
+             realised_richness = length(unique(species)), .groups = "drop" )
 
 # z-score standardise the different functions
 # translate them to make sure they are positive
@@ -118,78 +112,6 @@ bio_funcs %>%
   cor() %>%
   corrplot(method = "ellipse")
 
-
-# write a function to output a slope between richness and function for different numbers of functions
-est_n_func <- function(data, funcs, n_functions) {
-  
-  # set up combinations for each number of functions
-  comb_f <- gtools::combinations(n = length(funcs), r = n_functions)
-  
-  # set up an output vector
-  y <- vector("list", length = nrow(comb_f))
-  
-  for (i in 1:nrow(comb_f)) {
-    
-    v <- funcs[comb_f[i, ]]
-    
-    df <- data[, v]
-    
-    lm_df <- 
-      data %>%
-      mutate(species_pool = scale(species_pool, scale = TRUE, center = TRUE),
-             ave_mf = MF_av(adf = df, vars = v),
-             pasari_mf = MF_pasari(adf = df, vars = v),
-             enf_mf = hill_multifunc(adf = df, vars = v, scale = 1, HILL = TRUE),
-             thresh_30_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.3)/length(v),
-             thresh_50_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.5)/length(v),
-             thresh_70_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.7)/length(v)) %>%
-      mutate(sd_ave = sd(ave_mf),
-             mean_ave = mean(ave_mf))
-    
-    mf_names <- names(select(lm_df, ends_with("mf")))
-    
-    s_cof <- vector(length = length(mf_names))
-    
-    for(s in 1:length(mf_names)) {
-      
-      lm1 <- lm(as.formula(paste0(mf_names[s], "~ species_pool")),
-                data = lm_df)
-      
-      s_cof[s] <- lm1$coefficients[2]
-      
-    }
-    
-    s_cof <- c(s_cof, lm_df$sd_ave[1], lm_df$mean_ave[1])
-    
-    names(s_cof) <- c(mf_names, "sd_ave", "mean_ave")
-    
-    y[[i]] <- s_cof
-    
-  } 
-  
-  y <- bind_rows(y, .id = "run")
-  
-  y$number_functions <- n_functions
-  
-  y
-  
-}
-
-# test this function
-est_n_func(data = bio_funcs, funcs = func_names, n_functions = 2)
-
-
-# loop over this function for all possible numbers of functions
-slopes_n_func <- vector("list", length = length(func_names))
-
-for(j in 2:length(func_names)) {
-  
-  slopes_n_func[[j]] <- est_n_func(data = bio_funcs, funcs = func_names, n_functions = j)
-  
-}
-
-slopes_n_func <- bind_rows(slopes_n_func, .id = "n_func")
-
 # plot the diversity-function relationship
 bio_funcs %>%
   pivot_longer(cols = starts_with("F"),
@@ -197,34 +119,116 @@ bio_funcs %>%
                values_to = "value") %>%
   ggplot(data = .,
          mapping = aes(x = species_pool, y = value)) +
-  geom_jitter(width = 0.5) +
+  geom_point() +
   geom_smooth(method = "lm", se = FALSE) +
   facet_wrap(~eco_function, scales = "free") +
   theme_meta()
 
+bio_funcs %>%
+  pivot_longer(cols = starts_with("F"),
+               names_to = "eco_function",
+               values_to = "value") %>%
+  ggplot(data = .,
+         mapping = aes(x = realised_richness, y = value)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~eco_function, scales = "free") +
+  theme_meta()
+
+
+# write a function to output a slope between richness and function for different numbers of functions
+est_n_func <- function(data, funcs) {
+  
+  s_est <- function(a, b, d) {
+    
+    # set up combinations for each number of functions
+    comb_f <- gtools::combinations(n = length(b), r = d)
+    
+    # set up an output vector
+    y <- vector("list", length = nrow(comb_f))
+    
+    for (i in 1:nrow(comb_f)) {
+      
+      v <- b[comb_f[i, ]]
+      
+      df <- a[, v]
+      
+      lm_df <- 
+        a %>%
+        mutate(species_pool = scale(species_pool, scale = TRUE, center = TRUE),
+               ave_mf = MF_av(adf = df, vars = v),
+               sum_mf = MF_sum(adf = df, vars = v),
+               pasari_mf = MF_pasari(adf = df, vars = v),
+               enf_mf = hill_multifunc(adf = df, vars = v, scale = 1, HILL = TRUE),
+               thresh_30_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.3),
+               thresh_70_mf = single_threshold_mf(adf = df, vars = v, thresh = 0.7))
+      
+      mf_names <- names(select(lm_df, ends_with("mf")))
+      
+      s_cof <- vector(length = length(mf_names))
+      
+      for(s in 1:length(mf_names)) {
+        
+        lm1 <- lm(as.formula(paste0(mf_names[s], "~ species_pool")),
+                  data = lm_df)
+        
+        s_cof[s] <- lm1$coefficients[2]
+        
+      }
+      
+      names(s_cof) <- c(mf_names)
+      
+      y[[i]] <- s_cof
+      
+    } 
+    
+    y <- bind_rows(y, .id = "run")
+    
+    y$number_functions <- d
+    
+    y
+    
+  }
+  
+  # loop over this function for all possible numbers of functions
+  slopes_n_func <- vector("list", length = length(funcs))
+  
+  for(j in 2:length(funcs)) {
+    
+    slopes_n_func[[j]] <- 
+      s_est(a = data, b = funcs, d = j)
+    
+  }
+  
+  bind_rows(slopes_n_func, .id = "n_func")
+  
+}
+
+# test this function
+df_est <- est_n_func(data = bio_funcs, funcs = func_names)
+
 # plot the standardised effect size between species pool diversity and function
-slopes_n_func <- 
-  slopes_n_func %>%
+df_est <- 
+  df_est %>%
   pivot_longer(cols = ends_with("mf"),
                names_to = "mf_metric",
-               values_to = "mf_value")
+               values_to = "biodiv_func_est")
 
-ggplot(data = slopes_n_func, 
-       mapping = aes(x = number_functions, mf_value)) +
+ggplot(data = df_est, 
+       mapping = aes(x = number_functions, biodiv_func_est)) +
   geom_jitter(width = 0.5, alpha = 0.1) +
   geom_smooth(method = "lm", se = FALSE) +
   facet_wrap(~mf_metric, scales = "free") +
   theme_meta()
 
-ggplot(data = slopes_n_func %>%
-         pivot_longer(cols = c("sd_ave", "mean_ave"),
-                      names_to = "met",
-                      values_to = "val"),
-       mapping = aes(x = number_functions, y = val)) +
-  geom_jitter() +
-  geom_smooth(method = "lm") +
-  facet_wrap(~met, scales = "free") +
+ggplot(data = df_est %>%
+         filter(grepl("thresh", mf_metric)), 
+       mapping = aes(x = number_functions, biodiv_func_est)) +
+  geom_jitter(width = 0.5, alpha = 0.1) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~mf_metric) +
   theme_meta()
+
 
 
 
