@@ -27,97 +27,82 @@ nrow(lv_dat)
 sp_names <- unique(lv_dat$species)
 
 
-# simulate three sets of species-specific functions
+# set up different functional scenarios for different species
 
-lv_mf <- 
-  lapply(split(lv_dat, lv_dat$run), function(x) {
-  
-  # for each run that is applied to, generate functions with three correlation structures  
-    
-  # set correlation cluster values for each run
-  lc <- 
-    list(c1 = c(0, 0, 0),
-         c2 = c(-0.4, -0.3, -0.5),
-         c3 = c(0.1, 0.4, 0.4))
-  
-  # set an output list to gather the species-specific function values
-  ss_funcs <- vector("list", length = length(lc))
-  
-  for (i in 1:length(lc)) {
-    
-    # choose the number of functions to simulate (cannot be varied without varying the correlation matrix)
-    func_n <- 9
-    
-    # set the function names
-    func_names <- paste0("F_", 1:func_n)
-    
-    # create an empty data matrix
-    Funcs <- 
-      matrix(nrow = length(sp_names),
-             ncol = func_n,
-             dimnames = list(sp_names, func_names))
-    
-    # number of species
-    specnum <- length(sp_names)
-    
-    # choose pairwise correlation strength
-    COR <- 0
-    
-    # make correlation matrix (strictly speaking a covariance matrix but for these simulations it does not matter)
-    Sigma <- matrix(COR, ncol = func_n, nrow = func_n)
-    
-    # make three 'cluster' of correlated functions
-    Sigma[1:3,1:3] <- lc[[i]][1]
-    Sigma[8:9,8:9] <- lc[[i]][2]
-    Sigma[6:7,6:7] <- lc[[i]][3]
-    
-    diag(Sigma) <- 1
-    
-    is.positive.definite(x = Sigma)
-    
-    # draw correlated functions (with mean 0)
-    corF <- mvrnorm(n = specnum, mu = rep(0, func_n), Sigma = Sigma)
-    
-    # shift to positive
-    corF <- apply(corF, 2, function(x){ x + abs(min(x)) })
-    
-    # fill the function matrix
-    Funcs[1:nrow(Funcs), 1:ncol(Funcs)] <- 
-      as.vector(corF)
-    
-    # convert the Funcs data to a dataframe
-    Funcs <- as.data.frame(Funcs)
-    
-    # add a species column
-    Funcs$species <- row.names(Funcs)
-    row.names(Funcs) <- NULL
-    
-    # add these function values to the lotka_volterra data
-    df <- 
-      left_join(x,
-                Funcs,
-                by = "species") %>%
-      mutate( across(.cols = all_of(func_names), ~(.*abundance) ) ) %>%
-      group_by(replicate, species_pool) %>%
-      summarise( across(.cols = c("abundance", all_of(func_names) ) , ~sum(.) ), .groups = "drop" )
-    
-    # z-score standardise the different functions
-    # translate them to make sure they are positive
-    df <- 
-      df %>%
-      mutate(across(.cols = all_of(func_names), ~as.numeric(scale(.x, center = TRUE, scale = TRUE)) )) %>%
-      mutate(across(.cols = all_of(func_names), ~(.x + abs(min(.x)))  ))
-    
-    ss_funcs[[i]] <- df
-    
-  }
-  
-  bind_rows(ss_funcs, .id = "cor_mat")
-  
-})
+# set the number of functions
+n_funcs <- 9
 
-# bind this into a dataframe
-lv_mf <- bind_rows(lv_mf, .id = "model")
+# set the function names
+func_names <- paste0("F_", 1:n_funcs)
+
+# scenario 1:
+# "all species positively affect all functions as a function of their abundance"
+
+# scenario 2:
+# "species have a mix of positive and negative effects on different functions as a function of their abundance"
+# "however, positive effects outweigh negative effects"
+
+# scenario 3:
+# "species have a mix of positive and negatives on different functions as a function of their abundance
+
+# defines lower bound of the uniform distribution for scenario 1, 2 and 3 respectively
+mixf <- c(0, -0.25, -0.5)
+
+sp_funcs <- 
+  lapply(mixf, function(x) {
+    
+    z <- 
+      data.frame(t(replicate(n = length(sp_names), expr = runif(n = n_funcs, min = x, max = 1))))
+    
+    names(z) <- func_names
+    
+    z$species <- sp_names
+    
+    z
+    
+  })
+
+# for each of these species-specific function values, multiply it by the species abundances
+
+com_mf <- 
+  lapply(sp_funcs, function(x) {
+    
+    y <- left_join(lv_dat, x, by = "species")
+    
+    y <- 
+      y %>%
+      mutate(across(.cols = all_of(func_names), ~(.*abundance) ))
+    
+    y <- 
+      y %>%
+      group_by(run, species_pool, replicate) %>%
+      summarise( across(.cols = c("abundance", all_of(func_names) ) , 
+                        ~if_else(sum(.) >= 0, sum(.), 0)),
+                 .groups = "drop" )
+    
+    
+    m <- max(filter(y, run == 1) %>% pull(F_1))
+    (filter(y, run == 1) %>% pull(F_1))/m
+    
+    y <- 
+      y %>%
+      group_by(run) %>%
+      mutate( across(.cols = all_of(func_names) , ~./max(.)) ) %>%
+      ungroup()
+    
+    y <- 
+      y %>%
+      pivot_longer(cols = all_of(func_names),
+                   names_to = "eco_function",
+                   values_to = "function_value")
+    
+    y
+    
+  })
+
+
+# prepare the com_mf data for export
+
 
 # write this into a .csv file
 write_csv(x = lv_mf,
