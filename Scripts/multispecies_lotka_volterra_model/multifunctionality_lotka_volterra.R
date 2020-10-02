@@ -82,7 +82,7 @@ est_n_func <- function(data, funcs) {
     
   }
   
-  bind_rows(slopes_n_func, .id = "n_func")
+  bind_rows(slopes_n_func, .id = "n_func_rep")
   
 }
 
@@ -91,31 +91,59 @@ est_n_func <- function(data, funcs) {
 lv_mf_sims <- 
   read_csv(file = here("data/lv_mf_analysis_data.csv"))
 
-# make a unique id for model and cor matrix
-lv_mf_sims <- 
-  lv_mf_sims %>%
-  mutate(mod_cor = paste(as.character(model), as.character(cor_mat), sep = "_"))
-
 # get a vector of function names
 f_names <- names(select(lv_mf_sims, starts_with("F")))
 
+# create a unique id column
+lv_mf_sims$id <- paste(as.character(lv_mf_sims$run), as.character(lv_mf_sims$scenario), sep = ".")
+
+# change the name of run to model
+lv_mf_sims <- 
+  lv_mf_sims %>%
+  rename(model = run)
+
+# split the data by this id column into a list
+lv_mf_l <- 
+  split(select(lv_mf_sims, -id), lv_mf_sims$id)
+
+
 # apply the est_n_func to each of these unique replicates
 mf_ests <- 
-  lapply(split(select(lv_mf_sims, -mod_cor), lv_mf_sims$mod_cor),
-       function(x) {
+  lapply(lv_mf_l,
+       
+         function(x) {
+           
+         z <- est_n_func(data = x, funcs = f_names)
          
-        pivot_longer(est_n_func(data = x, funcs = f_names),
-                     cols = ends_with("mf"),
-                     names_to = "mf_metric",
-                     values_to = "mf_div_est")
+         z %>%
+           mutate(scenario = x$scenario[1],
+                  model = x$model[1])
          
        })
 
-mf_ests_b <- bind_rows(mf_ests, .id = "mod_cor")
+
+mf_ests_b <- bind_rows(mf_ests, .id = "id")
 
 
-ggplot(data = mf_ests_b, 
-       mapping = aes(x = number_functions, y = mf_div_est, colour = mod_cor)) +
+lv_mf_sims %>%
+  pivot_longer(cols = all_of(f_names),
+               names_to = "eco_function",
+               values_to = "value") %>%
+  ggplot(data = .,
+       mapping = aes(x = species_pool, y = value, colour = id)) +
+  geom_jitter(width = 0.3, alpha = 0.3) +
+  geom_smooth(se = FALSE, method = "lm") +
+  facet_wrap(~eco_function, scales = "free") +
+  scale_colour_viridis_d() +
+  theme_meta() +
+  theme(legend.position = "none")
+
+mf_ests_b %>%
+  pivot_longer(cols = ends_with("mf"),
+               names_to = "mf_metric",
+               values_to = "mf_div_est") %>%
+  ggplot(data = ., 
+       mapping = aes(x = number_functions, y = mf_div_est, colour = id)) +
   geom_jitter(width = 0.3, alpha = 0.3) +
   geom_smooth(se = FALSE, method = "lm") +
   facet_wrap(~mf_metric, scales = "free") +

@@ -62,8 +62,9 @@ sp_funcs <-
     
   })
 
-# for each of these species-specific function values, multiply it by the species abundances
-
+# for each of these species-specific function values, multiply it by the species' abundances
+# sum all species values in each community
+# standardise by the max
 com_mf <- 
   lapply(sp_funcs, function(x) {
     
@@ -80,32 +81,46 @@ com_mf <-
                         ~if_else(sum(.) >= 0, sum(.), 0)),
                  .groups = "drop" )
     
-    
-    m <- max(filter(y, run == 1) %>% pull(F_1))
-    (filter(y, run == 1) %>% pull(F_1))/m
-    
     y <- 
       y %>%
       group_by(run) %>%
       mutate( across(.cols = all_of(func_names) , ~./max(.)) ) %>%
       ungroup()
     
-    y <- 
-      y %>%
-      pivot_longer(cols = all_of(func_names),
-                   names_to = "eco_function",
-                   values_to = "function_value")
-    
     y
     
   })
 
 
-# prepare the com_mf data for export
+# explore the com_mf data
+com_mf
 
+# plot the relationship between species pool diversity and function
+com_mf[[1]] %>%
+  pivot_longer(cols = all_of(func_names),
+               names_to = "eco_function",
+               values_to = "function_value") %>%
+  mutate(run = as.character(run)) %>%
+  ggplot(data = .,
+       mapping = aes(x = species_pool, y = function_value, colour = run)) +
+  geom_jitter(alpha = 0.1, width = 0.2) +
+  geom_smooth(se = FALSE, method = "lm") +
+  facet_wrap(~eco_function, scales = "free") +
+  theme_meta()
+
+com_mf[[2]] %>%
+  filter(run == 3) %>%
+  select(all_of(func_names)) %>%
+  cor() %>%
+  corrplot()
+
+# prepare the data for export
+names(com_mf) <- paste0("s_", 1:length(mixf))
+
+com_mf <- bind_rows(com_mf, .id = "scenario")
 
 # write this into a .csv file
-write_csv(x = lv_mf,
+write_csv(x = com_mf,
           path = here("data/lv_mf_analysis_data.csv"))
 
 
