@@ -131,7 +131,7 @@ lv_mf_sims %>%
                values_to = "value") %>%
   ggplot(data = .,
        mapping = aes(x = species_pool, y = value, colour = id)) +
-  geom_jitter(width = 0.3, alpha = 0.3) +
+  geom_jitter(width = 0.1, alpha = 0.1) +
   geom_smooth(se = FALSE, method = "lm") +
   facet_wrap(~eco_function, scales = "free") +
   scale_colour_viridis_d() +
