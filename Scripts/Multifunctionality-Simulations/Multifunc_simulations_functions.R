@@ -620,3 +620,32 @@ mvrnorm <- function (n = 1, mu, Sigma, tol = 1e-06, empirical = FALSE, EISPACK =
 }
 
 
+# check if matrix is positive-definite
+# from matrixcalc package: https://rdrr.io/cran/matrixcalc/src/R/is.positive.definite.R
+is.positive.definite <- function( x, tol=1e-8 )
+{
+  ###
+  ### this function determines if the given real symmetric matrix is positive definite
+  ###
+  ### parameters
+  ### x = a square numeric matrix object
+  ### tol = tolerance level for zero
+  ###
+  eigenvalues <- eigen(x, only.values = TRUE)$values
+  n <- nrow( x )
+  for ( i in 1: n ) {
+    if ( abs( eigenvalues[i] ) < tol ) {
+      eigenvalues[i] <- 0
+    }
+  }    
+  if ( any( eigenvalues <= 0 ) ) {
+    return( FALSE )
+  }
+  return( TRUE )
+}
+
+
+
+
+
+

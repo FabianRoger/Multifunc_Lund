@@ -18,7 +18,7 @@ source(here("Scripts/Multifunctionality-Simulations/Multifunc_simulations_functi
 
 # load the Lotka-Volterra simulated data
 lv_dat <- 
-  read_csv(file = here("data/stachova_leps_model_data_mf.csv"))
+  read_csv(file = here("data/stachova_leps_model_mf.csv"))
 
 # check dimensions of the data
 nrow(lv_dat)
@@ -42,8 +42,6 @@ Funcs <-
   dimnames = list(sp_names, func_names))
 
 
-# we can fill this empty matrix in different ways:
-
 # fill this with function values with different correlation levels among species
 
 # number of species
@@ -56,13 +54,21 @@ COR <- 0
 Sigma <- matrix(COR, ncol = func_n, nrow = func_n)
 
 # make three 'cluster' of correlated functions
-Sigma[1:4,1:4] <- -2
-Sigma[5:6,5:6] <- -2
-Sigma[7:9,7:9] <- -2
+Sigma[1:3,1:3] <- -0.4
+Sigma[8:9,8:9] <- -0.3
+Sigma[6:7,6:7] <- -0.5
 
-diag(Sigma) <- rnorm(n = length(diag(Sigma)), mean = 10, sd = 2)
+diag(Sigma) <- 1
 
+is.positive.definite(x = Sigma)
+
+# or generate clusters randomly
+Sigma <- matrix( runif(func_n^2, min = -1, max = 1), ncol = func_n)
+Sigma <- t(Sigma) %*% Sigma
 Sigma
+
+is.positive.definite(x = Sigma)
+
 
 # draw correlated functions (with mean 0)
 corF <- mvrnorm(n = specnum, mu = rep(0, func_n), Sigma = Sigma)
@@ -80,7 +86,6 @@ Funcs %>%
   cor() %>%
   corrplot(method = "ellipse")
 
-
 # convert the Funcs data to a dataframe
 Funcs <- as.data.frame(Funcs)
 
@@ -94,7 +99,7 @@ row.names(Funcs) <- NULL
 # calculate function scores for each species
 
 bio_funcs <- 
-  left_join(filter(lv_dat, time == last(time)),
+  left_join(filter(lv_dat, run == 3),
             Funcs,
             by = "species") %>%
   mutate( across(.cols = all_of(func_names), ~(.*abundance) ) ) %>%
