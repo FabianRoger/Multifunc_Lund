@@ -88,140 +88,40 @@ est_n_func <- function(data, funcs) {
 
 
 # load the Lotka-Volterra simulated data
-lv_dat <- 
-  read_csv(file = here("data/stachova_leps_model_mf.csv"))
+lv_mf_sims <- 
+  read_csv(file = here("data/lv_mf_analysis_data.csv"))
 
-# check dimensions of the data
-nrow(lv_dat)
+# make a unique id for model and cor matrix
+lv_mf_sims <- 
+  lv_mf_sims %>%
+  mutate(mod_cor = paste(as.character(model), as.character(cor_mat), sep = "_"))
 
-# make a vector of species names
-sp_names <- unique(lv_dat$species)
+# get a vector of function names
+f_names <- names(select(lv_mf_sims, starts_with("F")))
 
-# choose the number of functions to simulate
-func_n <- 9
+# apply the est_n_func to each of these unique replicates
+mf_ests <- 
+  lapply(split(select(lv_mf_sims, -mod_cor), lv_mf_sims$mod_cor),
+       function(x) {
+         
+        pivot_longer(est_n_func(data = x, funcs = f_names),
+                     cols = ends_with("mf"),
+                     names_to = "mf_metric",
+                     values_to = "mf_div_est")
+         
+       })
 
-# set the function names
-func_names <- paste0("F_", 1:func_n)
+mf_ests_b <- bind_rows(mf_ests, .id = "mod_cor")
 
-# create an empty data matrix
-Funcs <- 
-  matrix(nrow = length(sp_names),
-         ncol = func_n,
-         dimnames = list(sp_names, func_names))
-  
-  # number of species
-  specnum <- length(sp_names)
-  
-  # choose pairwise correlation strength
-  COR <- 0
-  
-  # make correlation matrix (strictly speaking a covariance matrix but for these simulations it does not matter)
-  Sigma <- matrix(COR, ncol = func_n, nrow = func_n)
-  
-  # set correlation cluster values
-  lc <- 
-    list(c1 = c(0, 0, 0),
-         c2 = c(-0.4, -0.3, -0.5),
-         c3 = c(0.1, 0.4, 0.4))
-  
-  
-  # make three 'cluster' of correlated functions
-  Sigma[1:3,1:3] <- lc[[2]][1]
-  Sigma[8:9,8:9] <- lc[[2]][2]
-  Sigma[6:7,6:7] <- lc[[2]][3]
-  
-  diag(Sigma) <- 1
-  
-  is.positive.definite(x = Sigma)
-  
-  # draw correlated functions (with mean 0)
-  corF <- mvrnorm(n = specnum, mu = rep(0, func_n), Sigma = Sigma)
-  
-  # shift to positive
-  corF <- apply(corF, 2, function(x){ x + abs(min(x)) })
-  
-  # fill the function matrix
-  Funcs[1:nrow(Funcs), 1:ncol(Funcs)] <- 
-    as.vector(corF)
-  
-  Funcs %>%
-    cor() %>%
-    corrplot(method = "ellipse")
-  
-  # convert the Funcs data to a dataframe
-  Funcs <- as.data.frame(Funcs)
-  
-  # add a species column
-  Funcs$species <- row.names(Funcs)
-  row.names(Funcs) <- NULL
-  
-  
-  # extract the abundance of each species in the last time point
-  # multiply each species abundance by the function value
-  # calculate function scores for each species
-  
-  bio_funcs <- 
-    left_join(filter(lv_dat, run == 1),
-              Funcs,
-              by = "species") %>%
-    mutate( across(.cols = all_of(func_names), ~(.*abundance) ) ) %>%
-    group_by(replicate, species_pool) %>%
-    summarise( across(.cols = c("abundance", all_of(func_names) ) , ~sum(.) ), .groups = "drop" )
-  
-  # z-score standardise the different functions
-  # translate them to make sure they are positive
-  bio_funcs <- 
-    bio_funcs %>%
-    mutate(across(.cols = all_of(func_names), ~as.numeric(scale(.x, center = TRUE, scale = TRUE)) )) %>%
-    mutate(across(.cols = all_of(func_names), ~(.x + abs(min(.x)))  ))
-  
-  bio_funcs %>%
-    select(abundance, contains("F")) %>%
-    cor() %>%
-    corrplot(method = "ellipse")
-  
-  # plot the diversity-function relationship
-  bio_funcs %>%
-    pivot_longer(cols = starts_with("F"),
-                 names_to = "eco_function",
-                 values_to = "value") %>%
-    ggplot(data = .,
-           mapping = aes(x = species_pool, y = value)) +
-    geom_point() +
-    geom_smooth(method = "lm", se = FALSE) +
-    facet_wrap(~eco_function) +
-    theme_meta()
-  
-  # run the est_n_function to get the slope between multifunctionality and richness
-  df_est <- est_n_func(data = bio_funcs, funcs = func_names)
-  
-  # plot the standardised effect size between species pool diversity and function
-  df_est <- 
-    df_est %>%
-    pivot_longer(cols = ends_with("mf"),
-                 names_to = "mf_metric",
-                 values_to = "biodiv_func_est")
-  
-ggplot(data = df_est, 
-       mapping = aes(x = number_functions, biodiv_func_est)) +
-  geom_jitter(width = 0.5, alpha = 0.1) +
-  geom_smooth(method = "lm", se = FALSE) +
+
+ggplot(data = mf_ests_b, 
+       mapping = aes(x = number_functions, y = mf_div_est, colour = mod_cor)) +
+  geom_jitter(width = 0.3, alpha = 0.3) +
+  geom_smooth(se = FALSE, method = "lm") +
   facet_wrap(~mf_metric, scales = "free") +
-  theme_meta()
-
-ggplot(data = df_est %>%
-         filter(grepl("thresh", mf_metric)), 
-       mapping = aes(x = number_functions, biodiv_func_est)) +
-  geom_jitter(width = 0.5, alpha = 0.1) +
-  geom_smooth(method = "lm", se = FALSE) +
-  facet_wrap(~mf_metric) +
-  theme_meta()
-
-
-
-
-
-
+  scale_colour_viridis_d() +
+  theme_meta() +
+  theme(legend.position = "none")
 
 
 
