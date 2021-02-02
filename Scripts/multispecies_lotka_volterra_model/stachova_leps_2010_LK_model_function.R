@@ -166,36 +166,47 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
       
     }
     )
-    
-    # bind the rows together
-    bef.res <- bind_rows(sim.out, .id = "patch")
-    
-    # add a column for the local species pool
-    lsp.patch <- 
-      bef.res %>%
-      filter(time == min(time)) %>%
-      group_by(patch) %>%
-      summarise(local.sp.pool = sum(if_else(abundance > 0, 1, 0)), .groups = "drop")
-    
-    bef.func <- 
-      bef.res %>%
-      filter(time == max(time)) %>%
-      group_by(patch, time) %>%
-      summarise(richness = sum(if_else(abundance > 0, 1, 0)),
-                functioning = sum(abundance), .groups = "drop")
-    
-    # join these data.frames together
-    sim.proc <- full_join(bef.func, lsp.patch, by = "patch")
-    
-    # add a column for the environment
-    sim.proc <- full_join(sim.proc, data.frame(patch = as.character(1:patches), 
-                                               env = env.p),
-                          by = "patch")
-    
-    return(sim.proc)
   
+  library(dplyr)
+  
+  # bind the rows together
+  bef.res <- bind_rows(sim.out, .id = "patch")
+  
+  # add a column for the local species pool
+  lsp.patch <- 
+    bef.res %>%
+    filter(time == min(time)) %>%
+    group_by(patch) %>%
+    summarise(local.sp.pool = sum(if_else(abundance > 0, 1, 0)), .groups = "drop")
+  
+  bef.func <- 
+    bef.res %>%
+    filter(time == max(time)) %>%
+    group_by(patch, time) %>%
+    summarise(richness = sum(if_else(abundance > 0, 1, 0)),
+              total_abundance = sum(abundance), .groups = "drop")
+  
+  # join these data.frames together
+  sim.proc <- full_join(bef.func, lsp.patch, by = "patch")
+  
+  # individual species abundances
+  sim.spp <- 
+    bef.res %>%
+    filter(time == max(time))
+  
+  # write these outputs into a list
+  output.list <- list(data.summary = sim.proc,
+                      data.raw = sim.spp)
+  
+  return(output.list)
+    
 }
 
+# test the function
+# df <- s_l_function()
 
+# df[[1]]
+# df[[2]]
 
-
+# plot(df$richness, df$functioning)
+# plot(df$local.sp.pool, df$functioning)
