@@ -210,3 +210,10 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
 
 # plot(df$richness, df$functioning)
 # plot(df$local.sp.pool, df$functioning)
+
+# x <- df[[2]]
+# hist(x[x$patch == "1", ]$abundance)
+
+
+
+
