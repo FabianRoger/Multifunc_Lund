@@ -196,7 +196,10 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
   
   # write these outputs into a list
   output.list <- list(data.summary = sim.proc,
-                      data.raw = sim.spp)
+                      data.raw = sim.spp,
+                      spp.info = list(competition.coefficients = alpha,
+                                      r.vals = r,
+                                      k.vals = k))
   
   return(output.list)
     
