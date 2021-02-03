@@ -42,6 +42,27 @@ ggplot(data = df.sum,
 # check the species parameters
 df.1[[3]]
 
+
+# how to model species specialisation stochastically?
+
+# sample - or + with 0.3 vs. 0.7 distribution in line with Hautier et al. (2017)
+
+# draw values for all species for a given function using the weibull
+
+# weibull distribution looks good...
+y_rgamma <- rweibull(n = 30, shape = 0.5, scale = 0.25)  
+
+# Print values to RStudio console 
+y_rgamma  
+
+mean(y_rgamma)
+range(y_rgamma)
+
+# Plot of randomly drawn gamma density 
+hist(y_rgamma, breaks = 50, main = "")
+
+
+
 # get the species abundance data
 df.spp <- df.1[[2]]
 
