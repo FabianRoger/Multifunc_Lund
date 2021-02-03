@@ -87,7 +87,8 @@ prob.pos <- 0.7
 
 func.mat <- 
   lapply(spp.list, function(x){
-  x <- rweibull(n = func.n, shape = w.shape, scale = w.scale)
+  # x <- rweibull(n = func.n, shape = w.shape, scale = w.scale)
+    x <- rnorm(n = func.n, mean = 0.5, sd = 0.1)
   y <- sample(x = c(-1, 1), size = func.n, prob = c(prob.neg, prob.pos), replace = TRUE)
   z <- (x*y)
   round(z, digits = 4)
@@ -99,7 +100,7 @@ func.mat <- cbind(spp.list, func.mat)
 names(func.mat) <- c("species", paste("F", 1:func.n, sep = "_"))
 
 # quantify species specialisation
-vegan::diversity(abs(func.mat[, -1]), index = "shannon")
+vegan::diversity((func.mat[, -1] + (min(func.mat[, -1])*-1) ), index = "shannon")
 mean(vegan::vegdist(x = abs(func.mat[, -1]), method = "bray"))
 
 func.mat %>%
@@ -108,7 +109,7 @@ func.mat %>%
                values_to = "val") %>%
   ggplot(data = .,
          mapping = aes(x = species, y = val, colour = functioning)) +
-  geom_bar(stat = "identity") +
+  geom_point() +
   theme_bw() +
   theme(legend.position = "none")
 
