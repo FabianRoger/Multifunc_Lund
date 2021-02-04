@@ -221,27 +221,3 @@ for (i in 1:length(sim.outputs)) {
   write_csv(x = x.dat, paste(here("/data"), "/", data.names[1], ".csv", sep = "" ))
   
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
