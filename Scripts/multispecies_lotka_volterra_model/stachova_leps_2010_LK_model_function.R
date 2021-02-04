@@ -204,19 +204,3 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
   return(output.list)
     
 }
-
-# test the function
-# df <- s_l_function()
-
-# df[[1]]
-# df[[2]]
-
-# plot(df$richness, df$functioning)
-# plot(df$local.sp.pool, df$functioning)
-
-# x <- df[[2]]
-# hist(x[x$patch == "1", ]$abundance)
-
-
-
-
