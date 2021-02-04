@@ -478,11 +478,13 @@ MF_slade <- function(adf, vars,
   
   for (i in 1:length(vars)) {
     
-    y <- ( ( adf_mat[ , i] - a[i] )/( b[i] - a[i] ) )^S[i]
+    p <- (adf_mat[[i]])
     
-    z <- ifelse( adf_mat[ , i] < a[i], 0, y)
+    y <- ( ( p - a[[i]] )/( b[[i]] - a[[i]] ) )^S[[i]]
     
-    w <- ifelse( adf_mat[ , i] > b[i], 1, z )
+    z <- mapply(function(d, e) {ifelse(d < a[[i]], 0, e)}, p, y  )
+    
+    w <- mapply(function(f, g) {ifelse(f > b[[i]], 1, g)}, p, z  )
     
     d_out[[i]] <- w
     
@@ -492,7 +494,6 @@ MF_slade <- function(adf, vars,
   
   
   # apply weights to each function
-  weights = "equal"
   if ( ((is.vector(weights) == TRUE) & (length(weights) == length(vars)))  ) {
     
     ws <- weights
