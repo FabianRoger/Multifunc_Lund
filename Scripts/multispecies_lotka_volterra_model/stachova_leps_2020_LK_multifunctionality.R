@@ -38,7 +38,7 @@ library(readr)
 
 # lotka-volterra model
 lsp = c(4, 6, 8, 10, 12)
-reps = 15
+reps = 10
 rsp = 20
 t_steps = 10
 n0 = 20
@@ -60,9 +60,14 @@ func.n = 9
 prob.neg = 0.1
 
 # varying parameters
+
+# number of replicates per simulation
 sim.reps <- 5
 
+# set the average level of interspecific competition
 a_mean <- c(0.15, 0.7)
+
+# set the level of species specialisation using parameters of the Weibull distribution
 w.shape <- c(0.5, 3)
 w.scale <- c(0.25, 0.5)
 
@@ -74,7 +79,7 @@ params$w.scale <- rep(w.scale, each = length(w.shape)*sim.reps)
 params <- cbind(sim.id = 1:nrow(params), params)
 
 # write the parameter combinations to a .csv file
-# write_csv(x = params, here("data/parameters_sim.csv"))
+write_csv(x = params, here("data/parameters_sim.csv"))
 
 
 # run each simulation
@@ -182,13 +187,13 @@ for (i in 1:nrow(params)) {
   raw.abundances[[i]] <- df.x$data.raw
   
   # (3) competition coefficients
-  alpha.dat[[i]] <- df.x$spp.info$competition.coefficients
+  alpha.dat[[i]] <- as.data.frame(df.x$spp.info$competition.coefficients)
   
   # (4) carrying capacities
-  k.vals[[i]] <- df.x$spp.info$k.vals
+  k.vals[[i]] <- data.frame(K = df.x$spp.info$k.vals)
   
   # (5) intrinsic growth rates
-  r.vals[[i]] <- df.x$spp.info$r.vals
+  r.vals[[i]] <- data.frame(R = df.x$spp.info$r.vals)
   
   # (6) function matrix
   function.vals[[i]] <- func.mat
@@ -215,9 +220,11 @@ data.names <- c("multifunctionality_data",
 
 
 # for each of the outputs, write into a data.frame
+data.loc <- here("data")
 for (i in 1:length(sim.outputs)) {
   
   x.dat <- bind_rows(sim.outputs[[i]], .id = "sim.id")
-  write_csv(x = x.dat, paste(here("/data"), "/", data.names[1], ".csv", sep = "" ))
+  write_csv(x = x.dat, paste(data.loc, "/", data.names[i], ".csv", sep = "" ))
   
 }
+
