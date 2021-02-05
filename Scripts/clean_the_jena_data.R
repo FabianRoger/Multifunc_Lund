@@ -90,7 +90,7 @@ head(jena.dat)
 View(jena.dat)
 
 # output this into a .csv file for further analysis
-write_csv(x = jena.dat, file = here("data/jena_analysis_data.csv"))
+write_csv(x = jena.dat, file = here("data/jena_data_cleaned.csv"))
 
 
 
