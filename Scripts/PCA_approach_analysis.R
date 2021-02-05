@@ -165,22 +165,24 @@ S1a <-
   geom_jitter(alpha = 0.2, shape = 16) +
   geom_smooth(method = "lm", se = FALSE, size = 0.75) +
   scale_colour_viridis_d(option = "C", end = 0.9) +
+  ylab("function value") +
+  xlab("species richness") +
   theme_meta() +
   theme(legend.position = "none")
 
-pca_mf_plot %>%
+S1b <- 
+  pca_mf_plot %>%
   filter(run == row.id) %>%
   select(starts_with("F ")) %>%
-  cor() %>%
-  corrplot::corrplot(method = "ellipse", type = "lower")
+  GGally::ggcorr(data = ., legend.position = "bottom")
 
-gridGraphics::grid.echo()
-S1b <- grid.grab()
-grid.draw(S1b)
+S1 <- 
+  ggarrange(plotlist = list(S1a, S1b), 
+            labels = letters[1:length(list(S1a, S1b))],
+            font.label = list(size = 12, color = "black", face = "plain", family = NULL))
 
-ggarrange(plotlist = list(S1a, S1b), 
-          labels = letters[1:length(list(S1a, S1b))],
-          font.label = list(size = 12, color = "black", face = "plain", family = NULL))
+ggsave(filename = here("Figures/fig_S1.png"), plot = S1,
+       width = 19, height = 10, units = "cm", dpi = 300)
 
 # plot a histogram of slopes of the relationship between average...
 hist_slopes <- 
@@ -210,21 +212,21 @@ hist_slopes.df <-
                values_to = "est.")
   
 # plot the histograms
-ph <- 
+S3 <- 
   ggplot(data = hist_slopes.df,
        mapping = aes(x = est.)) +
   geom_histogram(colour = "white", alpha = 0.8, fill = "grey") +
   facet_wrap(~metric) +
   geom_vline(xintercept = 0, colour = "red", linetype = "dashed", size = 1) +
   theme_meta()
-ph
+S3
 
-ggsave(filename = here("Figures/pca_hist.png"), plot = ph,
+ggsave(filename = here("Figures/fig_S3.png"), plot = S3,
        width = 19, height = 10, units = "cm", dpi = 300)
 
 
 # plot average multifunctionality versus pca multifunctionality
-p2 <- 
+S2 <- 
   pca_mf_plot %>%
   filter(run %in% sample((1:n), size = 50 ) ) %>%
   pivot_longer(cols = c(`PCA MF`, `Pasari MF`),
@@ -238,10 +240,14 @@ p2 <-
   facet_wrap(~metric, scales = "free") +
   theme_meta() +
   theme(legend.position = "none")
-p2
+S2
 
-ggsave(filename = here("Figures/pca_fig_2.png"), plot = p2,
+ggsave(filename = here("Figures/fig_S2.png"), plot = S2,
        width = 19, height = 10, units = "cm", dpi = 300)
+
+
+### potential additional figures
+
 
 # plot richness-function plots for average and pca multifunctionality
 p3 <- 
