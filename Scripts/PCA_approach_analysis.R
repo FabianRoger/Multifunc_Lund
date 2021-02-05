@@ -17,7 +17,7 @@ source(here("Scripts/function_plotting_theme.R"))
 
 
 # set number of runs to do
-n <- 500
+n <- 200
 
 # set up a blank list to fill
 pca_func <- vector("list", length = n)
@@ -53,7 +53,7 @@ for (i in (1:n) ) {
   Sigma
   
   # create function matrix
-  FuncMat <- FunctionValue(specnum,funcnum, distribution, min = 0, max = 1)
+  FuncMat <- FunctionValue(specnum, funcnum, distribution, min = 0, max = 1)
   FuncMat
   
   # replace function values with correlated function values
@@ -150,21 +150,37 @@ pca_mf_plot <-
          `Pasari MF` = Pasari_mf)
 
 
-# plot the correlation matrix
-# cor_out <-
-  # lapply(split(select(pca_mf, all_of(func.names)), pca_mf$run), function(x) {
-  
-    # corrplot(cor(x), method = "ellipse", diag = FALSE, type = "lower")
-    # gridGraphics::grid.echo()
-    # grid::grid.grab()
-    
-  # })
+# plot the relationship between species richness and each function for one random run
+row.id <- sample(x = length(unique(pca_mf_plot$run)), size = 1)
+row.id
 
-#p1 <- do.call(grid.arrange, cor_out)
+S1a <- 
+  pca_mf_plot %>%
+  filter(run == row.id) %>%
+  pivot_longer(cols = starts_with("F "),
+               names_to = "function_id",
+               values_to = "function_val") %>%
+  ggplot(data = .,
+         mapping = aes(x = Richness, y = function_val, colour = function_id)) +
+  geom_jitter(alpha = 0.2, shape = 16) +
+  geom_smooth(method = "lm", se = FALSE, size = 0.75) +
+  scale_colour_viridis_d(option = "C", end = 0.9) +
+  theme_meta() +
+  theme(legend.position = "none")
 
-# ggsave(filename = here("Figures/pca_fig_1.png"), plot = p1,
-       # width = 21, height = 22, units = "cm", dpi = 300)
+pca_mf_plot %>%
+  filter(run == row.id) %>%
+  select(starts_with("F ")) %>%
+  cor() %>%
+  corrplot::corrplot(method = "ellipse", type = "lower")
 
+gridGraphics::grid.echo()
+S1b <- grid.grab()
+grid.draw(S1b)
+
+ggarrange(plotlist = list(S1a, S1b), 
+          labels = letters[1:length(list(S1a, S1b))],
+          font.label = list(size = 12, color = "black", face = "plain", family = NULL))
 
 # plot a histogram of slopes of the relationship between average...
 hist_slopes <- 
@@ -201,6 +217,7 @@ ph <-
   facet_wrap(~metric) +
   geom_vline(xintercept = 0, colour = "red", linetype = "dashed", size = 1) +
   theme_meta()
+ph
 
 ggsave(filename = here("Figures/pca_hist.png"), plot = ph,
        width = 19, height = 10, units = "cm", dpi = 300)
@@ -221,7 +238,6 @@ p2 <-
   facet_wrap(~metric, scales = "free") +
   theme_meta() +
   theme(legend.position = "none")
-
 p2
 
 ggsave(filename = here("Figures/pca_fig_2.png"), plot = p2,
