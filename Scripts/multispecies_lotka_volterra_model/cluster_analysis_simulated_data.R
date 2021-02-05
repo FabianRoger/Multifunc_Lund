@@ -104,14 +104,16 @@ nmds.figs <-
 
 
 # combine these nmds plots
-ggarrange(plotlist = nmds.figs, 
+p1 <- 
+  ggarrange(plotlist = nmds.figs, 
             labels = letters[1:length(nmds.figs)],
             font.label = list(size = 12, color = "black", face = "plain", family = NULL),
             common.legend = TRUE,
             legend = "bottom")
 
     
-
+ggsave(filename = here("Figures/pca_clust_fig.png"), plot = p1,
+       width = 19, height = 20, units = "cm", dpi = 300)
 
 
 
