@@ -21,12 +21,12 @@ mult.dat <- read_csv(file = here("data/multifunctionality_data.csv"))
 head(mult.dat)
 
 # create a simulation category variable
-reps <- length(unique(params$rep.id))
-id <- unique(paste(params$a_mean, params$w.shape, params$w.scale, sep = "_"))
-id <- LETTERS[1:length(id)]
+# reps <- length(unique(params$rep.id))
+# id <- unique(paste(params$a_mean, params$w.shape, params$w.scale, sep = "_"))
+# id <- LETTERS[1:length(id)]
 
 # add this to the params data
-params$sim.group <- rep(id, each = reps)
+# params$sim.group <- rep(id, each = reps)
 
 # add this variable to the mult.dat data
 mult.dat <- 

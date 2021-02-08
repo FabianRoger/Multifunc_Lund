@@ -81,6 +81,14 @@ params <- cbind(sim.id = 1:nrow(params), params)
 # write the parameter combinations to a .csv file
 write_csv(x = params, here("data/parameters_sim.csv"))
 
+# create a simulation category variable
+reps <- length(unique(params$rep.id))
+id <- unique(paste(params$a_mean, params$w.shape, params$w.scale, sep = "_"))
+id <- LETTERS[1:length(id)]
+
+# add this to the params data
+params$sim.group <- rep(id, each = reps)
+
 
 # run each simulation
 
