@@ -57,6 +57,10 @@ negCurve<-divNeeded(redund, type="negative")
 negCurve$div<-negCurve$div/ncol(redund)
 negCurve
 
+getOverlapSummary(redund, 
+                  m=2, type = "positive", 
+                  index = "sorensen", denom = "set")[1]
+
 
 
 # write a function to automate this
@@ -65,8 +69,11 @@ negCurve
 # vars: vector of function names
 # species: vector of species names
 # data: data.frame with species abundances/presence-absences and function data
+# output: either "prop_species" for proportion of species affecting a function
+# or "overlap" which reports the mean pairwise overlap in species positive and negative effects
+# between all functions
 
-turnover_aic <- function(func.names, species.names, adf.data) {
+turnover_aic <- function(func.names, species.names, adf.data, output = "prop_species") {
   
   if(! "multifunc" %in% installed.packages()[,1]) stop(
     "this function requires the multifunc package to be installed"
@@ -94,18 +101,26 @@ turnover_aic <- function(func.names, species.names, adf.data) {
   # calculate average sorensen overlap among all pairs of functions
   pos.overlap <- getOverlapSummary(redund.dat, 
                                    m=2, type = "positive", 
-                                   index = "sorensen", denom = "set")
+                                   index = "sorensen", denom = "set")[1]
   
   neg.overlap <- getOverlapSummary(redund.dat, m=2, 
                                    type = "negative", 
-                                   index = "sorensen", denom = "set")
+                                   index = "sorensen", denom = "set")[1]
   
   overlap_effects <- 
     data.frame(direction = c("positive", "negative"),
                mean_sorensen_overlap = c(pos.overlap, neg.overlap))
   
-  return(list(species_effects,
-              overlap_effects))
+  # specify what to output
+  if (output == "prop_species") {
+    return(species_effects)
+  } 
+  
+  else if(output == "overlap") {
+    return(overlap_effects)
+  } 
+  
+  else {print("error, specify an output")}
   
 }
 
@@ -132,7 +147,48 @@ row.randomiser <- function(func.names, species.names, adf.data) {
   
 }
 
+# wrap this loop into a function
+# run this on different data.sets
 
+# potentially also add the observed values...
+
+n = 5
+
+null.out <- vector("list", length = n)
+for (i in 1:n){
+  
+  # randomise the function positions relative to the species using row.randomiser
+  data.random <- row.randomiser(func.names = vars, 
+                                species.names = species, 
+                                adf.data = germany)
+  
+  # apply the approach to the randomised data
+  turnover.out <- turnover_aic(func.names = vars, 
+                               species.names = species, 
+                               adf.data = data.random,
+                               output = "prop_species")
+  
+  # write the n_func proportion of the species pool to a list
+  null.out[[i]] <- turnover.out
+  
+}
+
+# write this output into a dataframe
+null.func.dat <- dplyr::bind_rows(null.out, .id = "null.rep")
+View(null.func.dat)
+
+# get observed value
+x <- turnover_aic(func.names = vars, species.names = species, adf.data = germany,
+                  output = "prop_species")
+x
+
+ggplot() +
+  geom_smooth(data = null.func.dat %>% filter(effect_direction == "positive"),
+              mapping = aes(x = nfunc, y = div, group = null.rep),
+              method = "lm", se = FALSE) +
+  geom_smooth(data = x %>% filter(effect_direction == "positive"),
+              mapping = aes(x = nfunc, y = div), colour = "red",
+              method = "lm")
 
 
 
