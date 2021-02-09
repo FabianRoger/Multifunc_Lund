@@ -19,16 +19,16 @@ source(here("Scripts/function_plotting_theme.R"))
 
 # get the list of matrices of function combinations
 function.combinations <- function(vector.func.names) {
-  func.combs <- vector("list", length = (length(vector.func.names)-1) )
+  nested.list.matrices <- vector("list", length = (length(vector.func.names)-1) )
   for (i in 2:length(vector.func.names)){
-    func.combs[[i-1]] <- combn(x = vector.func.names, m = i)
+    nested.list.matrices[[i-1]] <- combn(x = vector.func.names, m = i)
   }
-  return(func.combs)
+  return(nested.list.matrices)
 }
 
 # write a function to flatten an individual part of a nested list
-flatten.list.matrices <- function(nested.list){
-  unnested.list <- split(nested.list, col(nested.list)) 
+flatten.list.matrices <- function(nested.list.matrices){
+  unnested.list <- split(nested.list.matrices, col(nested.list.matrices)) 
   names(unnested.list) <- NULL 
   return(unnested.list)
 }
@@ -40,7 +40,7 @@ get.function.combinations <- function(function.names){
   list.func.matrix <- function.combinations(vector.func.names = function.names)
   
   # flatten the first matrix in the list
-  list.combination <- flatten.list.matrices(nested.list = list.func.matrix[[1]])
+  list.combination <- flatten.list.matrices(nested.list.matrices = list.func.matrix[[1]])
   
   # loop over this and bind into a list
   for (i in 2:length(list.func.matrix)){
@@ -48,9 +48,7 @@ get.function.combinations <- function(function.names){
     list.combination <- c(list.combination, x)
   }
   return(list.combination)
-  
 }
-
 
 # function to standardise functions and translate them by minimum absolute value
 standardise <- function(x) {
@@ -69,6 +67,8 @@ standardise <- function(x) {
 
 # adf.data: data.frame where rows are plots and which contains ecosystem functions of interest
 # mf.func.names: vector of function names to consider
+# standardise_funcs = TRUE i.e. standardise functions (z-score) before calculating multifunctionality
+# covariate_name = name of the variable to regress against the multifunctional BEF slope
 
 get_BEF_mf_est <- function(adf.data, 
                            mf.func.names, 
@@ -97,12 +97,10 @@ get_BEF_mf_est <- function(adf.data,
       select(all_of(sample.func.names ))
     
     if (standardise_funcs == TRUE) {
-      
       adf.func <- 
         adf.func %>%
         mutate(across(.cols = all_of(sample.func.names) , ~standardise(.) ) )
       }
-    
     
     # calculate the multifunctionality metrics
     data.mf <- 
@@ -162,6 +160,11 @@ jena.func.names <- var.names[!(var.names %in% ( c(spp.names, site.id) ))  ]
 jena.dat <- 
   jena.raw %>%
   select(all_of( c(site.id, jena.func.names) ))
+
+# reflect the soil nutrient functions (i.e. low nutrients means high uptake)
+jena.dat <- 
+  jena.dat %>%
+  mutate(across(.cols = starts_with("Soil"), ~(.*-1) ))
 
 # get realised diversity - number of functions from Jena data
 jena.n.func <- get_BEF_mf_est(adf.data = jena.dat, 
