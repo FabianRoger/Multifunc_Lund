@@ -1,10 +1,12 @@
 
-library(devtools)
-install_github("jebyrnes/multifunc")
+# Project: Review of multifunctionality in ecology, conservation and ecosystem service science
+
+# Title: Implement the turnover approach using the multifunc package and an analogue to Meyer et al. (2017)'s null model
+
+# install and load the multifunc package
+# library(devtools)
+# install_github("jebyrnes/multifunc")
 library(multifunc)
-
-
-# write a function pipeline to automate the turnover method and the null expectation
 
 # arguments for the functions:
 
@@ -73,7 +75,7 @@ turnover_aic <- function(func.names, species.names, adf.data, output = "prop_spe
     return(overlap_effects)
   } 
   
-  else {print("error, specify an output")}
+  else { print("error, specify an output") }
   
 }
 
@@ -107,6 +109,10 @@ turnover_aic_null <- function(func.names,
                               adf.data, 
                               output = "prop_species",
                               n = 100) {
+  
+  if(! "dplyr" %in% installed.packages()[,1]) stop(
+    "this function requires the dplyr package to be installed"
+  )
   
   # randomise the data and calculate turnover indices n times
   null.out <- vector("list", length = n)
@@ -149,7 +155,9 @@ x <- turnover_aic_null(func.names = vars,
                               output = "prop_species",
                               n = 1000)
 
+
 # plot the null expectations versus the observed data
+library(ggplot2)
 ggplot() +
   stat_smooth(data = x[[1]],
               mapping = aes(x = nfunc, y = div, group = null.rep),
