@@ -3,69 +3,11 @@ library(devtools)
 install_github("jebyrnes/multifunc")
 library(multifunc)
 
-# test this package using the BIODEPTH data
-data(all_biodepth)
 
-# function names
-allVars<-qw(biomassY3, root3, N.g.m2,  light3, N.Soil, wood3, cotton3)
-allVars
+# write a function pipeline to automate the turnover method and the null expectation
 
-# index of the functions
-varIdx<-which(names(all_biodepth) %in% allVars)
-varIdx
+# arguments for the functions:
 
-# subset the germany data
-germany<-subset(all_biodepth, all_biodepth$location=="Germany")
-
-# make variable lists
-vars<-whichVars(germany, allVars)
-vars
-
-species<-relevantSp(germany,26:ncol(germany))
-species
-
-spIDX <- which(names(germany) %in% species) #in case we need these
-
-
-### overlap approach
-
-# reflect the soil nutrient function to make sure it increases when nutrient depletion is high
-germany$N.Soil<- -1*germany$N.Soil + max(germany$N.Soil, na.rm=T)
-
-# use the sAICfun function to get coefficients for one funciton
-# species: vector of species names
-# germany: dataset with species presence-absence data and the function values
-
-spList <- sAICfun("biomassY3", species, germany)
-spList
-
-# we apply this function for all functions
-
-# vars: vector of function names
-# species: vector of species names
-# germany: data.frame with species presence, absence and function values
-redund <- getRedundancy(vars, species, germany)
-
-# this outputs an effect matrix i.e. -1, 0 or 1 corresponding to neg, neu or positive effects for each function
-redund
-
-# plot the num. functions by fraction of the species pool needed
-posCurve <- divNeeded(redund, type="positive")
-posCurve$div <- posCurve$div/ncol(redund)
-
-negCurve<-divNeeded(redund, type="negative")
-negCurve$div<-negCurve$div/ncol(redund)
-negCurve
-
-getOverlapSummary(redund, 
-                  m=2, type = "positive", 
-                  index = "sorensen", denom = "set")[1]
-
-
-
-# write a function to automate this
-
-# three inputs:
 # vars: vector of function names
 # species: vector of species names
 # data: data.frame with species abundances/presence-absences and function data
@@ -73,50 +15,61 @@ getOverlapSummary(redund,
 # or "overlap" which reports the mean pairwise overlap in species positive and negative effects
 # between all functions
 
+# n: number of null replicates
+
 turnover_aic <- function(func.names, species.names, adf.data, output = "prop_species") {
   
   if(! "multifunc" %in% installed.packages()[,1]) stop(
     "this function requires the multifunc package to be installed"
   )
   
+  # load the multifunc package
+  library(multifunc)
+  
   # use getRedundancy to get the effect of different species on each function
   redund.dat <- getRedundancy(vars = func.names, species = species.names, data = adf.data)
   
-  # calculate the number of species that positively affect different numbers of functions
-  posCurve <- divNeeded(redund.dat, type = "positive")
-  posCurve$div <- posCurve$div/ncol(redund.dat)
-  row.names(posCurve) <- NULL
-  posCurve$effect_direction <- "positive"
-  
-  # calculate the number of species that negative affect different numbers of functions
-  negCurve<-divNeeded(redund.dat, type = "negative")
-  negCurve$div<-negCurve$div/ncol(redund.dat)
-  row.names(negCurve) <- NULL
-  negCurve$effect_direction <- "negative"
-  
-  # bind these positive and negative effects together
-  species_effects <- rbind(posCurve, negCurve)
-  species_effects <- cbind(row.id = 1:nrow(species_effects), species_effects)
-  
-  # calculate average sorensen overlap among all pairs of functions
-  pos.overlap <- getOverlapSummary(redund.dat, 
-                                   m=2, type = "positive", 
-                                   index = "sorensen", denom = "set")[1]
-  
-  neg.overlap <- getOverlapSummary(redund.dat, m=2, 
-                                   type = "negative", 
-                                   index = "sorensen", denom = "set")[1]
-  
-  overlap_effects <- 
-    data.frame(direction = c("positive", "negative"),
-               mean_sorensen_overlap = c(pos.overlap, neg.overlap))
-  
   # specify what to output
   if (output == "prop_species") {
+    
+    # calculate the number of species that positively affect different numbers of functions
+    posCurve <- divNeeded(redund.dat, type = "positive")
+    posCurve$div <- posCurve$div/ncol(redund.dat)
+    row.names(posCurve) <- NULL
+    posCurve$effect_direction <- "positive"
+    
+    # calculate the number of species that negative affect different numbers of functions
+    negCurve<-divNeeded(redund.dat, type = "negative")
+    negCurve$div<-negCurve$div/ncol(redund.dat)
+    row.names(negCurve) <- NULL
+    negCurve$effect_direction <- "negative"
+    
+    # bind these positive and negative effects together
+    species_effects <- rbind(posCurve, negCurve)
+    species_effects <- cbind(row.id = 1:nrow(species_effects), species_effects)
+    
     return(species_effects)
-  } 
+  }
   
   else if(output == "overlap") {
+    
+    # calculate average sorensen overlap among all pairs of functions
+    
+    # positive function effects
+    pos.overlap <- getOverlapSummary(redund.dat, 
+                                     m=2, type = "positive", 
+                                     index = "sorensen", denom = "set")[1]
+    
+    # negative function effects
+    neg.overlap <- getOverlapSummary(redund.dat, m=2, 
+                                     type = "negative", 
+                                     index = "sorensen", denom = "set")[1]
+    
+    # bind this into a data.frame
+    overlap_effects <- 
+      data.frame(direction = c("positive", "negative"),
+                 mean_sorensen_overlap = c(pos.overlap, neg.overlap))
+    
     return(overlap_effects)
   } 
   
@@ -147,48 +100,65 @@ row.randomiser <- function(func.names, species.names, adf.data) {
   
 }
 
-# wrap this loop into a function
-# run this on different data.sets
 
-# potentially also add the observed values...
-
-n = 5
-
-null.out <- vector("list", length = n)
-for (i in 1:n){
+# use the defined functions to calculate turnover for randomised data and observed data
+turnover_aic_null <- function(func.names, 
+                              species.names, 
+                              adf.data, 
+                              output = "prop_species",
+                              n = 100) {
   
-  # randomise the function positions relative to the species using row.randomiser
-  data.random <- row.randomiser(func.names = vars, 
-                                species.names = species, 
-                                adf.data = germany)
+  # randomise the data and calculate turnover indices n times
+  null.out <- vector("list", length = n)
+  for (i in 1:n){
+    
+    # randomise the function positions relative to the species using row.randomiser
+    data.random <- row.randomiser(func.names = func.names, 
+                                  species.names = species.names, 
+                                  adf.data = adf.data)
+    
+    # apply the approach to the randomised data
+    turnover.out <- turnover_aic(func.names = func.names, 
+                                 species.names = species.names, 
+                                 adf.data = data.random,
+                                 output = output)
+    
+    # write the n_func proportion of the species pool to a list
+    null.out[[i]] <- turnover.out
+  }
   
-  # apply the approach to the randomised data
-  turnover.out <- turnover_aic(func.names = vars, 
-                               species.names = species, 
-                               adf.data = data.random,
-                               output = "prop_species")
+  # bind the loop output into a data.frame
+  null.out <- dplyr::bind_rows(null.out, .id = "null.rep")
   
-  # write the n_func proportion of the species pool to a list
-  null.out[[i]] <- turnover.out
+  # get observed value
+  obs.out <- turnover_aic(func.names = func.names, 
+                          species.names = species.names, 
+                          adf.data = data.random,
+                          output = output)
+  
+  # bind this into a list
+  return(list(null.out, obs.out))
   
 }
 
-# write this output into a dataframe
-null.func.dat <- dplyr::bind_rows(null.out, .id = "null.rep")
-View(null.func.dat)
 
-# get observed value
-x <- turnover_aic(func.names = vars, species.names = species, adf.data = germany,
-                  output = "prop_species")
-x
+# test the turnover_aic_null function and plot the results
+x <- turnover_aic_null(func.names = vars, 
+                              species.names = species, 
+                              adf.data = germany,
+                              output = "prop_species",
+                              n = 1000)
 
+# plot the null expectations versus the observed data
 ggplot() +
-  geom_smooth(data = null.func.dat %>% filter(effect_direction == "positive"),
+  stat_smooth(data = x[[1]],
               mapping = aes(x = nfunc, y = div, group = null.rep),
-              method = "lm", se = FALSE) +
-  geom_smooth(data = x %>% filter(effect_direction == "positive"),
+              geom='line', alpha=0.01, size = 1, se=FALSE, method = "lm") +
+  geom_smooth(data = x[[2]],
               mapping = aes(x = nfunc, y = div), colour = "red",
-              method = "lm")
+              method = "lm", se = FALSE) +
+  facet_wrap(~effect_direction, scales = "free") +
+  theme_classic()
 
 
 
