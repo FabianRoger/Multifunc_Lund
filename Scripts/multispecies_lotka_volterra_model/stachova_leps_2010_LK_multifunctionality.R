@@ -42,11 +42,12 @@ library(readr)
 lsp = c(4, 6, 8, 10, 12)
 reps = 10
 rsp = 20
-t_steps = 10
+t_steps = 100
 n0 = 20
 a_min = 0
-a_max = 0.75
+a_max = 1
 sim.comp = "sym"
+a_scale = 1
 
 # set the number of functions
 func.n = 9
@@ -60,17 +61,17 @@ prob.neg = 0.1
 sim.reps <- 5
 
 # set the average level of interspecific competition
-a_mean <- c(0.15, 0.7, 0.05)
+a_mean <- c(0.25, 0.5, 0.05)
 
 # set the standard deviation of intraspecific competition
-a_sd <- c(0.05, 0.05, 0)
+a_sd <- c(0.1, 0.1, 0)
 
 # set the intraspecific competition value
 a_spp <- c(1, 1, 0.05)
 
 # set the min and max k-values
-k_min = c(20, 20, 50)
-k_max = c(150, 150, 50)
+k_min = c(20, 20, 75)
+k_max = c(150, 150, 75)
 
 # set the min and max r-values
 r_min = c(0.1, 0.1, 0.25)
@@ -102,7 +103,7 @@ id <- LETTERS[1:length(id)]
 params$sim.group <- rep(id, each = reps)
 
 # write the parameter combinations to a .csv file
-# write_csv(x = params, here("data/parameters_sim.csv"))
+write_csv(x = params, here("data/parameters_sim.csv"))
 
 # run each simulation
 
@@ -124,7 +125,7 @@ for (i in 1:nrow(params)) {
                  t_steps = t_steps,
                  n0 = n0,
                  a_mean = params$a_mean[i], a_sd = params$a_sd[i], 
-                 a_min = a_min, a_max = a_max, 
+                 a_min = a_min, a_max = a_max,
                  a_spp = params$a_spp[i], sim.comp = sim.comp,
                  k_min = params$k_min[i], k_max = params$k_max[i],
                  r_min = params$r_min[i], r_max = params$r_max[i]
@@ -195,7 +196,8 @@ for (i in 1:nrow(params)) {
            `thresh.70 MF` = single_threshold_mf(adf = adf.func, vars = func.names, thresh = 0.7),
            `Slade.10.90 MF` = MF_slade(adf = adf.func, vars = func.names, A_quant = 0.10, B_quant = 0.90),
            `Slade.40.60 MF` = MF_slade(adf = adf.func, vars = func.names, A_quant = 0.40, B_quant = 0.60),
-           `PCA MF` = pca_multifunc(adf = adf.func, vars = func.names, standardise = FALSE) )
+           `PCA MF` = pca_multifunc(adf = adf.func, vars = func.names, standardise = FALSE) 
+           )
   
   # join this multifunctionality data to the summary data
   mf.sim <- full_join(df.x$data.summary, multi.func, by = c("patch"))
@@ -221,6 +223,11 @@ for (i in 1:nrow(params)) {
   function.vals[[i]] <- func.mat
 }
 
+# check output
+check.id <- 25
+
+params[check.id,]
+mf.dataframe[[check.id]]$richness
 
 # put these outputs into a list
 sim.outputs <- 
@@ -230,7 +237,6 @@ sim.outputs <-
        k.vals,
        r.vals,
        function.vals)
-
 
 # set a vector of data.names
 data.names <- c("multifunctionality_data",

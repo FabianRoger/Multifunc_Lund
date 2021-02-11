@@ -17,6 +17,7 @@
 # a_min = min interspecific competition of a truncated normal distribution
 # a_max = max interspecific competition of a truncated normal distribution
 # a_spp = intraspecific competition for each species
+# a_scale = scaling coefficient of competition coefficients
 
 # kmin = minimum carrying capacity (uniform distribution)
 # kmax = maximum carrying capacity (unifrom distribution)
@@ -30,7 +31,7 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
                          t_steps = 10,
                          n0 = 20,
                          a_mean = 0.8, a_sd = 0.2, a_min = 0.2,
-                         a_max = 1.2, a_spp = 1, sim.comp = "sym",
+                         a_max = 1.2, a_spp = 1, sim.comp = "sym", a_scale = 1,
                          k_min = 20, k_max = 150,
                          r_min = 0.01, r_max = 0.5){
   
@@ -60,10 +61,10 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
   patches <- reps*length(lsp)
   
   # generate matrix of competition coefficients
-  alpha <- matrix(truncnorm::rtruncnorm(n = rsp*rsp, 
+  alpha <- matrix( (truncnorm::rtruncnorm(n = rsp*rsp, 
                                         a = a_min, b = a_max, 
                                         mean = rnorm(n = 1, mean = a_mean, sd = 0.01), 
-                                        sd = a_sd), rsp, rsp)
+                                        sd = a_sd)), rsp, rsp)
   
   # make the matrix symmetric if chosen
   if (sim.comp == "sym") {
@@ -72,6 +73,9 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
   
   # make all intraspecific competition coefficients equal to 1
   diag(alpha) <- rep(a_spp, rsp)
+  
+  # scale the competition-coefficient matrix
+  alpha <- alpha*a_scale
   
   # generate the carrying capacities (K) for each species from the uniform distribution
   k <- runif(n = rsp, min = k_min, max = k_max)
