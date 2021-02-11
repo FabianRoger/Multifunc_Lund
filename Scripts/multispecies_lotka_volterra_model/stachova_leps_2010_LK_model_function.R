@@ -17,7 +17,6 @@
 # a_min = min interspecific competition of a truncated normal distribution
 # a_max = max interspecific competition of a truncated normal distribution
 # a_spp = intraspecific competition for each species
-# sim.comp = if "sym" then competition is symmetric between species
 
 # kmin = minimum carrying capacity (uniform distribution)
 # kmax = maximum carrying capacity (unifrom distribution)
@@ -29,11 +28,10 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
                          reps = 10,
                          rsp = 50,
                          t_steps = 10,
-                         n0 = 3,
-                         ext.thresh = 0.2,
+                         n0 = 20,
                          a_mean = 0.8, a_sd = 0.2, a_min = 0.2,
                          a_max = 1.2, a_spp = 1, sim.comp = "sym",
-                         k_min = 3, k_max = 150,
+                         k_min = 20, k_max = 150,
                          r_min = 0.01, r_max = 0.5){
   
   # check that the correct packages are installed
@@ -141,7 +139,7 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
           }
           
           # if a species abundance drops below 0.2 it is considered extinct
-          if (n_t[[m]][g] < ext.thresh) { n_t[[m]][g] <- 0 }
+          # if (n_t[[m]][g] < ext.thresh) { n_t[[m]][g] <- 0 }
           
         }
         
