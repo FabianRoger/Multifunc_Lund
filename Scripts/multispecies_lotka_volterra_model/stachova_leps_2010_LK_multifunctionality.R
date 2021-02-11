@@ -15,8 +15,10 @@ source(here("Scripts/MF_functions_collated.R"))
 # (2) stabilising competition + low specialisation
 # (3) strong competition + high specialisation
 # (4) strong competition + low specialisation
+# (5) equal competition + high specialisation
+# (6) equal competition + low specialisation
 
-# run each of these types 10 times
+# run each of these types 5 times
 # stick with 500 time-steps to start with
 
 # what to output?
@@ -42,16 +44,9 @@ reps = 10
 rsp = 20
 t_steps = 10
 n0 = 20
-ext.thresh = 0.2
-a_sd = 0.05
 a_min = 0
 a_max = 0.75
-a_spp = 1
 sim.comp = "sym"
-k_min = 20
-k_max = 150
-r_min = 0.1
-r_max = 0.5
 
 # set the number of functions
 func.n = 9
@@ -65,21 +60,38 @@ prob.neg = 0.1
 sim.reps <- 5
 
 # set the average level of interspecific competition
-a_mean <- c(0.15, 0.7)
+a_mean <- c(0.15, 0.7, 0.05)
+
+# set the standard deviation of intraspecific competition
+a_sd <- c(0.05, 0.05, 0)
+
+# set the intraspecific competition value
+a_spp <- c(1, 1, 0.05)
+
+# set the min and max k-values
+k_min = c(20, 20, 50)
+k_max = c(150, 150, 50)
+
+# set the min and max r-values
+r_min = c(0.1, 0.1, 0.25)
+r_max = c(0.5, 0.5, 0.25)
 
 # set the level of species specialisation using parameters of the Weibull distribution
 w.shape <- c(0.5, 3)
 w.scale <- c(0.25, 0.5)
 
 # set-up a data.frame of parameter combinations for each simulation
-params <- expand.grid(rep.id = 1:sim.reps, a_mean = a_mean, w.shape = w.shape)
-params$w.scale <- rep(w.scale, each = length(w.shape)*sim.reps)
+params <- data.frame(a_mean = a_mean, a_sd = a_sd, a_spp = a_spp,
+           k_min = k_min, k_max = k_max,
+           r_min = r_min, r_max = r_max)
+
+params <- merge(params, data.frame(w.shape = w.shape))
+params <- merge(data.frame(rep.id = 1:sim.reps), params )
+
+params$w.scale <- rep(w.scale, each = length(a_mean)*sim.reps)
 
 # set an id column
 params <- cbind(sim.id = 1:nrow(params), params)
-
-# write the parameter combinations to a .csv file
-write_csv(x = params, here("data/parameters_sim.csv"))
 
 # create a simulation category variable
 reps <- length(unique(params$rep.id))
@@ -89,6 +101,8 @@ id <- LETTERS[1:length(id)]
 # add this to the params data
 params$sim.group <- rep(id, each = reps)
 
+# write the parameter combinations to a .csv file
+# write_csv(x = params, here("data/parameters_sim.csv"))
 
 # run each simulation
 
@@ -109,11 +123,11 @@ for (i in 1:nrow(params)) {
                  rsp = rsp,
                  t_steps = t_steps,
                  n0 = n0,
-                 ext.thresh = ext.thresh,
-                 a_mean = params$a_mean[1], a_sd = a_sd, a_min = a_min, a_max = a_max, 
-                 a_spp = a_spp, sim.comp = sim.comp,
-                 k_min = k_min, k_max = k_max,
-                 r_min = r_min, r_max = r_max
+                 a_mean = params$a_mean[i], a_sd = params$a_sd[i], 
+                 a_min = a_min, a_max = a_max, 
+                 a_spp = params$a_spp[i], sim.comp = sim.comp,
+                 k_min = params$k_min[i], k_max = params$k_max[i],
+                 r_min = params$r_min[i], r_max = params$r_max[i]
     )
   
   # get the raw species abundance data
@@ -128,7 +142,7 @@ for (i in 1:nrow(params)) {
   # generate a function matrix for the relationship between each species abundance and each function
   func.mat <- 
     lapply(spp.list, function(x){
-      x <- rweibull(n = func.n, shape = params$w.shape[1], scale = params$w.scale[1])
+      x <- rweibull(n = func.n, shape = params$w.shape[i], scale = params$w.scale[i])
       y <- x - quantile(x, prob.neg)
       z <- (x*y)
       round(z, digits = 4)
