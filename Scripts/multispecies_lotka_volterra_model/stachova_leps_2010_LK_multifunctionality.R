@@ -53,7 +53,7 @@ a_scale = 1
 func.n = 9
 
 # set the probability that a species negatively affects a function
-prob.neg = 0.1
+prob.neg = 0.2
 
 # varying parameters
 
@@ -144,7 +144,7 @@ for (i in 1:nrow(params)) {
   func.mat <- 
     lapply(spp.list, function(x){
       x <- rweibull(n = func.n, shape = params$w.shape[i], scale = params$w.scale[i])
-      x[x > 10] <- rnorm(n = sum(x > 10), mean = 10, sd = 2)
+      x[x > 10] <- rnorm(n = sum(x > 10), mean = 10, sd = 2) # constrain values to around 10
       y <- x - quantile(x, prob.neg)
       z <- round(y, digits = 4)
     })
@@ -226,11 +226,12 @@ for (i in 1:nrow(params)) {
 }
 
 # check output
-check.id <- 26
+check.id <- 25
 
 params[check.id,]
 mf.dataframe[[check.id]]$richness
-View(mf.dataframe[[check.id]])
+mf.dataframe[[check.id]]$local.sp.pool
+length(unique(mf.dataframe[[check.id]]$patch))
 
 # put these outputs into a list
 sim.outputs <- 
