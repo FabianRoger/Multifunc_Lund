@@ -40,10 +40,10 @@ library(readr)
 
 # lotka-volterra model
 lsp = c(4, 6, 8, 10, 12)
-reps = 10
+reps = 5
 rsp = 20
 t_steps = 100
-n0 = 20
+n0 = 50
 a_min = 0
 a_max = 1
 sim.comp = "sym"
@@ -70,8 +70,8 @@ a_sd <- c(0.1, 0.1, 0)
 a_spp <- c(1, 1, 0.05)
 
 # set the min and max k-values
-k_min = c(20, 20, 75)
-k_max = c(150, 150, 75)
+k_min = c(50, 50, 125)
+k_max = c(200, 200, 125)
 
 # set the min and max r-values
 r_min = c(0.1, 0.1, 0.25)
@@ -95,12 +95,12 @@ params$w.scale <- rep(w.scale, each = length(a_mean)*sim.reps)
 params <- cbind(sim.id = 1:nrow(params), params)
 
 # create a simulation category variable
-reps <- length(unique(params$rep.id))
+reps.sim <- length(unique(params$rep.id))
 id <- unique(paste(params$a_mean, params$w.shape, params$w.scale, sep = "_"))
 id <- LETTERS[1:length(id)]
 
 # add this to the params data
-params$sim.group <- rep(id, each = reps)
+params$sim.group <- rep(id, each = reps.sim)
 
 # write the parameter combinations to a .csv file
 write_csv(x = params, here("data/parameters_sim.csv"))
@@ -144,9 +144,9 @@ for (i in 1:nrow(params)) {
   func.mat <- 
     lapply(spp.list, function(x){
       x <- rweibull(n = func.n, shape = params$w.shape[i], scale = params$w.scale[i])
+      x[x > 10] <- rnorm(n = sum(x > 10), mean = 10, sd = 2)
       y <- x - quantile(x, prob.neg)
-      z <- (x*y)
-      round(z, digits = 4)
+      z <- round(y, digits = 4)
     })
   
   func.mat <- data.frame(do.call(rbind, func.mat))
@@ -157,9 +157,11 @@ for (i in 1:nrow(params)) {
   multi.func <- full_join(df.spp, func.mat, by = "species")
   
   # multiply abundance by these function values
+  # add small normally distributed error (i.e. sd = 0.1)
   multi.func <- 
     multi.func %>%
-    mutate(across(.cols = func.names, ~(.*abundance) ))
+    mutate(across(.cols = func.names, ~(.*abundance) )) %>%
+    mutate(across(.cols = func.names, ~(. + rnorm(n = length(.), mean = 0, sd = 0.1)) ) )
   
   # function to standardise and then translate the functions
   func.std.trans <- function(x){
@@ -224,10 +226,11 @@ for (i in 1:nrow(params)) {
 }
 
 # check output
-check.id <- 25
+check.id <- 26
 
 params[check.id,]
 mf.dataframe[[check.id]]$richness
+View(mf.dataframe[[check.id]])
 
 # put these outputs into a list
 sim.outputs <- 

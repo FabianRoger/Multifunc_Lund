@@ -156,6 +156,55 @@ x <- turnover_aic_null(func.names = vars,
                               n = 1000)
 
 
+### test the turnover approach using the simulated data...
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(here)
+
+# read some of the simulated data
+s <- 1
+
+abun.dat <- read_csv(here("data/raw_abundance_data.csv"))
+abun.dat <- 
+  abun.dat %>%
+  filter(sim.id == s) %>%
+  pivot_wider(names_from = "species", values_from = "abundance")
+
+mf.dat <- read_csv(here("data/multifunctionality_data.csv"))
+
+mf.dat <- 
+  mf.dat %>%
+  filter(sim.id == s) %>%
+  select(-richness, -total_abundance, -local.sp.pool, -ends_with("MF"))
+
+# join the abundance data to the function data
+mf.dat <- full_join(mf.dat, abun.dat, by = c("sim.id", "patch", "time"))
+
+func.dat <- read_csv(here("data/function_values_per_species.csv"))
+func.dat <- 
+  func.dat %>%
+  filter(sim.id == s)
+
+# list of species names
+spp.names <- 
+  mf.dat %>%
+  select(starts_with("sp_")) %>%
+  names(.)
+
+# list of function names
+f.names <- 
+  mf.dat %>%
+  select(starts_with("F_")) %>%
+  names(.)
+
+f.n <- 5
+
+r.dat <- getRedundancy(vars = f.names[f.n], species = spp.names, data = mf.dat)
+plot(func.dat[[f.names[f.n]]], sapply(r.dat, function(x)(x)))
+
+
 # plot the null expectations versus the observed data
 library(ggplot2)
 ggplot() +
