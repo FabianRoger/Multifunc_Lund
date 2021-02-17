@@ -12,6 +12,7 @@ library(ggplot2)
 
 # scripts to draw functions from
 source(here("Scripts/function_plotting_theme.R"))
+source(here("Scripts/MF_functions_collated.R"))
 
 # load the simulated data
 
@@ -37,10 +38,6 @@ sim.id.plots <-
   ungroup() %>%
   pull(sim.id)
 
-# sim.id
-sim.number <- sim.id.plots[4]
-params[sim.number,]
-
 # modify the plotting theme to make the text smaller
 theme_meta2 <- function() {
   theme_meta() +
@@ -48,9 +45,22 @@ theme_meta2 <- function() {
       axis.title.x = element_text(colour ="black", size = 9.5, face = "plain", margin=margin(5,0,0,0,"pt")),
       axis.title.y = element_text(colour = "black", size = 9.5, face = "plain", margin=margin(0,5,0,0,"pt")),
       axis.text.x = element_text(colour = "black", size=8, face = "plain",  margin=margin(10,0,0,0,"pt")),
-      axis.text.y = element_text(colour ="black", size=8, face = "plain", margin=margin(0,10,0,0,"pt"))
+      axis.text.y = element_text(colour ="black", size=8, face = "plain", margin=margin(0,10,0,0,"pt")),
+      title = element_text(colour = "black", size = 8, face = "plain")
     )
 }
+
+
+
+# set-up plot titles
+plot.titles <- 
+  c("weak comp. + specialisation",
+  "strong comp. + specialisation",
+  "equal comp. + specialisation",
+  "weak comp. + generalism",
+  "strong comp. + generalism",
+  "equal comp. + generalism")
+
 
 plot.list <- vector("list", length = length(sim.id.plots))
 for (i in 1:length(sim.id.plots)) {
@@ -81,6 +91,7 @@ for (i in 1:length(sim.id.plots)) {
     scale_x_continuous(breaks = c(0:max(p.df.ran$abundance_rank))) +
     ylab("abundance") +
     xlab("rank") +
+    ggtitle(plot.titles[i]) +
     theme_meta2() +
     theme(legend.position = "none") # +
   # facet_wrap(~patch, scales = "free") +
@@ -101,6 +112,7 @@ for (i in 1:length(sim.id.plots)) {
     geom_jitter(width = 0.1) +
     xlab("sp. richness") +
     ylab("tot. abundance") +
+    ggtitle("") +
     theme_meta2() # +
   # theme(plot.margin = unit(c(5.5,5.5,57,5.5), "pt"))
   
@@ -114,10 +126,11 @@ for (i in 1:length(sim.id.plots)) {
     ggplot(data = .,
            mapping = aes(x = richness, y = value, colour = EF)) +
     geom_jitter(width = 0.1, alpha = 0.5, shape = 16) +
-    geom_smooth(method = "lm", se = FALSE) +
+    geom_smooth(method = "lm", se = FALSE, size = 0.75) +
     scale_colour_viridis_d(option = "C", end = 0.9) +
     ylab("function") +
     xlab("sp. richness") +
+    ggtitle("") +
     theme_meta2() +
     theme(legend.position = "none") # +
   # theme(legend.position = "bottom",
@@ -141,14 +154,90 @@ for (i in 1:length(sim.id.plots)) {
 
 # high functional specialisation
 par.dat[sim.id.plots,]
-plot.list[[1]]/plot.list[[2]]/plot.list[[3]]
+h.s <- plot.list[[1]]/plot.list[[2]]/plot.list[[3]]
+h.s
+
+ggsave(filename = here("Figures/sim.exp1.png"), plot = h.s,
+       width = 17.3, height = 16, units = "cm", dpi = 450)
 
 # low functional specialisation
 par.dat[sim.id.plots,]
-plot.list[[4]]/plot.list[[5]]/plot.list[[6]]
+l.s <- (plot.list[[4]]/plot.list[[5]]/plot.list[[6]])
+l.s
+
+ggsave(filename = here("Figures/sim.exp2.png"), plot = l.s,
+       width = 17.3, height = 16, units = "cm", dpi = 450)
 
 
+# create the same plots for the Jena data
+
+# load the cleaned Jena data
+jena.raw <- read_csv(file = here("data/jena_data_cleaned.csv"))
+
+# define variable groups
+var.names <- names(jena.raw)
+
+# (1) get species names
+spp.p <- ( grepl("+\\.+", var.names) & nchar(var.names) == 7 )
+spp.names <- var.names[spp.p]
+
+# (2) get site identifiers
+site.id <- c("year", "sowndiv", "plotcode", "realised_diversity")
+
+# (3) get function names
+jena.func.names <- var.names[!(var.names %in% ( c(spp.names, site.id) ))  ]
+
+# subset the site.id and function names
+jena.dat <- 
+  jena.raw %>%
+  select(all_of( c(site.id, jena.func.names) ))
+
+# standardise the different ecosystem functions
+jena.dat <- 
+  jena.dat %>%
+  mutate(across(.cols = all_of(jena.func.names), standardise))
+
+# plot richness versus community biomass
+j1 <- 
+  ggplot(data = jena.dat,
+       mapping = aes(x = realised_diversity, y = BM_targ_DW)) +
+  geom_smooth(method = "lm", se = TRUE, colour = "black", alpha = 0.2, size = 0.75) +
+  geom_jitter(width = 0.1) +
+  xlab("sp. richness") +
+  ylab("community biomass") +
+  theme_meta2() +
+  theme(plot.margin = unit(c(5.5,5.5,57,5.5), "pt"))
 
 
+# plot richness versus the other functions
+j2 <- 
+  jena.dat %>%
+  pivot_longer(cols = jena.func.names[jena.func.names != "BM_targ_DW"],
+               names_to = "EF",
+               values_to = "value") %>%
+  ggplot(data = .,
+         mapping = aes(x = realised_diversity, y = value, colour = EF)) +
+  geom_jitter(width = 0.1, alpha = 0.5, shape = 16) +
+  geom_smooth(method = "lm", se = FALSE, size = 0.75) +
+  scale_colour_viridis_d(option = "C", end = 0.9) +
+  ylab("function") +
+  xlab("sp. richness") +
+  theme_meta2() +
+  theme(legend.position = "bottom",
+        legend.key = element_rect(fill = NA),
+        strip.background =element_rect(fill = "white", colour = "black"),
+        legend.text = element_text(size = 6),
+        legend.title = element_text(size = 7) )
 
+library(patchwork)
+dev.off()
+j.c <- (j1 + j2) + plot_layout(guides = 'collect') &
+  theme(legend.position='bottom') &
+  theme(plot.margin = unit(c(5.5,7.5,5.5,7.5), "pt"))
+j.c
+
+ggsave(filename = here("Figures/jena.exp.png"), plot = j.c,
+       width = 11, height = 7.5, units = "cm", dpi = 450)
+
+### END
 
