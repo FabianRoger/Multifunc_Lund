@@ -68,10 +68,10 @@ additional.mf.args = list(NA, NA, NA,
 
 # lotka-volterra model
 lsp = c(4, 6, 8, 10, 12)
-reps = 5
+reps = 10
 rsp = 20
-t_steps = 5
-n0 = 50
+t_steps = 50
+n0 = 100
 a_min = 0
 a_max = 1
 sim.comp = "sym"
@@ -89,17 +89,17 @@ prob.neg = 0.2
 sim.reps <- 5
 
 # set the average level of interspecific competition
-a_mean <- c(0.25, 0.5, 0.05)
+a_mean <- c(0.25, 0.5, 0.75)
 
 # set the standard deviation of intraspecific competition
 a_sd <- c(0.1, 0.1, 0)
 
 # set the intraspecific competition value
-a_spp <- c(1, 1, 0.05)
+a_spp <- c(1, 1, 0.75)
 
 # set the min and max k-values
-k_min = c(50, 50, 125)
-k_max = c(200, 200, 125)
+k_min = c(100, 100, 250)
+k_max = c(300, 300, 250)
 
 # set the min and max r-values
 r_min = c(0.1, 0.1, 0.25)
@@ -235,13 +235,16 @@ for (i in 1:nrow(params)) {
   function.vals[[i]] <- func.mat
 }
 
-# check output
-check.id <- 25
+# check a few random outputs
+check.id <- 26
 
 params[check.id,]
 mf.dataframe[[check.id]]$richness
 mf.dataframe[[check.id]]$local.sp.pool
 length(unique(mf.dataframe[[check.id]]$patch))
+
+
+# output these data as .csv files into the 'data' folder
 
 # put these outputs into a list
 sim.outputs <- 
@@ -259,7 +262,6 @@ data.names <- c("multifunctionality_data",
                 "carrying_capacities",
                 "intrinsic_growth_rates",
                 "function_values_per_species")
-
 
 # for each of the outputs, write into a data.frame
 data.loc <- here("data")
