@@ -5,7 +5,6 @@
 
 # load relevant libraries
 library(dplyr)
-library(tidyr)
 library(readr)
 library(ggplot2)
 library(here)
@@ -20,14 +19,6 @@ head(params)
 mult.dat <- read_csv(file = here("data/multifunctionality_data.csv"))
 head(mult.dat)
 
-# create a simulation category variable
-# reps <- length(unique(params$rep.id))
-# id <- unique(paste(params$a_mean, params$w.shape, params$w.scale, sep = "_"))
-# id <- LETTERS[1:length(id)]
-
-# add this to the params data
-# params$sim.group <- rep(id, each = reps)
-
 # add this variable to the mult.dat data
 mult.dat <- 
   full_join(select(params, rep.id, sim.group, sim.id), 
@@ -36,14 +27,14 @@ mult.dat <-
 
 # examine the relationship between richness and average MF for each simulation
 ggplot(data = mult.dat,
-       mapping = aes(x = richness, y = `ave. MF`, colour = as.character(sim.id) )) +
+       mapping = aes(x = richness, y = ave._MF, colour = as.character(sim.id) )) +
   geom_point(alpha = 0.1) +
   geom_smooth(method = "lm", se = FALSE) +
   theme_classic() +
   theme(legend.position = "none")
 
 ggplot(data = mult.dat,
-       mapping = aes(x = richness, y = `thresh.70 MF`, colour = as.character(sim.id) )) +
+       mapping = aes(x = richness, y = thresh.70_MF, colour = as.character(sim.id) )) +
   geom_point(alpha = 0.1) +
   geom_smooth(method = "lm", se = FALSE) +
   facet_wrap(~sim.id, scales = "free") +
@@ -51,23 +42,27 @@ ggplot(data = mult.dat,
   theme(legend.position = "none")
 
 
-### perform the cluster analysis
+# perform the cluster analysis
 library(vegan)
 
 # MF metric groups
 MF_groups <- 
-  c(rep("sum/ave.", 4),
-    rep("evenness", 4),
+  c(rep("sum/ave.", 3),
+    rep("evenness", 5),
     rep("threshold", 8),
     rep("other", 1))
 
 # Run an nMDS to cluster the different multifunctionality metrics
+
+# split the data.frame into simulation types and append this to the full dataset
+dat.list <- c(list(mult.dat), split(mult.dat, mult.dat$sim.group))
+
 nmds.figs <- 
-  lapply(split(mult.dat, mult.dat$sim.group), function(data){
+  lapply(dat.list, function(data){
   
   mds_out <- 
     data %>%
-    select(ends_with(" MF")) %>% 
+    select(ends_with("MF")) %>% 
     mutate(across(.cols = everything(), ~scale(.) ) ) %>% 
     as.matrix(.) %>% 
     t() %>% 
@@ -88,7 +83,7 @@ nmds.figs <-
     geom_point() +
     ggrepel::geom_label_repel(mapping = aes(label = MF_metrics),
                               show.legend = FALSE,
-                              size = 3,
+                              size = 2,
                               segment.alpha = 0.5,
                               label.size = NA, fill = "white") +
     scale_colour_viridis_d(option = "C", end = 0.9) +
@@ -97,23 +92,44 @@ nmds.figs <-
     theme_meta() +
     theme(legend.position = "bottom",
           legend.key = element_blank(),
-          legend.text = element_text(colour = "black", size = 14, face = "plain"),
           legend.title = element_blank())
   
 } )
 
+# plot the full data.set
+nmds.figs[[1]]
+
+ggsave(filename = here("Figures/pca_clust_fig.png"), plot = nmds.figs[[1]],
+       width = 12, height = 11, units = "cm", dpi = 450)
+
+
+# combine the remaining plots using patchwork
+library(patchwork)
+
+comb.nmds <- 
+  nmds.figs[[2]] + nmds.figs[[3]] + nmds.figs[[4]] +
+  nmds.figs[[5]] + nmds.figs[[6]] + nmds.figs[[7]] +
+  plot_layout(guides = 'collect') &
+  theme(legend.position='bottom') &
+  theme(axis.title.x = element_text(colour ="black", size = 9.5, face = "plain", margin=margin(5,0,0,0,"pt")),
+        axis.title.y = element_text(colour = "black", size = 9.5, face = "plain", margin=margin(0,5,0,0,"pt")),
+        axis.text.x = element_text(colour = "black", size=8, face = "plain",  margin=margin(10,0,0,0,"pt")),
+        axis.text.y = element_text(colour ="black", size=8, face = "plain", margin=margin(0,10,0,0,"pt")),
+        )
+  
+ggsave(filename = here("Figures/pca_clust_fig_all.png"), plot = comb.nmds,
+       width = 20, height = 19, units = "cm", dpi = 450)
 
 # combine these nmds plots
-p1 <- 
-  ggarrange(plotlist = nmds.figs, 
-            labels = letters[1:length(nmds.figs)],
-            font.label = list(size = 12, color = "black", face = "plain", family = NULL),
-            common.legend = TRUE,
-            legend = "bottom")
+# p1 <- 
+  # ggarrange(plotlist = nmds.figs, 
+            # labels = letters[1:length(nmds.figs)],
+            # font.label = list(size = 12, color = "black", face = "plain", family = NULL),
+            # common.legend = TRUE,
+            # legend = "bottom")
 
     
-ggsave(filename = here("Figures/pca_clust_fig.png"), plot = p1,
-       width = 19, height = 20, units = "cm", dpi = 300)
+
 
 
 
