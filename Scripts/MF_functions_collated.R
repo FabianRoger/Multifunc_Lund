@@ -537,6 +537,19 @@ multifunc_calculator <-
            mf.names = c("sum_MF", "ave._MF", "Pasari_MF", "thresh.30_MF", "thresh.70_MF"),
            add.args = list(NA, NA, NA, c(thresh = 0.3), c(thresh = 0.7))) {
     
+    # perform error checks
+    if( !any(is.na(add.args)) ) {
+      print("warning: no NAs in add.args list, is this correct?")
+    }
+    
+    if( length(mf.functions) != length(mf.names) ) {
+      stop("error, there must be a name for each multifunctionality metric")
+    }
+    
+    if(length(vars) < 2) {
+      stop("error, there must be two or more functions")
+    }
+    
     # add function names to the additional argument vector
     names(add.args) <- mf.names
     
@@ -572,6 +585,18 @@ multifunc_calculator <-
     mf.df <- data.frame(mf.df)
     
     # bind the metrics into a data.frame
-    return(cbind(adf, mf.df))
+    return( data.frame(cbind(adf, mf.df)) )
     
   }
+
+
+# function to standardise functions and translate them by minimum absolute value
+standardise <- function(x) {
+  mean.x <- mean(x)
+  sd.x <- sd(x)
+  x.standardised <- ((x-mean.x)/sd.x)
+  x.standardised.positive <- ( x.standardised + abs(min(x.standardised)) )
+  return(x.standardised.positive)
+}
+
+### END

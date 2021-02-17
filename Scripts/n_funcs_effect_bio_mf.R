@@ -50,15 +50,6 @@ get.function.combinations <- function(function.names){
   return(list.combination)
 }
 
-# function to standardise functions and translate them by minimum absolute value
-standardise <- function(x) {
-  mean.x <- mean(x)
-  sd.x <- sd(x)
-  x.standardised = ((x-mean.x)/sd.x)
-  x.standardised.positive = x.standardised + abs(min(x.standardised))
-  return(x.standardised.positive)
-}
-
 
 # using the defined functions:
 
@@ -91,29 +82,22 @@ get_BEF_mf_est <- function(adf.data,
     # get the vector of function names
     sample.func.names <- list.func.names[[i]]
     
-    # subset out the functions and standardise them
-    adf.func <- 
-      adf.data %>%
-      select(all_of(sample.func.names ))
-    
+    # standardise functions if TRUE
     if (standardise_funcs == TRUE) {
-      adf.func <- 
-        adf.func %>%
+      adf.data <- 
+        adf.data %>%
         mutate(across(.cols = all_of(sample.func.names) , ~standardise(.) ) )
       }
     
     # calculate the multifunctionality metrics
-    data.mf <- 
-      adf.data %>%
-      mutate(`sum MF` = MF_sum(adf = adf.func, vars = sample.func.names),
-             `ave. MF` = MF_av(adf = adf.func, vars = sample.func.names),
-             `Pasari MF` = MF_pasari(adf = adf.func, vars = sample.func.names),
-             `ENF MF` = as.numeric(hill_multifunc(adf = adf.func, vars = sample.func.names, scale = 1, HILL = TRUE)),
-             `thresh.30 MF` = single_threshold_mf(adf = adf.func, vars = sample.func.names, thresh = 0.3),
-             `thresh.70 MF` = single_threshold_mf(adf = adf.func, vars = sample.func.names, thresh = 0.7))
+    data.mf <- multifunc_calculator(adf = adf.data, vars = sample.func.names,
+                                    mf.functions = c("MF_sum", "MF_av", "MF_pasari", "single_threshold_mf", "single_threshold_mf"),
+                                    mf.names = c("sum_MF", "ave._MF", "Pasari_MF", "thresh.30_MF", "thresh.70_MF"),
+                                    add.args = list(NA, NA, NA, c(thresh = 0.3), c(thresh = 0.7))
+               )
     
     # subset the multifunctionality metric names
-    mf.names <- names(data.mf)[grepl(pattern = " MF", x = names(data.mf))]
+    mf.names <- names(data.mf)[grepl(pattern = "MF", x = names(data.mf))]
     
     # for each multifunctionality metric, calculate the BEF-slope
     bef_mf_slope <- 
@@ -171,6 +155,25 @@ jena.n.func <- get_BEF_mf_est(adf.data = jena.dat,
                               mf.func.names = jena.func.names, 
                               standardise_funcs = TRUE,
                               covariate_name = "realised_diversity")
+
+
+# plot the Jena data
+p1 <- 
+  ggplot(data = jena.n.func,
+         mapping = aes(x = number_of_functions, 
+                       y = realised_diversity_mf_est)) +
+  geom_jitter(alpha = 0.1) +
+  geom_smooth(method = "lm", se = FALSE, colour = "black") +
+  ylab("realised diversity - MF (est)") +
+  xlab("number of functions") +
+  facet_wrap(~multifunctionality_metric, scales = "free") +
+  theme_meta() +
+  theme(strip.background =element_rect(fill = "white", colour = "black"))
+
+p1
+
+ggsave(filename = here("Figures/fig_3_jena.png"), plot = p1,
+       width = 16, height = 12, units = "cm", dpi = 300)
   
 
 ### load the simulated data
@@ -220,22 +223,6 @@ params <- read_csv(file = here("data/parameters_sim.csv"))
 # join the parameter data to the n_function data
 sim.n.func.dat <- full_join(sim.n.func.dat, params, by = "sim.id")
 
-
-# plot the Jena data
-p1 <- 
-  ggplot(data = jena.n.func,
-       mapping = aes(x = number_of_functions, 
-                     y = realised_diversity_mf_est)) +
-  geom_jitter(alpha = 0.1) +
-  geom_smooth(method = "lm", se = FALSE, colour = "black") +
-  ylab("realised diversity - MF (est)") +
-  xlab("number of functions") +
-  facet_wrap(~multifunctionality_metric, scales = "free") +
-  theme_meta() +
-  theme(strip.background =element_rect(fill = "white", colour = "black"))
-
-ggsave(filename = here("Figures/fig_3_jena.png"), plot = p1,
-       width = 16, height = 12, units = "cm", dpi = 300)
 
 # plot the simulated data
 p2 <- 

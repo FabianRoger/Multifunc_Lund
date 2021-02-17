@@ -34,6 +34,34 @@ library(dplyr)
 library(tidyr)
 library(readr)
 
+# choose which multifunctionality metrics to calculate
+
+# set the function names to call
+mf.metric.function <- c("MF_jing", "MF_sum", "MF_av", 
+                        "MF_pasari", "MF_mesli", "MF_dooley", "hill_multifunc", "MF_simpsons_div",
+                        "manning_multifunc", "manning_multifunc", "manning_multifunc",
+                        "single_threshold_mf", "single_threshold_mf", "single_threshold_mf",
+                        "MF_slade", "MF_slade",
+                        "pca_multifunc" )
+
+# set the metric names to be outputted
+mf.metric.names = c("scal._MF", "sum_MF", "ave._MF", 
+                    "Pasari_MF", "MESLI_MF", "SAM_MF", "ENF_MF", "Simp_MF",
+                    "Manning.30_MF", "Manning.50_MF", "Manning.70_MF",
+                    "thresh.30_MF", "thresh.50_MF", "thresh.70_MF",
+                    "Slade.10.90 MF", "Slade.40.60 MF",
+                    "PCA_MF")
+
+# set the additional arguments list for each function
+additional.mf.args = list(NA, NA, NA, 
+                          NA, NA, NA, NA, NA,
+                          c(thresh = 0.3), c(thresh = 0.5), c(thresh = 0.7),
+                          c(thresh = 0.3), c(thresh = 0.5), c(thresh = 0.7),
+                          c(A_quant = 0.10, B_quant = 0.90), c(A_quant = 0.40, B_quant = 0.60),
+                          NA )
+
+
+
 # set-up a data.frame of parameters for each run
 
 # fixed parameters
@@ -42,7 +70,7 @@ library(readr)
 lsp = c(4, 6, 8, 10, 12)
 reps = 5
 rsp = 20
-t_steps = 100
+t_steps = 5
 n0 = 50
 a_min = 0
 a_max = 1
@@ -160,46 +188,28 @@ for (i in 1:nrow(params)) {
   # add small normally distributed error (i.e. sd = 0.1)
   multi.func <- 
     multi.func %>%
-    mutate(across(.cols = func.names, ~(.*abundance) )) %>%
-    mutate(across(.cols = func.names, ~(. + rnorm(n = length(.), mean = 0, sd = 0.1)) ) )
-  
-  # function to standardise and then translate the functions
-  func.std.trans <- function(x){
-    y <- (x - mean(x))/sd(x)
-    return(y + abs(min(y)))
-  }
+    mutate(across(.cols = all_of(func.names), ~(.*abundance) )) %>%
+    mutate(across(.cols = all_of(func.names), ~(. + rnorm(n = length(.), mean = 0, sd = 0.1)) ) )
   
   # calculate each function as the sum of all species-specific function values
+  # standardise the functions
   multi.func <- 
     multi.func %>%
     group_by(patch) %>%
-    summarise(across(.cols = func.names, sum), .groups = "drop") %>%
-    mutate(across(.cols = func.names, func.std.trans ))
+    summarise(across(.cols = all_of(func.names), sum), .groups = "drop") %>%
+    mutate(across(.cols = all_of(func.names), standardise ))
   
   # subset the functions from the multi.func data.frame
   adf.func <- select(multi.func, func.names)
   
   # calculate the multifunctionality metrics and add them to the multi.func data.frame
+  
+  # calculate the multifunctionality metrics
   multi.func <- 
-    multi.func %>%
-    mutate(`scal. MF` = MF_jing(adf = adf.func, vars = func.names),
-           `sum MF` = MF_sum(adf = adf.func, vars = func.names),
-           `ave. MF` = MF_av(adf = adf.func, vars = func.names),
-           `MESLI MF` = MF_mesli(adf = adf.func, vars = func.names),
-           `Pasari MF` = MF_pasari(adf = adf.func, vars = func.names),
-           `SAM MF` = MF_dooley(adf = adf.func, vars = func.names),
-           `ENF MF` = as.numeric(hill_multifunc(adf = adf.func, vars = func.names, scale = 1, HILL = TRUE)) ,
-           `Simp. MF` = MF_simpsons_div(adf = adf.func, vars = func.names),
-           `Manning.30 MF` = manning_multifunc(adf = adf.func, vars = func.names, thresh = 0.3),
-           `Manning.50 MF` = manning_multifunc(adf = adf.func, vars = func.names, thresh = 0.5),
-           `Manning.70 MF` = manning_multifunc(adf = adf.func, vars = func.names, thresh = 0.7),
-           `thresh.30 MF` = single_threshold_mf(adf = adf.func, vars = func.names, thresh = 0.3),
-           `thresh.50 MF` = single_threshold_mf(adf = adf.func, vars = func.names, thresh = 0.5),
-           `thresh.70 MF` = single_threshold_mf(adf = adf.func, vars = func.names, thresh = 0.7),
-           `Slade.10.90 MF` = MF_slade(adf = adf.func, vars = func.names, A_quant = 0.10, B_quant = 0.90),
-           `Slade.40.60 MF` = MF_slade(adf = adf.func, vars = func.names, A_quant = 0.40, B_quant = 0.60),
-           `PCA MF` = pca_multifunc(adf = adf.func, vars = func.names, standardise = FALSE) 
-           )
+    multifunc_calculator(adf = multi.func, vars = func.names,
+                         mf.functions = mf.metric.function,
+                         mf.names = mf.metric.names,
+                         add.args = additional.mf.args)
   
   # join this multifunctionality data to the summary data
   mf.sim <- full_join(df.x$data.summary, multi.func, by = c("patch"))
