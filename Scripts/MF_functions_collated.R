@@ -30,7 +30,7 @@ hill_multifunc <- function(adf, vars, scale = 1, HILL = TRUE){
   meanFunc <- rowMeans(adf_mat) 
   
   multifunc_effN <-  effN*meanFunc
-  return(multifunc_effN)
+  return( as.numeric(multifunc_effN) )
   
 }
 
@@ -525,9 +525,53 @@ MF_slade <- function(adf, vars,
 }
 
 
-
-
-
-
-
-
+# define a function to calculate different multifunctionality metrics
+# mf.functions is a vector of the names of the function to call
+# mf.names are the names to assign to the output of each function call
+# add.args is a list of additional arguments to pass to each function called
+# if no additional arguments are required then an NA must be specified
+multifunc_calculator <- 
+  function(adf,
+           vars,
+           mf.functions = c("MF_sum", "MF_av", "MF_pasari", "single_threshold_mf", "single_threshold_mf"),
+           mf.names = c("sum_MF", "ave._MF", "Pasari_MF", "thresh.30_MF", "thresh.70_MF"),
+           add.args = list(NA, NA, NA, c(thresh = 0.3), c(thresh = 0.7))) {
+    
+    # add function names to the additional argument vector
+    names(add.args) <- mf.names
+    
+    # for each function, create an input list with or without additional arguments
+    input.list <- vector("list")
+    for(j in 1:length(add.args)) {
+      
+      if (!is.na(add.args[[j]])){
+        
+        input.list[[j]] <- list(adf, vars)
+        
+        for (i in 1:length(add.args[[j]])){
+          
+          input.list[[j]] <- c(input.list[[j]], add.args[[j]][i])
+          
+        }
+        
+      } else(
+        
+        input.list[[j]] <- list(adf, vars)
+        
+      )
+      
+    }
+    
+    # assign each function name the multifunctionality value
+    for (k in 1:length(mf.names)) {
+      assign(mf.names[k], do.call(mf.functions[k], input.list[[k]]))
+    }
+    
+    # pull the metrics into a data.frame
+    mf.df <- sapply(mf.names, function(x){get(x)})
+    mf.df <- data.frame(mf.df)
+    
+    # bind the metrics into a data.frame
+    return(cbind(adf, mf.df))
+    
+  }
