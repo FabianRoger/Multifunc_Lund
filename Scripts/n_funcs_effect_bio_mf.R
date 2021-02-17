@@ -145,11 +145,6 @@ jena.dat <-
   jena.raw %>%
   select(all_of( c(site.id, jena.func.names) ))
 
-# reflect the soil nutrient functions (i.e. low nutrients means high uptake)
-jena.dat <- 
-  jena.dat %>%
-  mutate(across(.cols = starts_with("Soil"), ~(.*-1) ))
-
 # get realised diversity - number of functions from Jena data
 jena.n.func <- get_BEF_mf_est(adf.data = jena.dat, 
                               mf.func.names = jena.func.names, 

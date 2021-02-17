@@ -6,9 +6,12 @@
 # load the relevant libraries
 library(here)
 library(dplyr)
-library(tidyr)
 library(readr)
-library(ggplot2)
+
+# make sure the vegan package is installed
+if(! "vegan" %in% installed.packages()[,1]) stop(
+  "WARNING!! this script requires the ggpubr package to be installed to combine figures"
+)
 
 # read in the function data from 2004
 jena.func <- read_delim(here("data/41559_2017_391_MOESM5_ESM.csv"), delim = ";")
@@ -49,7 +52,7 @@ spp <- names(jena.com)[52:100]
 # replace the NAs with zeros then summarise abundance across seasons
 jena.com <- 
   jena.com %>%
-  mutate(across(.cols = spp, ~if_else(is.na(.), 0, .))) %>%
+  mutate(across(.cols = all_of(spp), ~if_else(is.na(.), 0, .))) %>%
   group_by(year, sowndiv, plotcode) %>%
   summarise(across(.cols = spp, ~mean(.)), .groups = "drop") %>%
   arrange(year, sowndiv, plotcode)
@@ -58,12 +61,12 @@ head(jena.com)
 # set-up a species by site matrix
 spp.site <- 
   jena.com %>%
-  select(spp)
+  select(all_of(spp))
 
 # subset out the id vars
 site <- 
   jena.com %>%
-  select(-spp)
+  select(-all_of(spp) )
 
 # convert the spp.site to relative abundance
 spp.site <- spp.site/if_else(rowSums(spp.site) == 0, 1, rowSums(spp.site))
@@ -87,27 +90,15 @@ jena.dat <-
   filter(sowndiv < 60)
 head(jena.dat)
 
+# reflect the soil nutrient functions (i.e. low nutrients means high uptake)
+jena.dat <- 
+  jena.dat %>%
+  mutate(across(.cols = starts_with("Soil"), ~(.*-1) ))
+
+# view the dataset
 View(jena.dat)
 
 # output this into a .csv file for further analysis
 write_csv(x = jena.dat, file = here("data/jena_data_cleaned.csv"))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+### END
