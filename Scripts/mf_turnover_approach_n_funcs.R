@@ -87,7 +87,7 @@ row.randomiser <- function(func.names, species.names, adf.data) {
   func.mat.nrow <- nrow(func.mat) # calculat the number of rows in that matrix
   
   # use sample to get random row ids from the function matrix
-  random.row.ids <- sample(x = 1:func.mat.nrow , size = func.mat.nrow , replace = FALSE)
+  random.row.ids <- sample(x = 1:func.mat.nrow, size = func.mat.nrow , replace = FALSE)
   
   # randomise the function matrix
   func.mat.random <- func.mat[random.row.ids, ]
@@ -98,7 +98,7 @@ row.randomiser <- function(func.names, species.names, adf.data) {
   # bind this randomised data together
   adf.data.random <- cbind(spec.mat, func.mat.random)
   
-  return(adf.data.random)
+  return(as.data.frame(adf.data.random))
   
 }
 
@@ -178,14 +178,22 @@ ggplot() +
   facet_wrap(~effect_direction, scales = "free") +
   theme_classic()
 
+# randomly assigning functions to plots generates the same pattern as the empirical data
+# why is this the case?
+
+# maybe it is because the turnover approach does always work?
 
 
 # test the turnover approach using the simulated data
 
 # can it detect positive and negative effects on functions?
-# if so, at what rate are there errors?
+# if so, at what rate do errors arise?
+
 
 # next step: wrap the simulations into a list to run for each simulation
+
+# wrap the turnover and AIC approaches into pipelines
+# calculate error associated with both of them
 
 # load relevant libraries
 library(readr)
@@ -211,9 +219,11 @@ abun.dat <-
   filter(sim.id == s) %>%
   pivot_wider(names_from = "species", values_from = "abundance")
 
+# get a vector of species names that are present for the chosen simulation
 spp.present <- sapply(abun.dat[, grepl("sp_", names(abun.dat)) ], function(x) sum(ifelse(x > 0, 1, 0)))
 spp.present <- names(spp.present[spp.present > 0])
 
+# subset the species that are present in the simulation
 abun.dat <- 
   abun.dat %>%
   select(sim.id, patch, time, all_of(spp.present))
@@ -224,11 +234,11 @@ mf.dat <-
   filter(sim.id == s) %>%
   select(-richness, -total_abundance, -local.sp.pool, -ends_with("MF"))
 
-# join the abundance data to the function data
+# join the raw abundance data to the function data
+# mf.dat contains function data and species abundances in one data.frame
 mf.dat <- full_join(mf.dat, abun.dat, by = c("sim.id", "patch", "time"))
 
-
-# subset the function data
+# subset the functional trait data
 func.dat <- 
   func.dat %>%
   filter(sim.id == s)
@@ -237,9 +247,11 @@ func.dat <-
 func.dat <- func.dat[func.dat$species %in% spp.present, ]
 
 # test if order is preserved: if FALSE then order is preserved
+# this works because R tests element per element
+# e.g. c(1, 2, 3) == c(1, 2, 3)
 any(func.dat$species != spp.present)
 
-# list of function names
+# get a list of function names
 f.names <- 
   mf.dat %>%
   select(starts_with("F_")) %>%
@@ -249,46 +261,51 @@ f.names <-
 list.out <- vector("list", length = length(f.names))
 for (i in 1:length(f.names)){
   
-  # get correct function
+  # get the function values for each species for the given function i
   f.vals <- func.dat[[f.names[i]]]
   names(f.vals) <- func.dat$species
   
   # get species effect on each function using abundances
+  # this outputs a vector of species effects (-1, 0 or 1) on the function i
   r.abun <- getRedundancy(vars = f.names[i], species = spp.present, data = mf.dat)
   r.abun <- sapply(r.abun, function(x)(x))
   
-  # get species effect on each function using presence absence
+  # get species effect on each function using presence-absence
+  # first convert the species abundance data to presence-absence data
   mf.dat2 <- 
     mf.dat %>%
     mutate(across(.cols = all_of(spp.present), ~if_else(. > 0, 1, 0) ) )
   
+  # this outputs a vector of species effects (-1, 0 or 1) on the function i
   r.pa <- getRedundancy(vars = f.names[i], species = spp.present, data =  mf.dat2)
   r.pa <- sapply(r.pa, function(x)(x))
+  r.pa
   
   # proportion of incorrect directions?
-  # vec1: real function values
-  # vec2: inferred species effect (-1, 0 or 1)
+  # true.function.vals: real function values (i.e. linear coefficient)
+  # inferred.effects: inferred species effect (-1, 0 or 1)
   # ignores species that were non-significant
   
-  # outputs proportion of incorrectly inferred directions
-  compare.directions.vectors <- function(vec1, vec2){
-    x <- sum(vec1[vec2 < 0] > 0)
-    y <- sum(vec1[vec2 > 0] < 0)
-    (x + y)/sum(vec2 != 0)
+  # outputs proportion of IN-correctly inferred directions
+  compare.directions.vectors <- function(true.function.vals, inferred.effects){
+    x <- sum(true.function.vals[inferred.effects < 0] > 0)
+    y <- sum(true.function.vals[inferred.effects > 0] < 0)
+    (x + y)/sum(inferred.effects != 0)
   }
   
   # compare presence absence versus abundance accuracy
-  error.pa <- compare.directions.vectors(vec1 = f.vals, vec2 = r.pa)
+  # error.pa is the proportion of incorrectly inferred directions
+  error.pa <- compare.directions.vectors(true.function.vals = f.vals, inferred.effects = r.pa)
   
   # ifelse(f.vals < 0, -1, 1)[r.pa != 0]
   # r.pa[r.pa != 0]
   
-  error.abun <- compare.directions.vectors(vec1 = f.vals, vec2 = r.abun)
+  error.abun <- compare.directions.vectors(true.function.vals = f.vals, inferred.effects = r.abun)
   
   # ifelse(f.vals < 0, -1, 1)[r.abun != 0]
   # r.abun[r.abun != 0]
   
-  # calculate proportion of incorrect directions
+  # correlation between inferred coefficients and true inferred effects
   cor.pa <- cor(f.vals, r.pa, method = "spearman")
   cor.abun <- cor(f.vals, r.abun, method = "spearman")
   
@@ -306,8 +323,71 @@ bind_rows(list.out)
 
 
 
+### implement Gotelli et al. (2011)'s turnover metric
 
+# we use the mf.dat2 data for this
+mf.dat2 <- 
+  mf.dat %>%
+  mutate(across(.cols = all_of(spp.present), ~if_else(. > 0, 1, 0) ) )
 
+# use row.randomiser to reshuffle function rows
+# then calculate D-values for the shuffled data
+
+# set number of replicates
+n <- 10
+
+ran.d.vals <- 
+  lapply(c(1:n), function(x){
+  
+  # randomise function values across plots
+  mf.dat2.ran <- row.randomiser(func.names = f.names,
+                                species.names = spp.present, 
+                                adf.data = mf.dat2)
+  
+  # calculate difference values for each species for each function
+  mf.dat2.ran %>%
+    pivot_longer(cols = starts_with("sp_"),
+                 names_to = "species",
+                 values_to = "pa") %>%
+    group_by(species, pa) %>%
+    summarise(across(.cols = all_of(func.names), mean )) %>%
+    summarise(across(.cols = all_of(func.names), diff ), .groups = "drop")
+  
+})
+
+ran.d.vals <- bind_rows(ran.d.vals, .id = "run")
+
+ran.d.vals <- 
+  ran.d.vals %>%
+  pivot_longer(cols = starts_with("F_"),
+               names_to = "function_name",
+               values_to = "d_value") %>%
+  arrange(species, function_name) %>%
+  group_by(species, function_name) %>%
+  summarise(mean_d_value = mean(d_value, na.rm = TRUE),
+            sd_d_value = sd(d_value, na.rm = TRUE), .groups = "drop")
+
+obs.d.vals <- 
+  mf.dat2 %>%
+  pivot_longer(cols = starts_with("sp_"),
+               names_to = "species",
+               values_to = "pa") %>%
+  group_by(species, pa) %>%
+  summarise(across(.cols = all_of(func.names), mean )) %>%
+  summarise(across(.cols = all_of(func.names), diff ), .groups = "drop") %>%
+  pivot_longer(cols = starts_with("F_"),
+               names_to = "function_name",
+               values_to = "d_value_obs") %>%
+  arrange(species, function_name)
+
+# join the observed d.vals to the randomised d.vals
+d.val.dat <- full_join(ran.d.vals, obs.d.vals, by = c("species", "function_name"))
+
+# calculate species importance scores
+d.val.dat %>%
+  mutate(SES = (d_value_obs - mean_d_value)/(sd_d_value)) %>%
+  mutate(SES_effect = if_else(SES > 2, 1, 
+                              if_else(SES < -2, -1, 0)))
 
 
 
