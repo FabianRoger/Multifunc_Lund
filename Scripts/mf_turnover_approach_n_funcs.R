@@ -169,7 +169,8 @@ x <- turnover_aic_null(func.names = vars,
                   
 # plot the null expectations versus the observed data
 library(ggplot2)
-ggplot() +
+g1 <- 
+  ggplot() +
   stat_smooth(data = x[[1]],
               mapping = aes(x = nfunc, y = div, group = null.rep),
               geom='line', alpha=0.025, size = 1, se=FALSE, method = "lm") +
@@ -177,7 +178,12 @@ ggplot() +
               mapping = aes(x = nfunc, y = div), colour = "red",
               method = "lm", se = FALSE) +
   facet_wrap(~effect_direction, scales = "free") +
-  theme_classic()
+  ylab("number of species") +
+  xlab("number of functions") +
+  theme_meta()
+
+ggsave(filename = here("Figures/aic_turnover_null.png"), plot = g1,
+       width = 11, height = 7.5, units = "cm", dpi = 450)
 
 # randomly assigning functions to plots generates the same pattern as the empirical data
 # why is this the case?
@@ -534,7 +540,7 @@ for (i in 1:length(sim.ids)) {
   aic.x <- AIC_sp(data = mf.pa, function_names = f.names, species_names = sp.present)
   
   # implement the ses-based approach to get species effects on each function
-  ses.x <- SES_score(data = mf.pa, function_names = f.names, species_names = sp.present, n_ran = 10)
+  ses.x <- SES_score(data = mf.pa, function_names = f.names, species_names = sp.present, n_ran = 1000)
   
   # compare these two approaches for each of the 30 simulated data.sets
   compare.sims[[i]] <- 
@@ -546,6 +552,44 @@ for (i in 1:length(sim.ids)) {
 }
 
 # bind into a data.frame
+compare.df <- bind_rows(compare.sims, .id = "simulation.id")
+
+# plot the error rates
+
+# load the plotting theme:
+source(here("Scripts/function_plotting_theme.R"))
+
+p1 <- 
+  compare.df %>%
+  group_by(simulation.id, approach, effect) %>%
+  summarise(mean_value = mean(value, na.rm = TRUE),
+            sd_value = sd(value, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(data = .,
+         mapping = aes(x = approach, y = mean_value, colour = simulation.id)) +
+  geom_point(position=position_dodge(width=0.5)) +
+  geom_errorbar(mapping = aes(x = approach, 
+                              ymin = mean_value-sd_value, 
+                              ymax = mean_value+sd_value, 
+                              colour = simulation.id),
+                width = 0.05,
+                position=position_dodge(width=0.5)) +
+  facet_wrap(~effect, scales = "free") +
+  ylab("") +
+  scale_colour_viridis_d(end = 0.9, option = "C") +
+  theme_meta() +
+  theme(legend.position = "right",
+        legend.key = element_rect(fill = NA),
+        legend.text = element_text(size = 7),
+        legend.title = element_text(size = 8))
+
+ggsave(filename = here("Figures/turnover_reliability.png"), plot = p1,
+       width = 18.5, height = 16, units = "cm", dpi = 450)
+
+
+
+
+
+
 
 
 
