@@ -414,25 +414,63 @@ x <- SES_score(data = mf.pa, function_names = f.names, species_names = spp.prese
 y$F_1
 x$F_1
 
+plot(func.dat$F_1, y$F_1)
+plot(func.dat$F_1, x$F_1)
 
 
-### quantify deviation from true results and compare them
 
-# proportion of incorrect directions?
+# Q1: for detected effects, how many are in the correct direction?
+
 # true.function.vals: real function values (i.e. linear coefficient)
-# inferred.effects: inferred species effect (-1, 0 or 1)
-# ignores species that were non-significant
-
-# get the function values for each species for the given function i
-f.vals <- func.dat[[f.names[i]]]
-names(f.vals) <- func.dat$species
+# inferred.effects: inferred species effect (-1, 0 or 1) ignores species that were non-significant
 
 # outputs proportion of IN-correctly inferred directions
-compare.directions.vectors <- function(true.function.vals, inferred.effects){
+compare.directions <- function(true.function.vals, inferred.effects){
   x <- sum(true.function.vals[inferred.effects < 0] > 0)
   y <- sum(true.function.vals[inferred.effects > 0] < 0)
   (x + y)/sum(inferred.effects != 0)
 }
+
+# aic approach
+mapply(compare.directions, func.dat[, f.names], y[, f.names])
+
+# ses approach
+mapply(compare.directions, func.dat[, f.names], x[, f.names])
+
+
+
+
+# Q2: do the approaches detect the correct direction for species 
+# above and below certain percentiles of function values?
+
+# true.function.vals: real function values (i.e. linear coefficient)
+# inferred.effects: inferred species effect (-1, 0 or 1)
+# ignores species that were non-significant
+
+# outputs proportion of IN-correctly inferred directions
+compare.quantiles <- function(true.function.vals, inferred.effects, low.q = 0.10, upp.q = 0.90){
+  
+  # get upper and lower quantiles of true.function.vals
+  quantiles <- quantile(true.function.vals, probs = c(low.q, upp.q))
+  
+  # test if lowest quantiles show negative effects
+  true.function.vals < quantiles[1]
+  
+  inferred.effects[true.function.vals < quantiles[1]]
+  
+  (x + y)/sum(inferred.effects != 0)
+}
+
+x <- sum(true.function.vals[inferred.effects < 0] > 0)
+y <- sum(true.function.vals[inferred.effects > 0] < 0)
+
+z <- quantile(func.dat$F_1, probs = c(0.10, 0.90))
+z
+
+(func.dat$F_1 < z[1]) & (func.dat$F_1 < 0) 
+
+
+func.dat$F_1[func.dat$F_1 > z[2]]
 
 # compare presence absence versus abundance accuracy
 # error.pa is the proportion of incorrectly inferred directions
@@ -446,6 +484,9 @@ error.abun <- compare.directions.vectors(true.function.vals = f.vals, inferred.e
 # ifelse(f.vals < 0, -1, 1)[r.abun != 0]
 # r.abun[r.abun != 0]
 
+# get the function values for each species for the given function i
+f.vals <- func.dat[[f.names[i]]]
+names(f.vals) <- func.dat$species
 
 
 
