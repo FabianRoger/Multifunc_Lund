@@ -161,11 +161,11 @@ species <- relevantSp(germany,26:ncol(germany))
 
 # test the turnover_aic_null function and plot the results
 x <- turnover_aic_null(func.names = vars, 
-                              species.names = species, 
-                              adf.data = germany,
-                              output = "prop_species",
-                              n = 100)
-
+                       species.names = species, 
+                       adf.data = germany,
+                       output = "prop_species",
+                       n = 100)
+                  
 # plot the null expectations versus the observed data
 library(ggplot2)
 ggplot() +
@@ -181,7 +181,7 @@ ggplot() +
 # randomly assigning functions to plots generates the same pattern as the empirical data
 # why is this the case?
 
-# maybe it is because the turnover approach does always work?
+# maybe it is because the turnover approach is anti-conservative
 
 
 # test the turnover approach using the simulated data
@@ -201,42 +201,66 @@ library(dplyr)
 library(tidyr)
 library(here)
 
-# choose a simulation id
-s <- 11
-
-# read some of the simulated data
+# load the simulated data
 par.dat <- read_csv(here("data/parameters_sim.csv"))
 abun.dat <- read_csv(here("data/raw_abundance_data.csv"))
 mf.dat <- read_csv(here("data/multifunctionality_data.csv"))
 func.dat <- read_csv(here("data/function_values_per_species.csv"))
 
+
+# this must run for each simulation
+
+# choose a simulation id
+s <- 11
+
 # check the parameters
 par.dat[s,]
 
+
+# prepare the abundance data
+
 # subset the chosen simulation id
-abun.dat <- 
+abun <- 
   abun.dat %>%
   filter(sim.id == s) %>%
   pivot_wider(names_from = "species", values_from = "abundance")
 
 # get a vector of species names that are present for the chosen simulation
-spp.present <- sapply(abun.dat[, grepl("sp_", names(abun.dat)) ], function(x) sum(ifelse(x > 0, 1, 0)))
+spp.present <- sapply(abun[, grepl("sp_", names(abun)) ], function(x) sum(ifelse(x > 0, 1, 0)))
 spp.present <- names(spp.present[spp.present > 0])
 
 # subset the species that are present in the simulation
-abun.dat <- 
-  abun.dat %>%
+abun <- 
+  abun %>%
   select(sim.id, patch, time, all_of(spp.present))
 
+
+# prepare the function data
+
 # subset the multifunctionality data
-mf.dat <- 
+mf <- 
   mf.dat %>%
   filter(sim.id == s) %>%
   select(-richness, -total_abundance, -local.sp.pool, -ends_with("MF"))
 
 # join the raw abundance data to the function data
 # mf.dat contains function data and species abundances in one data.frame
-mf.dat <- full_join(mf.dat, abun.dat, by = c("sim.id", "patch", "time"))
+mf.a <- full_join(mf, abun, by = c("sim.id", "patch", "time"))
+
+# get species effect on each function using presence-absence
+# first convert the species abundance data to presence-absence data
+mf.pa <- 
+  mf.a %>%
+  mutate(across(.cols = all_of(spp.present), ~if_else(. > 0, 1, 0) ) )
+
+# get a list of function names
+f.names <- 
+  mf.a %>%
+  select(starts_with("F_")) %>%
+  names(.)
+
+
+# function trait data
 
 # subset the functional trait data
 func.dat <- 
@@ -251,144 +275,141 @@ func.dat <- func.dat[func.dat$species %in% spp.present, ]
 # e.g. c(1, 2, 3) == c(1, 2, 3)
 any(func.dat$species != spp.present)
 
-# get a list of function names
-f.names <- 
-  mf.dat %>%
-  select(starts_with("F_")) %>%
-  names(.)
 
+# write two functions:
 
-list.out <- vector("list", length = length(f.names))
+# (1) calculate species effects using the AIC-based turnover approach
+
+# (2) calculate species effects using Gotelli et al. (2011)'s method
+
+a.out <- vector("list", length = length(f.names))
+pa.out <- vector("list", length = length(f.names))
 for (i in 1:length(f.names)){
-  
-  # get the function values for each species for the given function i
-  f.vals <- func.dat[[f.names[i]]]
-  names(f.vals) <- func.dat$species
   
   # get species effect on each function using abundances
   # this outputs a vector of species effects (-1, 0 or 1) on the function i
-  r.abun <- getRedundancy(vars = f.names[i], species = spp.present, data = mf.dat)
-  r.abun <- sapply(r.abun, function(x)(x))
+  r.abun <- getRedundancy(vars = f.names[i], species = spp.present, data = mf.a)
+  a.out[[i]] <- sapply(r.abun, function(x)(x))
   
   # get species effect on each function using presence-absence
-  # first convert the species abundance data to presence-absence data
-  mf.dat2 <- 
-    mf.dat %>%
-    mutate(across(.cols = all_of(spp.present), ~if_else(. > 0, 1, 0) ) )
-  
   # this outputs a vector of species effects (-1, 0 or 1) on the function i
-  r.pa <- getRedundancy(vars = f.names[i], species = spp.present, data =  mf.dat2)
-  r.pa <- sapply(r.pa, function(x)(x))
-  r.pa
+  r.pa <- getRedundancy(vars = f.names[i], species = spp.present, data =  mf.pa)
+  pa.out[[i]] <- sapply(r.pa, function(x)(x))
   
-  # proportion of incorrect directions?
-  # true.function.vals: real function values (i.e. linear coefficient)
-  # inferred.effects: inferred species effect (-1, 0 or 1)
-  # ignores species that were non-significant
-  
-  # outputs proportion of IN-correctly inferred directions
-  compare.directions.vectors <- function(true.function.vals, inferred.effects){
-    x <- sum(true.function.vals[inferred.effects < 0] > 0)
-    y <- sum(true.function.vals[inferred.effects > 0] < 0)
-    (x + y)/sum(inferred.effects != 0)
   }
-  
-  # compare presence absence versus abundance accuracy
-  # error.pa is the proportion of incorrectly inferred directions
-  error.pa <- compare.directions.vectors(true.function.vals = f.vals, inferred.effects = r.pa)
-  
-  # ifelse(f.vals < 0, -1, 1)[r.pa != 0]
-  # r.pa[r.pa != 0]
-  
-  error.abun <- compare.directions.vectors(true.function.vals = f.vals, inferred.effects = r.abun)
-  
-  # ifelse(f.vals < 0, -1, 1)[r.abun != 0]
-  # r.abun[r.abun != 0]
-  
-  # correlation between inferred coefficients and true inferred effects
-  cor.pa <- cor(f.vals, r.pa, method = "spearman")
-  cor.abun <- cor(f.vals, r.abun, method = "spearman")
-  
-  df.out <- 
-    data.frame(func.id = f.names[i],
-               error.pa = error.pa,
-               error.abun = error.abun,
-               cor.pa = cor.pa,
-               cor.abun = cor.abun)
-  
-  list.out[[i]] <- df.out
+
+do.call(cbind, a.out)
+do.call(cbind, pa.out)
+
+
+# proportion of incorrect directions?
+# true.function.vals: real function values (i.e. linear coefficient)
+# inferred.effects: inferred species effect (-1, 0 or 1)
+# ignores species that were non-significant
+
+# get the function values for each species for the given function i
+f.vals <- func.dat[[f.names[i]]]
+names(f.vals) <- func.dat$species
+
+# outputs proportion of IN-correctly inferred directions
+compare.directions.vectors <- function(true.function.vals, inferred.effects){
+  x <- sum(true.function.vals[inferred.effects < 0] > 0)
+  y <- sum(true.function.vals[inferred.effects > 0] < 0)
+  (x + y)/sum(inferred.effects != 0)
 }
 
-bind_rows(list.out)
+# compare presence absence versus abundance accuracy
+# error.pa is the proportion of incorrectly inferred directions
+error.pa <- compare.directions.vectors(true.function.vals = f.vals, inferred.effects = r.pa)
 
+# ifelse(f.vals < 0, -1, 1)[r.pa != 0]
+# r.pa[r.pa != 0]
+
+error.abun <- compare.directions.vectors(true.function.vals = f.vals, inferred.effects = r.abun)
+
+# ifelse(f.vals < 0, -1, 1)[r.abun != 0]
+# r.abun[r.abun != 0]
 
 
 ### implement Gotelli et al. (2011)'s turnover metric
-
-# we use the mf.dat2 data for this
-mf.dat2 <- 
-  mf.dat %>%
-  mutate(across(.cols = all_of(spp.present), ~if_else(. > 0, 1, 0) ) )
 
 # use row.randomiser to reshuffle function rows
 # then calculate D-values for the shuffled data
 
 # set number of replicates
-n <- 10
+n <- 1000
 
-ran.d.vals <- 
-  lapply(c(1:n), function(x){
+# data: species presence-absence data
+
+SES_score <- function(data, function_names, species_names, n_ran) {
   
-  # randomise function values across plots
-  mf.dat2.ran <- row.randomiser(func.names = f.names,
-                                species.names = spp.present, 
-                                adf.data = mf.dat2)
+  ran.d.vals <- vector("list", length = n_ran)
+  for (i in 1:n_ran) {
+    
+    # randomise function values across plots
+    data.random <- row.randomiser(func.names = function_names,
+                                  species.names = species_names, 
+                                  adf.data = data)
+    
+    # calculate difference values for each species for each function
+    ran.d.vals[[i]] <-  
+      data.random %>%
+      pivot_longer(cols = species_names,
+                   names_to = "species",
+                   values_to = "pa") %>%
+      group_by(species, pa) %>%
+      summarise(across(.cols = all_of(function_names), mean ), .groups = "keep") %>%
+      summarise(across(.cols = all_of(function_names), diff ), .groups = "drop")
+    
+  }
   
-  # calculate difference values for each species for each function
-  mf.dat2.ran %>%
-    pivot_longer(cols = starts_with("sp_"),
+  # bind the list into a data.frame  
+  ran.d.vals <- bind_rows(ran.d.vals, .id = "run")
+  
+  # calculate mean and sd of d-values of randomised data
+  ran.d.vals <- 
+    ran.d.vals %>%
+    pivot_longer(cols = function_names,
+                 names_to = "function_name",
+                 values_to = "d_value") %>%
+    arrange(species, function_name) %>%
+    group_by(species, function_name) %>%
+    summarise(mean_d_value = mean(d_value, na.rm = TRUE),
+              sd_d_value = sd(d_value, na.rm = TRUE), .groups = "drop")
+  
+  # calculate observed d values
+  obs.d.vals <- 
+    data %>%
+    pivot_longer(cols = species_names,
                  names_to = "species",
                  values_to = "pa") %>%
     group_by(species, pa) %>%
-    summarise(across(.cols = all_of(func.names), mean )) %>%
-    summarise(across(.cols = all_of(func.names), diff ), .groups = "drop")
+    summarise(across(.cols = all_of(function_names), mean ), .groups = "keep") %>%
+    summarise(across(.cols = all_of(function_names), diff ), .groups = "drop") %>%
+    pivot_longer(cols = starts_with("F_"),
+                 names_to = "function_name",
+                 values_to = "d_value_obs") %>%
+    arrange(species, function_name)
   
-})
+  # join the observed d.vals to the randomised d.vals
+  d.val.dat <- full_join(ran.d.vals, obs.d.vals, by = c("species", "function_name"))
+  
+  # calculate species importance scores
+  sp.SES <- 
+    d.val.dat %>%
+    mutate(SES = (d_value_obs - mean_d_value)/(sd_d_value)) %>%
+    mutate(SES_effect = if_else(SES > 2, 1, 
+                                if_else(SES < -2, -1, 0))) %>%
+    select(species, function_name, SES_effect) %>%
+    pivot_wider(id_cols = "species",
+                names_from = "function_name",
+                values_from = "SES_effect")
+  
+  return(sp.SES)
+  
+}
 
-ran.d.vals <- bind_rows(ran.d.vals, .id = "run")
-
-ran.d.vals <- 
-  ran.d.vals %>%
-  pivot_longer(cols = starts_with("F_"),
-               names_to = "function_name",
-               values_to = "d_value") %>%
-  arrange(species, function_name) %>%
-  group_by(species, function_name) %>%
-  summarise(mean_d_value = mean(d_value, na.rm = TRUE),
-            sd_d_value = sd(d_value, na.rm = TRUE), .groups = "drop")
-
-obs.d.vals <- 
-  mf.dat2 %>%
-  pivot_longer(cols = starts_with("sp_"),
-               names_to = "species",
-               values_to = "pa") %>%
-  group_by(species, pa) %>%
-  summarise(across(.cols = all_of(func.names), mean )) %>%
-  summarise(across(.cols = all_of(func.names), diff ), .groups = "drop") %>%
-  pivot_longer(cols = starts_with("F_"),
-               names_to = "function_name",
-               values_to = "d_value_obs") %>%
-  arrange(species, function_name)
-
-# join the observed d.vals to the randomised d.vals
-d.val.dat <- full_join(ran.d.vals, obs.d.vals, by = c("species", "function_name"))
-
-# calculate species importance scores
-d.val.dat %>%
-  mutate(SES = (d_value_obs - mean_d_value)/(sd_d_value)) %>%
-  mutate(SES_effect = if_else(SES > 2, 1, 
-                              if_else(SES < -2, -1, 0)))
-
+SES_score(data = mf.pa, function_names = f.names, species_names = spp.present, n_ran = 10)
 
 
 
