@@ -146,6 +146,7 @@ turnover_aic_null <- function(func.names,
   
 }
 
+
 # test the turnover_aic_null function using BIODEPTH data
 library(multifunc)
 data(all_biodepth)
@@ -181,100 +182,14 @@ ggplot() +
 # randomly assigning functions to plots generates the same pattern as the empirical data
 # why is this the case?
 
-# maybe it is because the turnover approach is anti-conservative
+# maybe it is because the turnover approach is anti-conservative...
 
 
-# test the turnover approach using the simulated data
+
+### test the turnover approach using the simulated data
 
 # can it detect positive and negative effects on functions?
 # if so, at what rate do errors arise?
-
-
-# next step: wrap the simulations into a list to run for each simulation
-
-# wrap the turnover and AIC approaches into pipelines
-# calculate error associated with both of them
-
-# load relevant libraries
-library(readr)
-library(dplyr)
-library(tidyr)
-library(here)
-
-# load the simulated data
-par.dat <- read_csv(here("data/parameters_sim.csv"))
-abun.dat <- read_csv(here("data/raw_abundance_data.csv"))
-mf.dat <- read_csv(here("data/multifunctionality_data.csv"))
-func.dat <- read_csv(here("data/function_values_per_species.csv"))
-
-
-# this must run for each simulation
-
-# choose a simulation id
-s <- 11
-
-# check the parameters
-par.dat[s,]
-
-
-# prepare the abundance data
-
-# subset the chosen simulation id
-abun <- 
-  abun.dat %>%
-  filter(sim.id == s) %>%
-  pivot_wider(names_from = "species", values_from = "abundance")
-
-# get a vector of species names that are present for the chosen simulation
-spp.present <- sapply(abun[, grepl("sp_", names(abun)) ], function(x) sum(ifelse(x > 0, 1, 0)))
-spp.present <- names(spp.present[spp.present > 0])
-
-# subset the species that are present in the simulation
-abun <- 
-  abun %>%
-  select(sim.id, patch, time, all_of(spp.present))
-
-
-# prepare the function data
-
-# subset the multifunctionality data
-mf <- 
-  mf.dat %>%
-  filter(sim.id == s) %>%
-  select(-richness, -total_abundance, -local.sp.pool, -ends_with("MF"))
-
-# join the raw abundance data to the function data
-# mf.dat contains function data and species abundances in one data.frame
-mf.a <- full_join(mf, abun, by = c("sim.id", "patch", "time"))
-
-# get species effect on each function using presence-absence
-# first convert the species abundance data to presence-absence data
-mf.pa <- 
-  mf.a %>%
-  mutate(across(.cols = all_of(spp.present), ~if_else(. > 0, 1, 0) ) )
-
-# get a list of function names
-f.names <- 
-  mf.a %>%
-  select(starts_with("F_")) %>%
-  names(.)
-
-
-# function trait data
-
-# subset the functional trait data
-func.dat <- 
-  func.dat %>%
-  filter(sim.id == s)
-
-# subset the species that are present
-func.dat <- func.dat[func.dat$species %in% spp.present, ]
-
-# test if order is preserved: if FALSE then order is preserved
-# this works because R tests element per element
-# e.g. c(1, 2, 3) == c(1, 2, 3)
-any(func.dat$species != spp.present)
-
 
 
 # functions to implement aic-based species effects and Gotelli et al. (2011) species effects
@@ -314,8 +229,7 @@ AIC_sp <- function(data, function_names, species_names) {
   
 }
 
-# test this function
-y <- AIC_sp(data = mf.pa, function_names = f.names, species_names = spp.present)
+# AIC_sp(data = mf.pa, function_names = f.names, species_names = spp.present)
 
 
 # 2. calculate species effects using Gotelli et al. (2011)'s method
@@ -354,7 +268,8 @@ SES_score <- function(data, function_names, species_names, n_ran) {
                    names_to = "species",
                    values_to = "pa") %>%
       group_by(species, pa) %>%
-      summarise(across(.cols = all_of(function_names), mean )) %>%
+      summarise(across(.cols = all_of(function_names), mean ), .groups = "drop") %>%
+      group_by(species) %>%
       summarise(across(.cols = all_of(function_names), diff ), .groups = "drop")
     
   }
@@ -380,7 +295,8 @@ SES_score <- function(data, function_names, species_names, n_ran) {
                  names_to = "species",
                  values_to = "pa") %>%
     group_by(species, pa) %>%
-    summarise(across(.cols = all_of(function_names), mean )) %>%
+    summarise(across(.cols = all_of(function_names), mean ), .groups = "drop") %>%
+    group_by(species) %>%
     summarise(across(.cols = all_of(function_names), diff ), .groups = "drop") %>%
     pivot_longer(cols = starts_with("F_"),
                  names_to = "function_name",
@@ -405,39 +321,26 @@ SES_score <- function(data, function_names, species_names, n_ran) {
   
 }
 
-x <- SES_score(data = mf.pa, function_names = f.names, species_names = spp.present, n_ran = 100)
+# SES_score(data = mf.pa, function_names = f.names, species_names = spp.present, n_ran = 10)
 
 
-# we have the x and y data
-# compare to each other and to the true results
+# write functions to test reliability
 
-y$F_1
-x$F_1
-
-plot(func.dat$F_1, y$F_1)
-plot(func.dat$F_1, x$F_1)
-
-
-
-# Q1: for detected effects, how many are in the correct direction?
+# Q1: for detected species effects, how many species effects are in the incorrect direction?
 
 # true.function.vals: real function values (i.e. linear coefficient)
-# inferred.effects: inferred species effect (-1, 0 or 1) ignores species that were non-significant
+# inferred.effects: inferred species effect (-1, 0 or 1)
+
+# note that this function ignores non-significant species effects (i.e. effect = 0)
 
 # outputs proportion of IN-correctly inferred directions
 compare.directions <- function(true.function.vals, inferred.effects){
-  x <- sum(true.function.vals[inferred.effects < 0] > 0)
-  y <- sum(true.function.vals[inferred.effects > 0] < 0)
-  (x + y)/sum(inferred.effects != 0)
+  n.incorrect.negative <- sum(true.function.vals[inferred.effects < 0] > 0)
+  n.incorrect.positive <- sum(true.function.vals[inferred.effects > 0] < 0)
+  n.incorrect.total <- (n.incorrect.negative + n.incorrect.positive)
+  
+  return( n.incorrect.total/sum(inferred.effects != 0) )
 }
-
-# aic approach
-mapply(compare.directions, func.dat[, f.names], y[, f.names])
-
-# ses approach
-mapply(compare.directions, func.dat[, f.names], x[, f.names])
-
-
 
 
 # Q2: do the approaches detect the correct direction for species 
@@ -445,7 +348,18 @@ mapply(compare.directions, func.dat[, f.names], x[, f.names])
 
 # true.function.vals: real function values (i.e. linear coefficient)
 # inferred.effects: inferred species effect (-1, 0 or 1)
-# ignores species that were non-significant
+# low.q: lower quantile
+# upp.q: upper quantile
+
+# note that this function only includes values below the lower quantile that are negative
+# and values above the upper quantile that are positive
+
+# proportion_undetected_negatives: proportion of true negatives that were falsely specified
+# proportion_undetected_positives: proportion of true positives that were falsely specified
+
+# true negatives/positives are based on the quantile values
+# we assume that function values below the low.q and upp.q (that are negative and positive respectively)
+# indicate true negative effects
 
 # outputs proportion of IN-correctly inferred directions
 compare.quantiles <- function(true.function.vals, inferred.effects, low.q = 0.10, upp.q = 0.90){
@@ -454,53 +368,184 @@ compare.quantiles <- function(true.function.vals, inferred.effects, low.q = 0.10
   quantiles <- quantile(true.function.vals, probs = c(low.q, upp.q))
   
   # test if lowest quantiles show negative effects
-  true.function.vals < quantiles[1]
+  true.negative <- (true.function.vals < quantiles[1]) & (true.function.vals < 0) 
+  undetected.negatives <- sum(inferred.effects[true.negative] < 0)/sum(true.negative)
   
-  inferred.effects[true.function.vals < quantiles[1]]
+  # test if high quantiles show positive effects
+  true.positive <- (true.function.vals > quantiles[2]) & (true.function.vals > 0) 
+  undetected.positives <- sum(inferred.effects[true.positive] > 0)/sum(true.positive)
   
-  (x + y)/sum(inferred.effects != 0)
+  return(c("proportion_undetected_negatives" = undetected.negatives, 
+           "proportion_undetected_positives" = undetected.positives))
+  
 }
 
-x <- sum(true.function.vals[inferred.effects < 0] > 0)
-y <- sum(true.function.vals[inferred.effects > 0] < 0)
 
-z <- quantile(func.dat$F_1, probs = c(0.10, 0.90))
-z
+# pull comparisons into a function that outputs a cleaned data.frame
 
-(func.dat$F_1 < z[1]) & (func.dat$F_1 < 0) 
+# aic_dat: output from AIC_sp
+# ses_dat: output from SES_score
+
+# true_function_data: simulated function coefficients
+# function_names: vector of function names
+
+# note that these different objects must correspond to the same input data
+compare_turnover_approaches <- function(aic_dat, ses_dat, true_function_data, function_names) {
+  
+  if(! "dplyr" %in% installed.packages()[,1]) stop(
+    "this function requires the dplyr package to be installed"
+  )
+  if(! "tidyr" %in% installed.packages()[,1]) stop(
+    "this function requires the tidyr package to be installed"
+  )
+  
+  # load dplyr and tidyr packages
+  library(dplyr)
+  library(tidyr)
+  
+  # Q1:
+  # aic approach
+  q1.aic <- mapply(compare.directions, true_function_data[, function_names], aic_dat[, function_names])
+  
+  # ses approach
+  q1.ses <- mapply(compare.directions, true_function_data[, function_names], ses_dat[, function_names])
+  
+  # Q2:
+  # aic approach
+  q2.aic <- mapply(compare.quantiles, true_function_data[, function_names], aic_dat[, function_names])
+  
+  # ses approach
+  q2.ses <- mapply(compare.quantiles, true_function_data[, function_names], ses_dat[, function_names])
+  
+  # Q3:
+  # aic approach
+  q3.aic <- mapply(cor, true_function_data[, function_names], aic_dat[, function_names], method = "spearman")
+  
+  # ses approach
+  q3.ses <- mapply(cor, true_function_data[, function_names], ses_dat[, function_names], method = "spearman")
+  
+  # create a vector of aic vs. ses
+  approach <- c("aic", "ses", "aic", "aic", "ses", "ses", "aic", "ses")
+  
+  # create a vector of labels
+  e.labs <- 
+    c(rep("prop_incorrect_direction", 2),
+      rep(c("proportion_undetected_negatives", "proportion_undetected_positives"), 2),
+      rep("spearman_correlation", 2))
+  
+  # pull into a list
+  q.list <- 
+    list(q1.aic, q1.ses, 
+         q2.aic[1,], q2.aic[2 ,], q2.ses[1, ], q2.ses[2,], 
+         q3.aic, q3.ses)
+  
+  sp.effect.performance <- cbind(approach = approach, effect = e.labs, bind_rows(q.list, .id = "num") )
+  sp.effect.performance <- as.data.frame(sp.effect.performance)
+  
+  # make this data longer
+  sp.effect.performance <- 
+    sp.effect.performance %>%
+    pivot_longer(cols = all_of(f.names),
+                 names_to = "function_name",
+                 values_to = "value")
+  
+  return(sp.effect.performance)
+}
 
 
-func.dat$F_1[func.dat$F_1 > z[2]]
+# load relevant libraries
+library(readr)
+library(dplyr)
+library(tidyr)
+library(here)
 
-# compare presence absence versus abundance accuracy
-# error.pa is the proportion of incorrectly inferred directions
-error.pa <- compare.directions.vectors(true.function.vals = f.vals, inferred.effects = r.pa)
+# load the simulated data
+par.dat <- read_csv(here("data/parameters_sim.csv"))
+abun.dat <- read_csv(here("data/raw_abundance_data.csv"))
+mf.dat <- read_csv(here("data/multifunctionality_data.csv"))
+func.dat <- read_csv(here("data/function_values_per_species.csv"))
 
-# ifelse(f.vals < 0, -1, 1)[r.pa != 0]
-# r.pa[r.pa != 0]
+# get a vector of simulation ids
+sim.ids <- unique(par.dat$sim.id)
 
-error.abun <- compare.directions.vectors(true.function.vals = f.vals, inferred.effects = r.abun)
+# loop over each simulation
+compare.sims <- vector("list", length = length(sim.ids))
+for (i in 1:length(sim.ids)) {
+  
+  # prepare the abundance data
+  
+  # subset the chosen simulation id
+  abun <- 
+    abun.dat %>%
+    filter(sim.id == sim.ids[i]) %>%
+    pivot_wider(names_from = "species", values_from = "abundance")
+  
+  # get a vector of species names that are present for the chosen simulation
+  sp.present <- sapply(abun[, grepl("sp_", names(abun)) ], function(x) sum(ifelse(x > 0, 1, 0)))
+  sp.present <- names(sp.present[sp.present > 0])
+  
+  # subset the species that are present in the simulation
+  abun <- 
+    abun %>%
+    select(sim.id, patch, time, all_of(sp.present))
+  
+  # prepare the function data
+  
+  # subset the multifunctionality data
+  mf <- 
+    mf.dat %>%
+    filter(sim.id == sim.ids[i]) %>%
+    select(-richness, -total_abundance, -local.sp.pool, -ends_with("MF"))
+  
+  # join the raw abundance data to the function data
+  # mf.dat contains function data and species abundances in one data.frame
+  mf.a <- full_join(mf, abun, by = c("sim.id", "patch", "time"))
+  
+  # get species effect on each function using presence-absence
+  # first convert the species abundance data to presence-absence data
+  mf.pa <- 
+    mf.a %>%
+    mutate(across(.cols = all_of(sp.present), ~if_else(. > 0, 1, 0) ) )
+  
+  # get a list of function names
+  f.names <- 
+    mf.pa %>%
+    select(starts_with("F_")) %>%
+    names(.)
+  
+  # function trait data
+  
+  # subset the functional trait data
+  func <- 
+    func.dat %>%
+    filter(sim.id == sim.ids[i])
+  
+  # subset the species that are present
+  func <- func[func$species %in% sp.present, ]
+  
+  # test if order is preserved: if FALSE then order is preserved
+  # this works because R tests element per element
+  # e.g. c(1, 2, 3) == c(1, 2, 3)
+  if( any(func$species != sp.present) == TRUE){
+    print("WARNING! species order is not preserved")
+  }
+  
+  # implement the aic-based approach to get species effects on each function
+  aic.x <- AIC_sp(data = mf.pa, function_names = f.names, species_names = sp.present)
+  
+  # implement the ses-based approach to get species effects on each function
+  ses.x <- SES_score(data = mf.pa, function_names = f.names, species_names = sp.present, n_ran = 10)
+  
+  # compare these two approaches for each of the 30 simulated data.sets
+  compare.sims[[i]] <- 
+    compare_turnover_approaches(aic_dat = aic.x, 
+                                ses_dat = ses.x, 
+                                true_function_data = func, 
+                                function_names = f.names)
+  
+}
 
-# ifelse(f.vals < 0, -1, 1)[r.abun != 0]
-# r.abun[r.abun != 0]
-
-# get the function values for each species for the given function i
-f.vals <- func.dat[[f.names[i]]]
-names(f.vals) <- func.dat$species
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# bind into a data.frame
 
 
 
