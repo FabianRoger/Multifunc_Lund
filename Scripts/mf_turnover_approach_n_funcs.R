@@ -203,7 +203,7 @@ g1 <-
   ggplot() +
   stat_smooth(data = jena.null,
               mapping = aes(x = nfunc, y = div, group = null.rep),
-              geom='line', alpha=0.025, size = 1, se=FALSE, method = "lm") +
+              geom='line', alpha=0.01, size = 1, se=FALSE, method = "lm") +
   geom_smooth(data = jena.obs,
               mapping = aes(x = nfunc, y = div), colour = "red",
               method = "lm", se = FALSE) +
@@ -451,10 +451,10 @@ compare_turnover_approaches <- function(aic_dat, ses_dat, true_function_data, fu
   
   # Q2:
   # aic approach
-  q2.aic <- mapply(compare.quantiles, true_function_data[, function_names], aic_dat[, function_names])
+  # q2.aic <- mapply(compare.quantiles, true_function_data[, function_names], aic_dat[, function_names])
   
   # ses approach
-  q2.ses <- mapply(compare.quantiles, true_function_data[, function_names], ses_dat[, function_names])
+  # q2.ses <- mapply(compare.quantiles, true_function_data[, function_names], ses_dat[, function_names])
   
   # Q3:
   # aic approach
@@ -469,13 +469,11 @@ compare_turnover_approaches <- function(aic_dat, ses_dat, true_function_data, fu
   # create a vector of labels
   e.labs <- 
     c(rep("prop_incorrect_direction", 2),
-      rep(c("proportion_undetected_negatives", "proportion_undetected_positives"), 2),
       rep("spearman_correlation", 2))
   
   # pull into a list
   q.list <- 
     list(q1.aic, q1.ses, 
-         q2.aic[1,], q2.aic[2 ,], q2.ses[1, ], q2.ses[2,], 
          q3.aic, q3.ses)
   
   sp.effect.performance <- cbind(approach = approach, effect = e.labs, bind_rows(q.list, .id = "num") )
