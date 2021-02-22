@@ -538,7 +538,7 @@ multifunc_calculator <-
            add.args = list(NA, NA, NA, c(thresh = 0.3), c(thresh = 0.7))) {
     
     # perform error checks
-    if( any(!is.na(add.args)) ) {
+    if( !any(is.na(add.args)) ) {
       print("warning: no NAs in add.args list, is this correct?")
     }
     

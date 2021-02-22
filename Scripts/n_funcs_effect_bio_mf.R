@@ -157,18 +157,20 @@ p1 <-
   ggplot(data = jena.n.func,
          mapping = aes(x = number_of_functions, 
                        y = realised_diversity_mf_est)) +
-  geom_jitter(alpha = 0.1) +
-  geom_smooth(method = "lm", se = FALSE, colour = "black") +
-  ylab("realised diversity - MF (est)") +
+  geom_jitter(width = 0.1, alpha = 0.3, shape = 16, size = 1) +
+  geom_smooth(method = "lm", se = FALSE, 
+              colour = viridis::viridis(n = 1, begin = 0.5, end = 0.5, option = "D")) +
+  ylab("multifunctional BEF-slope") +
   xlab("number of functions") +
   facet_wrap(~multifunctionality_metric, scales = "free") +
   theme_meta() +
-  theme(strip.background =element_rect(fill = "white", colour = "black"))
+  theme(strip.background = element_rect(fill = "white", colour = "black"))
+
 
 p1
 
-ggsave(filename = here("Figures/fig_3_jena.png"), plot = p1,
-       width = 16, height = 12, units = "cm", dpi = 300)
+ggsave(filename = here("Figures/fig_9_jena.png"), plot = p1,
+       width = 16, height = 12, units = "cm", dpi = 450)
   
 
 ### load the simulated data
@@ -207,16 +209,18 @@ sim.n.func.dat$sim.id <- as.numeric(sim.n.func.dat$sim.id)
 # load the simulated data parameters
 params <- read_csv(file = here("data/parameters_sim.csv"))
 
-# create a simulation category variable
-# reps <- length(unique(params$rep.id))
-# id <- unique(paste(params$a_mean, params$w.shape, params$w.scale, sep = "_"))
-# id <- LETTERS[1:length(id)]
-
-# add this to the params data
-# params$sim.group <- rep(id, each = reps)
-
 # join the parameter data to the n_function data
 sim.n.func.dat <- full_join(sim.n.func.dat, params, by = "sim.id")
+head(sim.n.func.dat)
+
+# add descriptions of the simulations
+names(sim.n.func.dat)
+
+sim.n.func.dat <- 
+  sim.n.func.dat %>%
+  mutate(competition = if_else(a_mean == 0.25, "weak",
+                               if_else(a_mean == 0.5, "strong", "equal")),
+         specialisation = if_else(w.shape == 0.5, "specialisation", "generalism"))
 
 
 # plot the simulated data
@@ -225,11 +229,12 @@ p2 <-
        mapping = aes(x = number_of_functions, 
                      y = realised_diversity_mf_est,
                      group = sim.id,
-                     colour = sim.group )) +
-  geom_smooth(method = "lm", se = FALSE) +
-  ylab("realised diversity - MF (est)") +
+                     colour = competition)) +
+  geom_smooth(aes(linetype = specialisation), method = "lm", se = FALSE, size = 0.75) +
+  ylab("multifunctional BEF-slope") +
   xlab("number of functions") +
   scale_colour_viridis_d(option = "C", end = 0.9) +
+  scale_linetype_manual(values=c("solid", "dotted"))+
   facet_wrap(~multifunctionality_metric, scales = "free") +
   theme_meta() +
   theme(legend.position = "bottom",
@@ -237,8 +242,104 @@ p2 <-
         legend.key = element_rect(fill = NA),
         strip.background =element_rect(fill = "white", colour = "black")) 
 
-ggsave(filename = here("Figures/fig_4_sim.png"), plot = p2,
-       width = 16, height = 13.5, units = "cm", dpi = 300)
+p2
+
+ggsave(filename = here("Figures/fig_8_sim.png"), plot = p2,
+       width = 16, height = 13.5, units = "cm", dpi = 450)
+
+
+
+# questions to answer:
+
+# why does the multifunctional BEF-slope increase with number of functions for the Pasari approach increase?
+
+# make a copy of the sim.dat data
+pasari.inv <- 
+  lapply(split(sim.dat, sim.raw$sim.id), function(data) {
+  
+  # get combinations of function names
+  list.func.names <- get.function.combinations(function.names = sim.func.names)
+  
+  func.out <- vector("list")
+  
+  # loop over each set of function names
+  for (i in 1:length(list.func.names)) {
+    
+    # get the vector of function names
+    sample.func.names <- list.func.names[[i]]
+    
+    site.mods <- 
+      data %>%
+      select("patch", "time", "richness", "total_abundance", "local.sp.pool")
+    
+    df.x <- 
+      data %>%
+      select(all_of(sample.func.names) )
+    
+    site.mods$mean_funcs <- apply(df.x, MARGIN = 1, mean)
+    site.mods$sd_funcs <- apply(df.x, MARGIN = 1, sd)
+    
+    site.mods$n.func <- length(sample.func.names)
+    site.mods$n.func.id <- paste(sample.func.names, collapse = "")
+    
+    func.out[[i]] <- site.mods
+    
+  }
+  
+  return(bind_rows(func.out))
+  
+  } )
+
+pasari.inv <- bind_rows(pasari.inv, .id = "sim.id")
+View(head(pasari.inv))
+
+# average among-function sd increases with number of functions
+# mean stays absolutely constant:
+pasari.inv %>%
+  group_by(sim.id, n.func, n.func.id) %>%
+  summarise(mean_sd = mean(sd_funcs),
+            mean_mean = mean(mean_funcs), .groups = "drop") %>%
+  pivot_longer(cols = starts_with("mean"),
+               names_to = "sd_mean",
+               values_to = "val") %>%
+  ggplot(data = .,
+         mapping = aes(x = n.func, y = val, group = sd_mean, 
+                       colour = sd_mean)) +
+  geom_jitter() +
+  geom_smooth(method = "lm", se = FALSE, colour = "black") +
+  facet_wrap(~sim.id, scales = "free") +
+  theme_classic()
+
+# this might affect the intercept but how does it affect the slope?
+
+# what is the relationship between richness and:
+# mean across functions
+# sd across functions
+# for different numbers of functions?
+
+# plot correlation between richness and the mean/sd
+pasari.inv %>%
+  group_by(sim.id, n.func, n.func.id) %>%
+  summarise(sd_cor = cor(richness, sd_funcs),
+            mean_cor = cor(richness, mean_funcs), .groups = "drop") %>%
+  pivot_longer(cols = ends_with("cor"),
+               names_to = "key",
+               values_to = "richness_cor") %>%
+  ggplot(data = .,
+         mapping = aes(x = n.func, y = richness_cor, group = key,
+                       colour = key)) +
+  geom_jitter(alpha = 0.5) +
+  geom_smooth(method = "lm", colour = "black") +
+  facet_wrap(~sim.id, scales = "free") +
+  theme_classic()
+
+# when you have more functions, the relationship between richness and sd among functions is more negative
+# this could be driving this?
+
+
+# why does the summing approach decrease under equal competition?
+
+# not obvious actually...
 
 
 
