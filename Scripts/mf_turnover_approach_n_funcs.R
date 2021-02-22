@@ -7,6 +7,9 @@
 # library(devtools)
 # install_github("jebyrnes/multifunc")
 
+# load the plotting theme
+source(here("Scripts/function_plotting_theme.R"))
+
 # arguments for the functions:
 
 # vars: vector of function names
@@ -147,40 +150,70 @@ turnover_aic_null <- function(func.names,
 }
 
 
-# test the turnover_aic_null function using BIODEPTH data
-library(multifunc)
-data(all_biodepth)
-allVars <- qw(biomassY3, root3, N.g.m2,  light3, N.Soil, wood3, cotton3)
+# apply the aic_turnover_null function to the Jena data
 
-# subset out the german site
-germany <- subset(all_biodepth, all_biodepth$location=="Germany")
-head(germany)
+# load relevant libraries
+library(dplyr)
+library(readr)
+library(here)
 
-# get vectors for functions and for species
-vars <- whichVars(germany, allVars)
-species <- relevantSp(germany,26:ncol(germany))
+# load the cleaned Jena data
+jena.raw <- read_csv(file = here("data/jena_data_cleaned.csv"))
+
+# define variable groups
+var.names <- names(jena.raw)
+
+# (1) get species names
+spp.p <- ( grepl("+\\.+", var.names) & nchar(var.names) == 7 )
+spp.names <- var.names[spp.p]
+
+# (2) get site identifiers
+site.id <- c("year", "sowndiv", "plotcode", "realised_diversity")
+
+# (3) get function names
+jena.func.names <- var.names[!(var.names %in% ( c(spp.names, site.id) ))  ]
+
+# convert to presence-absence instead of relative abundance
+jena.dat <- 
+  jena.raw %>%
+  mutate(across(.cols = all_of(spp.names), ~if_else(.x > 0, 1, 0)))
 
 # test the turnover_aic_null function and plot the results
-x <- turnover_aic_null(func.names = vars, 
-                       species.names = species, 
-                       adf.data = germany,
-                       output = "prop_species",
-                       n = 100)
+# this function can take a long time to run (e.g. 20-30 minutes)
+# jena.turn <- turnover_aic_null(func.names = jena.func.names, 
+                       # species.names = spp.names, 
+                       # adf.data = jena.dat,
+                       # output = "prop_species",
+                       # n = 1000)
+
+# output these files to a .csv
+# write_csv(x = jena.turn[[1]], file = here("data/jena_null_model_data.csv"))
+# write_csv(x = jena.turn[[2]], file = here("data/jena_null_observed_data.csv"))
+
+# read in the null model data
+jena.null <- read_csv(file = here("data/jena_null_model_data.csv"))
+jena.obs <- read_csv(file = here("data/jena_null_observed_data.csv"))
+
+# check the max of the null data to see if it is below 1
+max(jena.null$div)
                   
 # plot the null expectations versus the observed data
 library(ggplot2)
 g1 <- 
   ggplot() +
-  stat_smooth(data = x[[1]],
+  stat_smooth(data = jena.null,
               mapping = aes(x = nfunc, y = div, group = null.rep),
               geom='line', alpha=0.025, size = 1, se=FALSE, method = "lm") +
-  geom_smooth(data = x[[2]],
+  geom_smooth(data = jena.obs,
               mapping = aes(x = nfunc, y = div), colour = "red",
               method = "lm", se = FALSE) +
   facet_wrap(~effect_direction, scales = "free") +
+  scale_y_continuous(breaks = seq(0, 1, 0.1)) +
   ylab("number of species") +
   xlab("number of functions") +
   theme_meta()
+
+g1
 
 ggsave(filename = here("Figures/aic_turnover_null.png"), plot = g1,
        width = 11, height = 7.5, units = "cm", dpi = 450)
