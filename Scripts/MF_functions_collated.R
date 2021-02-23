@@ -147,7 +147,7 @@ pca_multifunc <- function(adf, vars, standardise = FALSE){
       
     })
   
-  temp2 <- vegan::scores(pca2, choices=1:length(vars), display=c("sites")) 
+  temp2 <- vegan::scores(pca2, choices=1:length(pca2$CA$eig), display=c("sites")) 
   eig<-summary(pca2)$cont$importance[1,]
   for(i in 1:length(eig)) temp2[,i] <- temp2[,i] * eig[i]
   
