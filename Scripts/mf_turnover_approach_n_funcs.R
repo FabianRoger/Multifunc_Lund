@@ -7,6 +7,8 @@
 # library(devtools)
 # install_github("jebyrnes/multifunc")
 
+library(here)
+
 # load the plotting theme
 source(here("Scripts/function_plotting_theme.R"))
 
@@ -196,19 +198,40 @@ jena.obs <- read_csv(file = here("data/jena_null_observed_data.csv"))
 
 # check the max of the null data to see if it is below 1
 max(jena.null$div)
+
+# calculate the 97.5% and 2.5% quantiles for each number of functions
+# plot this as well
+jena.null.q <- 
+  jena.null %>% 
+  group_by(effect_direction, null.rep, nfunc) %>%
+  summarise(mean_div = mean(div, na.rm = TRUE), .groups = "drop") %>%
+  group_by(effect_direction, nfunc) %>%
+  summarise(quant_97.5 = quantile(mean_div, probs = c(0.975)),
+            quant_2.5 = quantile(mean_div, probs = c(0.025)),
+            .groups = "drop")
+
+# calculate mean and sd of the observed data
+jena.obs.s <- 
+  jena.obs %>%
+  group_by(effect_direction, nfunc) %>%
+  summarise(mean_div = mean(div, na.rm = TRUE),
+            sd_div = sd(div, na.rm = TRUE))
                   
 # plot the null expectations versus the observed data
 library(ggplot2)
 g1 <- 
   ggplot() +
-  stat_smooth(data = jena.null,
-              mapping = aes(x = nfunc, y = div, group = null.rep),
-              geom='line', alpha=0.01, size = 1, se=FALSE, method = "lm") +
-  geom_smooth(data = jena.obs,
-              mapping = aes(x = nfunc, y = div), colour = "red",
-              method = "lm", se = FALSE) +
+  geom_ribbon(data = jena.null.q,
+            mapping = aes(x = nfunc, ymax = quant_97.5, ymin = quant_2.5),
+            alpha = 0.25) +
+  geom_jitter(data = jena.obs,
+              mapping = aes(x = nfunc, y = div), 
+              width = 0.1, colour = "red", shape = 16, alpha = 0.1, size = 2) +
+  geom_line(data = jena.obs.s,
+              mapping = aes(x = nfunc, y = mean_div), size = 1, colour = "red") +
   facet_wrap(~effect_direction, scales = "free") +
   scale_y_continuous(breaks = seq(0, 1, 0.1)) +
+  scale_x_continuous(breaks = seq(0, 9, 1)) +
   ylab("number of species") +
   xlab("number of functions") +
   theme_meta()
@@ -585,36 +608,48 @@ for (i in 1:length(sim.ids)) {
 # bind into a data.frame
 compare.df <- bind_rows(compare.sims, .id = "simulation.id")
 
-# plot the error rates
-
-# load the plotting theme:
-source(here("Scripts/function_plotting_theme.R"))
-
-p1 <- 
+# bind the parameter data to this
+compare.df <- 
   compare.df %>%
   group_by(simulation.id, approach, effect) %>%
   summarise(mean_value = mean(value, na.rm = TRUE),
             sd_value = sd(value, na.rm = TRUE), .groups = "drop") %>%
-  ggplot(data = .,
-         mapping = aes(x = approach, y = mean_value, colour = simulation.id)) +
-  geom_point(position=position_dodge(width=0.5)) +
+  rename(sim.id = simulation.id)
+
+# join the parameter data to this
+compare.df <- 
+  full_join(compare.df, mutate(par.dat, sim.id = as.character(sim.id)), by = "sim.id") %>%
+  mutate(competition = if_else(a_mean == 0.25, "weak",
+                               if_else(a_mean == 0.5, "strong", "equal")),
+         specialisation = if_else(w.shape == 0.5, "specialisation", "generalism"))
+
+
+# plot the error rates
+library(ggplot2)
+p1 <- 
+  ggplot(data = compare.df,
+         mapping = aes(x = approach, y = mean_value, group = sim.id,
+                       colour = competition, shape = specialisation)) +
+  geom_point(position=position_dodge(width=0.75)) +
   geom_errorbar(mapping = aes(x = approach, 
                               ymin = mean_value-sd_value, 
                               ymax = mean_value+sd_value, 
-                              colour = simulation.id),
+                              colour = competition),
                 width = 0.05,
-                position=position_dodge(width=0.5)) +
+                position=position_dodge(width=0.75)) +
   facet_wrap(~effect, scales = "free") +
   ylab("") +
   scale_colour_viridis_d(end = 0.9, option = "C") +
   theme_meta() +
-  theme(legend.position = "right",
+  theme(legend.position = "bottom",
         legend.key = element_rect(fill = NA),
         legend.text = element_text(size = 7),
         legend.title = element_text(size = 8))
 
+p1
+
 ggsave(filename = here("Figures/turnover_reliability.png"), plot = p1,
-       width = 18.5, height = 16, units = "cm", dpi = 450)
+       width = 17, height = 10, units = "cm", dpi = 450)
 
 
 
