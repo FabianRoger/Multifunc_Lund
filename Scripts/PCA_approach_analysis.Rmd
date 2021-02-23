@@ -49,7 +49,7 @@ for (i in (1:L) ) {
   set.seed(134 + i*9)
  
   # choose pairwise correlation strength
-  COR <- runif(1, -0.3,0.9)
+  COR <- runif(1, -0.3,0)
 
   # make correlation matrix (strictly speaking a covariance matrix but for these simulations it does not matter)
   Sigma <- matrix(COR, ncol = funcnum, nrow = funcnum)
@@ -136,4 +136,22 @@ pca_mf %>%
 ```
 
 
+```{r}
+pca_mf %>% 
+  split(.$run) %>% 
+  lapply(function(x) {
+    x %>% 
+      dplyr::summarise(`PCA MF cor` = cor(`average MF`, `PCA MF`),
+                   `Pasari MF cor` = cor(`average MF`, `Pasari MF`),
+                   var_cor_mean = mean(cor(.[,func.names])))}) %>% 
+      bind_rows() %>% 
+  mutate(row = 1:n()) %>% 
+  pivot_longer(!one_of("row", "var_cor_mean"), names_to = "metric", values_to = "value") %>%
+  ggplot(aes(x = var_cor_mean, y = value)) +
+  geom_point()+
+  geom_hline(yintercept = 0)+
+  facet_wrap(~metric) +
+  theme_minimal()+
+  labs(y = "correlation with average MF", x = "average Function correlation")
+```
 
