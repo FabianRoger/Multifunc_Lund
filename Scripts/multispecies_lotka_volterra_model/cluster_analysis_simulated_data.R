@@ -26,20 +26,56 @@ mult.dat <-
             by = "sim.id")
 
 # examine the relationship between richness and average MF for each simulation
-ggplot(data = mult.dat,
+d1 <- 
+  ggplot(data = mult.dat,
        mapping = aes(x = richness, y = ave._MF, colour = as.character(sim.id) )) +
-  geom_point(alpha = 0.1) +
+  geom_jitter(width = 0.1, alpha = 0.1, shape = 16) +
   geom_smooth(method = "lm", se = FALSE) +
-  theme_classic() +
+  scale_colour_viridis_d(option = "C", end = 0.9) +
+  ylab("average MF") +
+  xlab("sp. richness") +
+  theme_meta() +
   theme(legend.position = "none")
 
-ggplot(data = mult.dat,
-       mapping = aes(x = richness, y = thresh.70_MF, colour = as.character(sim.id) )) +
-  geom_point(alpha = 0.1) +
+d2 <- 
+  ggplot(data = mult.dat,
+         mapping = aes(x = richness, y = Pasari_MF, colour = as.character(sim.id) )) +
+  geom_jitter(width = 0.1, alpha = 0.1, shape = 16) +
   geom_smooth(method = "lm", se = FALSE) +
-  facet_wrap(~sim.id, scales = "free") +
-  theme_classic() +
+  scale_colour_viridis_d(option = "C", end = 0.9) +
+  ylab("Pasari MF") +
+  xlab("sp. richness") +
+  theme_meta() +
   theme(legend.position = "none")
+
+d3 <- 
+  ggplot(data = mult.dat,
+         mapping = aes(x = richness, y = thresh.50_MF, colour = as.character(sim.id) )) +
+  geom_jitter(width = 0.1, alpha = 0.1, shape = 16) +
+  geom_smooth(method = "lm", se = FALSE) +
+  scale_colour_viridis_d(option = "C", end = 0.9) +
+  ylab("threshold MF (70%)") +
+  xlab("sp. richness") +
+  theme_meta() +
+  theme(legend.position = "none")
+
+
+# plot a correlation matrix
+library(ellipse)
+
+# calculate a correlation matrix
+mult.cor <- 
+  mult.dat %>%
+  select(ends_with("_MF")) %>%
+  cor(.)
+
+# order the correlation matrix
+plotcorr(mult.cor , mar=c(1,1,1,1), type = c("lower"), yaxt="none")
+d4 <- corrplot::corrplot(corr = mult.cor, method = c("ellipse"),
+                   type = "lower",
+                   tl.pos = "d", tl.col = "black", tl.cex = 0.75,
+                   pos = 4, cl.align.text = "c",
+                   mar = c(0, 0, 0, 0))
 
 
 # perform the cluster analysis
@@ -83,14 +119,14 @@ nmds.figs <-
     geom_point() +
     ggrepel::geom_label_repel(mapping = aes(label = MF_metrics),
                               show.legend = FALSE,
-                              size = 2,
+                              size = 2.25,
                               segment.alpha = 0.5,
                               label.size = NA, fill = "white") +
     scale_colour_viridis_d(option = "C", end = 0.9) +
     guides(label = FALSE,
            colour = guide_legend(override.aes = list(size = 3))) +
     theme_meta() +
-    theme(legend.position = "bottom",
+    theme(legend.position = "right",
           legend.key = element_blank(),
           legend.title = element_blank())
   
@@ -99,8 +135,15 @@ nmds.figs <-
 # plot the full data.set
 nmds.figs[[1]]
 
+# combine this plot with example plots using patchwork
+library(patchwork)
+e.g <- (d1 + d2 + d3)
+
 ggsave(filename = here("Figures/pca_clust_fig.png"), plot = nmds.figs[[1]],
-       width = 12, height = 11, units = "cm", dpi = 450)
+       width = 13, height = 8, units = "cm", dpi = 450)
+
+# ggsave(filename = here("Figures/pca_clust_examples.png"), plot = e.g,
+       # width = 17, height = 8, units = "cm", dpi = 450)
 
 
 # combine the remaining plots using patchwork
