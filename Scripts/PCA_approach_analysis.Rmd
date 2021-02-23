@@ -1,0 +1,139 @@
+---
+title: "PCA_approach_analysis"
+author: "Fabian Roger"
+date: "2/23/2021"
+output: html_document
+---
+
+
+This script explores the behaviour of the PCA metric and compares it to the behaviour of the multifunctionality metric suggested by Pasari et al. 
+
+##load libraries
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(here)
+library(corrplot)
+library(grid)
+library(gridExtra)
+library(Matrix)
+
+source(here("Scripts/Multifunctionality-Simulations/Multifunc_simulations_functions.R"))
+source(here("Scripts/MF_functions_collated.R"))
+#source(here("Scripts/function_plotting_theme.R"))
+
+
+```
+
+
+#create data
+
+here we create 200 simulated datasets were we draw `funcnum` function values for `specnum` species (from a uniform distribution - but that can be changed)
+```{r}
+# set number of runs to do
+L <- 200
+
+# set up a blank list to fill
+pca_func <- vector("list", length = L)
+
+# number of species
+specnum <- 15
+  
+# number of functions
+funcnum <- 10
+
+# run the loop to generate 10 datasets with different seeds
+for (i in (1:L) ) {
+  
+  set.seed(134 + i*9)
+ 
+  # choose pairwise correlation strength
+  COR <- runif(1, -0.3,0.9)
+
+  # make correlation matrix (strictly speaking a covariance matrix but for these simulations it does not matter)
+  Sigma <- matrix(COR, ncol = funcnum, nrow = funcnum)
+  
+  Sigma <- Sigma + rnorm(funcnum^2, 0, 0.05)
+
+  diag(Sigma) <- 1
+  
+  Sigma <- Matrix::nearPD(Sigma)$mat
+  
+  # draw correlated functions (with mean 0)
+  corF <- mvrnorm(n = specnum, mu = rep(0, funcnum), Sigma = Sigma, empirical = TRUE)
+
+  # corF <- matrix(ncol = funcnum, nrow = specnum)
+  # corF <- apply(corF, 2, function(x) x <- runif(specnum, 0,1))
+  # 
+  # shift to positive and standardize
+  corF <- corF %>% 
+    apply(., 2, function(x){ x + abs(min(x)) }) %>% 
+    `colnames<-`(paste("Func_", 1:funcnum)) %>% 
+    as_tibble() %>% 
+    mutate_all(function(x) {x/max(x)})
+    #mutate_all(function(x) {(x-min(x))/(max(x)-min(x))})
+  
+  pca_func[[i]] <- corF
+  
+  }
+
+lapply(pca_func, function(x) {mean(cor(x))}) %>%
+  unlist() %>% hist
+
+
+
+```
+
+```{r}
+
+func.names <- colnames(pca_func[[1]])
+
+pca_mf <- 
+  
+  lapply(seq_along(pca_func), function(x) {
+    
+    df <- pca_func[[x]]
+    
+    mutate(df, 
+           `PCA MF` = pca_multifunc(adf = df, vars = func.names, standardise = FALSE),
+           `average MF` = MF_av(adf = df, vars = func.names),
+           `Pasari MF` = MF_pasari(adf = df, vars = func.names) )
+    
+  }
+  ) %>% bind_rows(.id = "run")
+```
+
+
+```{r}
+# plot average multifunctionality versus pca multifunctionality
+  pca_mf %>%
+  #filter(run %in% sample((1:L), size = 50 ) ) %>%
+  pivot_longer(cols = c(`PCA MF`, `Pasari MF`),
+               names_to = "metric",
+               values_to = "MF") %>%
+  ggplot(data = .,
+         mapping = aes(x = `average MF`, y = MF, colour = run)) +
+  #geom_point(alpha = 0.2, shape = 16) +
+  geom_smooth(method = "lm", se = FALSE, size = 0.3) +
+  scale_colour_viridis_d(option = "C", end = 0.9) +
+  facet_wrap(~metric, scales = "free") +
+  theme_bw()+
+  theme(legend.position = "none")
+```
+
+```{r}
+pca_mf %>% 
+  group_by(run) %>% 
+  dplyr::summarise(`PCA MF cor` = cor(`average MF`, `PCA MF`),
+                   `Pasari MF cor` = cor(`average MF`, `Pasari MF`)) %>% 
+  pivot_longer(!matches("run"), names_to = "metric", values_to = "value") %>%
+  ggplot(aes(x = value)) +
+  geom_histogram(colour = "white", alpha = 0.8, fill = "grey") +
+  facet_wrap(~metric, scales = "free_x") +
+  geom_vline(xintercept = 0, colour = "red", linetype = "dashed", size = 1) +
+  theme_minimal()
+```
+
+
+
