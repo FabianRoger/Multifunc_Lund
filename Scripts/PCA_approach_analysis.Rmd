@@ -14,16 +14,13 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(here)
-library(corrplot)
-library(grid)
+#library(corrplot)
+#library(grid)
 library(gridExtra)
 library(Matrix)
+library(MASS)
 
-source(here("Scripts/Multifunctionality-Simulations/Multifunc_simulations_functions.R"))
-source(here("Scripts/MF_functions_collated.R"))
-#source(here("Scripts/function_plotting_theme.R"))
-
-
+source(here("MF_functions_collated.R"))
 ```
 
 
@@ -32,7 +29,7 @@ source(here("Scripts/MF_functions_collated.R"))
 here we create 200 simulated datasets were we draw `funcnum` function values for `specnum` species (from a uniform distribution - but that can be changed)
 ```{r}
 # set number of runs to do
-L <- 200
+L <- 1000
 
 # set up a blank list to fill
 pca_func <- vector("list", length = L)
@@ -53,8 +50,6 @@ for (i in (1:L) ) {
 
   # make correlation matrix (strictly speaking a covariance matrix but for these simulations it does not matter)
   Sigma <- matrix(COR, ncol = funcnum, nrow = funcnum)
-  
-  Sigma <- Sigma + rnorm(funcnum^2, 0, 0.05)
 
   diag(Sigma) <- 1
   
@@ -63,6 +58,8 @@ for (i in (1:L) ) {
   # draw correlated functions (with mean 0)
   corF <- mvrnorm(n = specnum, mu = rep(0, funcnum), Sigma = Sigma, empirical = TRUE)
 
+  corF <- corF +  rnorm(funcnum*specnum, 0, 0.05)
+  
   # corF <- matrix(ncol = funcnum, nrow = specnum)
   # corF <- apply(corF, 2, function(x) x <- runif(specnum, 0,1))
   # 
@@ -79,8 +76,20 @@ for (i in (1:L) ) {
   }
 
 lapply(pca_func, function(x) {mean(cor(x))}) %>%
-  unlist() %>% hist
+  unlist() %>% 
+  tibble(mean_cor = .) %>% 
+  ggplot(aes(x = mean_cor))+
+  geom_histogram(fill = NA, colour = "black")+
+  theme_minimal()+
+  ggtitle("mean correlation across dataframes")
 
+lapply(pca_func, function(x) {cor(x)[upper.tri(cor(x))]}) %>%
+  unlist() %>% 
+  tibble(cor = .) %>% 
+  ggplot(aes(x = cor))+
+  geom_histogram(fill = NA, colour = "black")+
+  theme_minimal()+
+  ggtitle("correlations between functions across all dfs")
 
 
 ```
@@ -96,62 +105,112 @@ pca_mf <-
     df <- pca_func[[x]]
     
     mutate(df, 
-           `PCA MF` = pca_multifunc(adf = df, vars = func.names, standardise = FALSE),
-           `average MF` = MF_av(adf = df, vars = func.names),
-           `Pasari MF` = MF_pasari(adf = df, vars = func.names) )
+           `PCA_MF` = pca_multifunc(adf = df, vars = func.names, standardise = FALSE),
+           `average_MF` = MF_av(adf = df, vars = func.names),
+           `Pasari_MF` = MF_pasari(adf = df, vars = func.names),
+           `Dooley_MF`= MF_dooley(adf = df, vars = func.names),
+           #`Manning_MF` = manning_multifunc(adf = df, vars = func.names),
+           `Hill_MF` = hill_multifunc(adf = df, vars = func.names))
     
   }
   ) %>% bind_rows(.id = "run")
+
+head(pca_mf)
+
 ```
 
 
 ```{r}
+
 # plot average multifunctionality versus pca multifunctionality
   pca_mf %>%
-  #filter(run %in% sample((1:L), size = 50 ) ) %>%
-  pivot_longer(cols = c(`PCA MF`, `Pasari MF`),
+  dplyr::select(!starts_with("Func")) %>% 
+  pivot_longer(cols = !one_of("run", "average_MF"),
                names_to = "metric",
                values_to = "MF") %>%
   ggplot(data = .,
-         mapping = aes(x = `average MF`, y = MF, colour = run)) +
+         mapping = aes(x = `average_MF`, y = MF, colour = run)) +
   #geom_point(alpha = 0.2, shape = 16) +
   geom_smooth(method = "lm", se = FALSE, size = 0.3) +
   scale_colour_viridis_d(option = "C", end = 0.9) +
   facet_wrap(~metric, scales = "free") +
   theme_bw()+
   theme(legend.position = "none")
+
 ```
 
 ```{r}
 pca_mf %>% 
   group_by(run) %>% 
-  dplyr::summarise(`PCA MF cor` = cor(`average MF`, `PCA MF`),
-                   `Pasari MF cor` = cor(`average MF`, `Pasari MF`)) %>% 
+  dplyr::summarise(`PCA_MF_cor` = cor(`average_MF`, `PCA_MF`),
+                   `Pasari_MF_cor` = cor(`average_MF`, `Pasari_MF`),
+                   #`Manning MF cor` = cor(`average MF`, `Manning MF`),
+                   `Dooley_MF_cor` = cor(`average_MF`, `Dooley_MF`),
+                   `Hill_MF_cor` = cor(`average_MF`,`Hill_MF`)) %>% 
   pivot_longer(!matches("run"), names_to = "metric", values_to = "value") %>%
   ggplot(aes(x = value)) +
   geom_histogram(colour = "white", alpha = 0.8, fill = "grey") +
-  facet_wrap(~metric, scales = "free_x") +
+  facet_wrap(~metric, scales = "free_y") +
   geom_vline(xintercept = 0, colour = "red", linetype = "dashed", size = 1) +
   theme_minimal()
 ```
+```{r}
 
+pca_mf %>% 
+  group_by(run) %>% 
+  dplyr::summarise(`PCA_MF_cor` = cor(`average_MF`, `PCA_MF`),
+                   `Pasari_MF_cor` = cor(`average_MF`, `Pasari_MF`),
+                   #`Manning MF cor` = cor(`average MF`, `Manning MF`),
+                   `Dooley_MF_cor` = cor(`average_MF`, `Dooley_MF`),
+                   `Hill_MF_cor` = cor(`average_MF`,`Hill_MF`),
+                   mean_mf_range = diff(range(`average_MF`))) %>% 
+  pivot_longer(!one_of("run", "mean_mf_range"), names_to = "metric", values_to = "value") %>% 
+  mutate(sign = case_when(value < 0 ~ "negative",
+                          TRUE ~ "positive")) %>% 
+  ggplot(aes(x = mean_mf_range, y = value, colour = sign))+
+  geom_point(size = 0.5, alpha = 0.5)+
+  facet_wrap(~metric)+
+  geom_hline(yintercept = 0, linetype = "dashed")+
+  theme_minimal()+
+  labs(x = "range of average MF", y = "correlation to average MF")
+
+```
 
 ```{r}
+
+neg_cor <- 
 pca_mf %>% 
-  split(.$run) %>% 
-  lapply(function(x) {
-    x %>% 
-      dplyr::summarise(`PCA MF cor` = cor(`average MF`, `PCA MF`),
-                   `Pasari MF cor` = cor(`average MF`, `Pasari MF`),
-                   var_cor_mean = mean(cor(.[,func.names])))}) %>% 
-      bind_rows() %>% 
-  mutate(row = 1:n()) %>% 
-  pivot_longer(!one_of("row", "var_cor_mean"), names_to = "metric", values_to = "value") %>%
-  ggplot(aes(x = var_cor_mean, y = value)) +
-  geom_point()+
-  geom_hline(yintercept = 0)+
-  facet_wrap(~metric) +
-  theme_minimal()+
-  labs(y = "correlation with average MF", x = "average Function correlation")
+  group_by(run) %>% 
+  dplyr::summarise(`PCA_MF` = cor(`average_MF`, `PCA_MF`),
+                   `Pasari_MF` = cor(`average_MF`, `Pasari_MF`),
+                   #`Manning_MF` = cor(`average MF`, `Manning MF`),
+                   `Dooley_MF` = cor(`average_MF`, `Dooley_MF`),
+                   `Hill_MF` = cor(`average_MF`,`Hill_MF`)) %>% 
+  pivot_longer(!matches("run"), names_to = "metric", values_to = "value") %>%
+  filter(value < 0) %>% 
+  split(.$metric)
+
+for(i in seq_along(neg_cor)){
+
+  p <- 
+  pca_mf %>%
+  dplyr::select(one_of("run", "average_MF", names(neg_cor)[i]))%>% 
+  filter(run %in% neg_cor[[i]]$run) %>%
+  ggplot(data = .,
+         mapping = aes_string(x = "`average_MF`", y = names(neg_cor)[i], colour = "run")) +
+  geom_smooth(method = "lm", se = FALSE, size = 0.3) +
+  scale_colour_viridis_d(option = "C", end = 0.9) +
+ # facet_wrap(~metric, scales = "free") +
+  theme_bw()+
+  theme(legend.position = "none")+
+  labs(title = names(neg_cor)[i])
+  
+  assign(paste("p_", i, sep = ""), p)
+
+  
+}
+
+grid.arrange(p_1, p_2, p_3, p_4)
+
 ```
 
