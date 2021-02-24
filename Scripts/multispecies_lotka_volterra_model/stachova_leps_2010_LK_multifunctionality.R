@@ -19,7 +19,7 @@ source(here("Scripts/MF_functions_collated.R"))
 # (6) equal competition + low specialisation
 
 # run each of these types 5 times
-# stick with 500 time-steps to start with
+# stick with 50 time-steps to start with
 
 # what to output?
 # (1) multifunctionality dataframe
@@ -67,8 +67,8 @@ additional.mf.args = list(NA, NA, NA,
 # fixed parameters
 
 # lotka-volterra model
-lsp = c(4, 6, 8, 10, 12)
-reps = 10
+lsp = c(1, 2, 4, 6, 8, 16)
+reps = 15
 rsp = 20
 t_steps = 50
 n0 = 100
@@ -81,7 +81,7 @@ a_scale = 1
 func.n = 9
 
 # set the probability that a species negatively affects a function
-prob.neg = 0.2
+prob.neg = 0.1
 
 # varying parameters
 
