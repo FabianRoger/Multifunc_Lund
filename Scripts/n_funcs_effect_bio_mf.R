@@ -252,9 +252,10 @@ ggsave(filename = here("Figures/fig_8_sim.png"), plot = p2,
 # questions to answer:
 
 # why does the multifunctional BEF-slope increase with number of functions for the Pasari approach increase?
+# why does the multifunctional BEF-slope increase and decrease with number of functions for the summing approach?
 
 # make a copy of the sim.dat data
-pasari.inv <- 
+mf_slope_dat <- 
   lapply(split(sim.dat, sim.raw$sim.id), function(data) {
   
   # get combinations of function names
@@ -277,6 +278,7 @@ pasari.inv <-
       select(all_of(sample.func.names) )
     
     site.mods$mean_funcs <- apply(df.x, MARGIN = 1, mean)
+    site.mods$sum_funcs <- apply(df.x, MARGIN = 1, sum)
     site.mods$sd_funcs <- apply(df.x, MARGIN = 1, sd)
     
     site.mods$n.func <- length(sample.func.names)
@@ -290,56 +292,103 @@ pasari.inv <-
   
   } )
 
-pasari.inv <- bind_rows(pasari.inv, .id = "sim.id")
-View(head(pasari.inv))
+mf_slope_dat <- bind_rows(mf_slope_dat, .id = "sim.id")
+View(head(mf_slope_dat))
 
-# average among-function sd increases with number of functions
-# mean stays absolutely constant:
-pasari.inv %>%
+dat.sum <- 
+  mf_slope_dat %>%
   group_by(sim.id, n.func, n.func.id) %>%
-  summarise(mean_sd = mean(sd_funcs),
-            mean_mean = mean(mean_funcs), .groups = "drop") %>%
-  pivot_longer(cols = starts_with("mean"),
-               names_to = "sd_mean",
-               values_to = "val") %>%
-  ggplot(data = .,
-         mapping = aes(x = n.func, y = val, group = sd_mean, 
-                       colour = sd_mean)) +
+  summarise(average_sum = mean(sum_funcs, na.rm = TRUE),
+            range_sum = max(sum_funcs, na.rm = TRUE) - min(sum_funcs, na.rm = TRUE),
+            .groups = "drop")
+
+# overall sum_MF increases with number of functions
+# this, alone, should only affect the intercept
+ggplot(data = dat.sum,
+       mapping = aes(x = n.func, y = average_sum) ) +
   geom_jitter() +
   geom_smooth(method = "lm", se = FALSE, colour = "black") +
   facet_wrap(~sim.id, scales = "free") +
   theme_classic()
 
-# this might affect the intercept but how does it affect the slope?
-
-# what is the relationship between richness and:
-# mean across functions
-# sd across functions
-# for different numbers of functions?
-
-# plot correlation between richness and the mean/sd
-pasari.inv %>%
-  group_by(sim.id, n.func, n.func.id) %>%
-  summarise(sd_cor = cor(richness, sd_funcs),
-            mean_cor = cor(richness, mean_funcs), .groups = "drop") %>%
-  pivot_longer(cols = ends_with("cor"),
-               names_to = "key",
-               values_to = "richness_cor") %>%
-  ggplot(data = .,
-         mapping = aes(x = n.func, y = richness_cor, group = key,
-                       colour = key)) +
-  geom_jitter(alpha = 0.5) +
-  geom_smooth(method = "lm", colour = "black") +
+# but varying the number of functions increases with range of sum_MF
+# however, the richness range stays the same and this will affect the slope
+# this is not biological though
+ggplot(data = dat.sum,
+       mapping = aes(x = n.func, y = range_sum) ) +
+  geom_jitter() +
+  geom_smooth(method = "lm", se = FALSE, colour = "black") +
   facet_wrap(~sim.id, scales = "free") +
   theme_classic()
 
-# when you have more functions, the relationship between richness and sd among functions is more negative
-# this could be driving this?
+
+# what about the Pasari approach?
+dat.pas <- 
+  mf_slope_dat %>%
+  group_by(sim.id, n.func, n.func.id) %>%
+  summarise(average_sd = mean(sd_funcs, na.rm = TRUE),
+            average_mean = mean(mean_funcs, na.rm = TRUE),
+            range_mean = diff(range(mean_funcs)),
+            range_sd = diff(range(sd_funcs)),
+            .groups = "drop")
+
+# how does the average standard deviation change?
+# yes, the average standard deviation increases with number of functions
+ggplot(data = dat.pas,
+       mapping = aes(x = n.func, y = average_sd) ) +
+  geom_jitter(width = 0.1) +
+  geom_smooth(method = "lm", se = FALSE, colour = "black") +
+  facet_wrap(~sim.id, scales = "free") +
+  theme_classic()
+
+# what about the SD range?
+# what does this mean? 
+# range in among function SD among plots is lower when multiple functions are considered
+ggplot(data = dat.pas,
+       mapping = aes(x = n.func, y = range_sd) ) +
+  geom_jitter(width = 0.1, alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, colour = "black") +
+  facet_wrap(~sim.id, scales = "free") +
+  theme_classic()
 
 
-# why does the summing approach decrease under equal competition?
+# what about the mean?
+# the mean does not change as per Gamfeldt and Roger (2017)
+ggplot(data = dat.pas,
+       mapping = aes(x = n.func, y = average_mean) ) +
+  geom_jitter() +
+  geom_smooth(method = "lm", se = FALSE, colour = "black") +
+  facet_wrap(~sim.id, scales = "free") +
+  theme_classic()
 
-# not obvious actually...
+# what about the mean range?
+ggplot(data = dat.pas,
+       mapping = aes(x = n.func, y = range_mean) ) +
+  geom_jitter() +
+  geom_smooth(method = "lm", se = FALSE, colour = "black") +
+  facet_wrap(~sim.id, scales = "free") +
+  theme_classic()
+
+
+# now we have to plot some of the raw data
+id.input <- 2
+
+func_ids <- 
+  mf_slope_dat %>%
+  filter(sim.id == id.input) %>%
+  group_by(n.func) %>%
+  slice_sample(n = 1) %>%
+  pull(n.func.id)
+
+mf_slope_dat %>%
+  filter(sim.id == id.input) %>%
+  filter(n.func.id %in% func_ids) %>%
+  ggplot(data = .,
+         mapping = aes(x = richness, y = (mean_funcs - sd_funcs) )) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_meta() +
+  facet_wrap(~n.func.id)
 
 
 
