@@ -67,8 +67,8 @@ additional.mf.args = list(NA, NA, NA,
 # fixed parameters
 
 # lotka-volterra model
-lsp = c(1, 2, 4, 6, 8, 16)
-reps = 15
+lsp = c(1, 2, 4, 6, 8, 10, 12)
+reps = 20
 rsp = 20
 t_steps = 50
 n0 = 100
@@ -271,4 +271,6 @@ for (i in 1:length(sim.outputs)) {
   write_csv(x = x.dat, paste(data.loc, "/", data.names[i], ".csv", sep = "" ))
   
 }
+
+### END
 

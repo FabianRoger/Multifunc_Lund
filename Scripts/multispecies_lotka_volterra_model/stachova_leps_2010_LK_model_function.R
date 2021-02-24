@@ -106,7 +106,7 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
       n_vals <- rep(0, times = rsp)
       
       # add starting values for species in the lsp
-      n_vals[lsp.patch] <- n0
+      n_vals[lsp.patch] <- (n0/lsp.size)
       
       # create an output list of species abundances for each time point
       n_t <- vector("list", length = t_steps)
