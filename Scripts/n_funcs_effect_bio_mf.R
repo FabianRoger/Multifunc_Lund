@@ -110,6 +110,7 @@ get_BEF_mf_est <- function(adf.data,
     # bind this into a data.frame
     df.out <- 
       data.frame(func.comb.id = i,
+                 n.func.id = paste(sample.func.names, collapse = ""),
                  number_of_functions = length(sample.func.names),
                  multifunctionality_metric = mf.names,
                  realised_diversity_mf_est = bef_mf_slope)
@@ -292,9 +293,14 @@ mf_slope_dat <-
   
   } )
 
+# bind this into a data.frame
 mf_slope_dat <- bind_rows(mf_slope_dat, .id = "sim.id")
 View(head(mf_slope_dat))
 
+
+# what changes with the sum_MF when we consider more functions?
+
+# calculate average and range in sum of functions for each random draw
 dat.sum <- 
   mf_slope_dat %>%
   group_by(sim.id, n.func, n.func.id) %>%
@@ -302,11 +308,22 @@ dat.sum <-
             range_sum = max(sum_funcs, na.rm = TRUE) - min(sum_funcs, na.rm = TRUE),
             .groups = "drop")
 
+# get slope between biodiversity and sum multifunctionality
+sum.slopes <- 
+  sim.n.func.dat %>%
+  filter(multifunctionality_metric == "sum_MF") %>%
+  mutate(sim.id = as.character(sim.id)) %>%
+  select(sim.id, n.func.id, number_of_functions, realised_diversity_mf_est) %>%
+  rename(n.func = number_of_functions)
+
+mf.sum.exp <- 
+  full_join(dat.sum, sum.slopes, by = c("sim.id", "n.func.id", "n.func"))
+
 # overall sum_MF increases with number of functions
 # this, alone, should only affect the intercept
-ggplot(data = dat.sum,
+ggplot(data = mf.sum.exp,
        mapping = aes(x = n.func, y = average_sum) ) +
-  geom_jitter() +
+  geom_jitter(alpha = 0.5) +
   geom_smooth(method = "lm", se = FALSE, colour = "black") +
   facet_wrap(~sim.id, scales = "free") +
   theme_classic()
@@ -314,12 +331,55 @@ ggplot(data = dat.sum,
 # but varying the number of functions increases with range of sum_MF
 # however, the richness range stays the same and this will affect the slope
 # this is not biological though
-ggplot(data = dat.sum,
+ggplot(data = mf.sum.exp,
        mapping = aes(x = n.func, y = range_sum) ) +
-  geom_jitter() +
+  geom_jitter(alpha = 0.5) +
   geom_smooth(method = "lm", se = FALSE, colour = "black") +
   facet_wrap(~sim.id, scales = "free") +
   theme_classic()
+
+# does the average sum or range sum correlate with the BEF slope?
+ggplot(data = mf.sum.exp,
+         mapping = aes(x = average_sum, y = realised_diversity_mf_est)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~sim.id, scales = "free") +
+  theme_meta()
+
+ggplot(data = mf.sum.exp,
+       mapping = aes(x = range_sum, y = realised_diversity_mf_est)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~sim.id, scales = "free") +
+  theme_meta()
+
+# now we have to plot some of the raw data
+id.input <- 27
+
+mf.sum.exp %>%
+  filter(sim.id == id.input) %>%
+  ggplot(data = .,
+         mapping = aes(x = n.func, y = realised_diversity_mf_est )) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_meta()
+
+# func_ids <- 
+  # mf_slope_dat %>%
+  # filter(sim.id == id.input) %>%
+  # group_by(n.func) %>%
+  # slice_sample(n = 1) %>%
+  # pull(n.func.id)
+
+mf_slope_dat %>%
+  filter(sim.id == id.input) %>%
+  # filter(n.func.id %in% func_ids) %>%
+  ggplot(data = .,
+         mapping = aes(x = richness, y = sum_funcs, 
+                       group = n.func.id, colour = n.func )) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, size = 0.75) +
+  theme_meta()
 
 
 # what about the Pasari approach?
@@ -330,65 +390,66 @@ dat.pas <-
             average_mean = mean(mean_funcs, na.rm = TRUE),
             range_mean = diff(range(mean_funcs)),
             range_sd = diff(range(sd_funcs)),
+            range_pasari = diff( range( (mean_funcs - sd_funcs)  )  ),
             .groups = "drop")
 
-# how does the average standard deviation change?
-# yes, the average standard deviation increases with number of functions
-ggplot(data = dat.pas,
-       mapping = aes(x = n.func, y = average_sd) ) +
-  geom_jitter(width = 0.1) +
-  geom_smooth(method = "lm", se = FALSE, colour = "black") +
-  facet_wrap(~sim.id, scales = "free") +
-  theme_classic()
+# get slope between biodiversity and sum multifunctionality
+pas.slopes <- 
+  sim.n.func.dat %>%
+  filter(multifunctionality_metric == "Pasari_MF") %>%
+  mutate(sim.id = as.character(sim.id)) %>%
+  select(sim.id, n.func.id, number_of_functions, realised_diversity_mf_est) %>%
+  rename(n.func = number_of_functions)
 
-# what about the SD range?
-# what does this mean? 
-# range in among function SD among plots is lower when multiple functions are considered
-ggplot(data = dat.pas,
-       mapping = aes(x = n.func, y = range_sd) ) +
-  geom_jitter(width = 0.1, alpha = 0.5) +
-  geom_smooth(method = "lm", se = FALSE, colour = "black") +
-  facet_wrap(~sim.id, scales = "free") +
-  theme_classic()
+mf.pas.exp <- 
+  full_join(dat.pas, pas.slopes, by = c("sim.id", "n.func.id", "n.func"))
+  
 
+# does the range in Pasari_MF change with n_funcs?
+head(mf.pas.exp)
 
-# what about the mean?
-# the mean does not change as per Gamfeldt and Roger (2017)
-ggplot(data = dat.pas,
-       mapping = aes(x = n.func, y = average_mean) ) +
+ggplot(data = mf.pas.exp,
+       mapping = aes(x = n.func, y = range_pasari)) +
   geom_jitter() +
-  geom_smooth(method = "lm", se = FALSE, colour = "black") +
-  facet_wrap(~sim.id, scales = "free") +
-  theme_classic()
+  geom_smooth(method = "lm") +
+  facet_wrap(~sim.id) +
+  theme_meta()
 
-# what about the mean range?
-ggplot(data = dat.pas,
-       mapping = aes(x = n.func, y = range_mean) ) +
+# why does this happen?
+ggplot(data = mf.pas.exp,
+       mapping = aes(x = n.func, y = average_sd)) +
   geom_jitter() +
-  geom_smooth(method = "lm", se = FALSE, colour = "black") +
-  facet_wrap(~sim.id, scales = "free") +
-  theme_classic()
+  geom_smooth(method = "lm") +
+  facet_wrap(~sim.id) +
+  theme_meta()
 
+ggplot(data = mf.pas.exp,
+       mapping = aes(x = n.func, y = average_mean)) +
+  geom_jitter() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~sim.id) +
+  theme_meta()
 
 # now we have to plot some of the raw data
-id.input <- 2
+id.input <- 12
 
-func_ids <- 
-  mf_slope_dat %>%
-  filter(sim.id == id.input) %>%
-  group_by(n.func) %>%
-  slice_sample(n = 1) %>%
-  pull(n.func.id)
+# func_ids <- 
+  # mf_slope_dat %>%
+  # filter(sim.id == id.input) %>%
+  # group_by(n.func) %>%
+  # slice_sample(n = 1) %>%
+  # pull(n.func.id)
 
 mf_slope_dat %>%
   filter(sim.id == id.input) %>%
-  filter(n.func.id %in% func_ids) %>%
+  # filter(n.func.id %in% func_ids) %>%
   ggplot(data = .,
-         mapping = aes(x = richness, y = (mean_funcs - sd_funcs) )) +
+         mapping = aes(x = richness, y = (mean_funcs - sd_funcs),
+                       group = n.func.id, colour = as.character(n.func) )) +
   geom_point() +
-  geom_smooth(method = "lm") +
+  geom_smooth(method = "lm", se = FALSE) +
   theme_meta() +
-  facet_wrap(~n.func.id)
+  facet_wrap(~as.character(n.func))
 
 
 
