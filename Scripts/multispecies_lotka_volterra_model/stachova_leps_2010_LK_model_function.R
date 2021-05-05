@@ -9,7 +9,7 @@
 # reps: number of replicates for each local species pool size
 # rsp: number of species in the regional species pool
 # t_steps: number of time steps to model
-# n0: initial abundance of each species
+# n0: initial abundance of all species
 # ext.thresh = threshold abundance of species extinction
 
 # a_mean = mean interspecific competition of a truncated normal distribution
