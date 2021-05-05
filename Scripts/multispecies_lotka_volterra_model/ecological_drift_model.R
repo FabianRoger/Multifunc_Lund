@@ -66,10 +66,10 @@ trunc_pois <- function(n, lambda) {
 lsp = c(1, 2, 4, 6)
 reps = 5
 rsp = 12
-t_steps = 10
-n0 = 20
+t_steps = 50
+n0 = 100
 
-prop_change = 0.05
+prop_change = 0.1
 
 prob_local <- 0.9
 
@@ -84,66 +84,82 @@ lsp.p
 # put this into a data.frame
 df.p <- data.frame(loc.sp.p = lsp.p)
 df.p <- split(df.p, 1:nrow(df.p))
-df.p
 
-# for this patch
-patch <- df.p[[4]]
-patch
-
-# get the local species pool size
-lsp.size <- patch$loc.sp.p
-lsp.size
-
-# get a set of species from the regional species pool
-lsp.patch <- sample(x = (1:rsp), size = lsp.size, replace = FALSE)
-lsp.patch
-
-# create a sack of individuals of each species
-patch.sack <- rep(lsp.patch, each = round((n0/lsp.size), 0))
-patch.sack
-
-# create an output list of species abundances for each time point
-n_t <- vector("list", length = t_steps)
-
-# fill the first time point with starting abundances
-n_t[[1]] <- patch.sack
-n_t[[1]]
-
-# round the proportion change variable
-n_change <- round(n0*prop_change, 0)
-
-# for each time point m
-for(m in seq(from = 2, to = t_steps, by = 1)){
+lapply(df.p, function(patch) {
   
-  # kill n individuals drawn from a poisson distribution
-  post_death <- n_t[[m-1]][-sample(x = 1:length(n_t[[m-1]]), size = trunc_pois(n = 1, n_change))]
+  # get the local species pool size
+  lsp.size <- patch$loc.sp.p
   
-  # draw new recruits
+  # get a set of species from the regional species pool
+  lsp.patch <- sample(x = (1:rsp), size = lsp.size, replace = FALSE)
   
-  # determine to draw from local community or regional pool
-  source_pool <- sample(x = c("LC", "RP"), size = 1, prob = c(prob_local, (1-prob_local)))
+  # create a sack of individuals of each species
+  patch.sack <- rep(lsp.patch, each = round((n0/lsp.size), 0))
   
-  # draw new recruits either from the local community or the regional pool
-  if(source_pool == "LC") {
+  # create an output list of species abundances for each time point
+  n_t <- vector("list", length = t_steps)
+  
+  # fill the first time point with starting abundances
+  n_t[[1]] <- patch.sack
+  
+  # round the proportion change variable
+  n_change <- round(n0*prop_change, 0)
+  
+  # for each time point m
+  for(m in seq(from = 2, to = t_steps, by = 1)){
     
-    z <- trunc_pois(n = 1, n_change)
-    new_recruits <- post_death[sample(x = 1:length(post_death), size = z, replace = FALSE)]
+    # kill n individuals drawn from a poisson distribution
+    post_death <- n_t[[m-1]][-sample(x = 1:length(n_t[[m-1]]), size = trunc_pois(n = 1, n_change))]
     
-  } else {
+    # draw new recruits
     
-    z <- trunc_pois(n = 1, n_change)
-    new_recruits <- sample(x = lsp.patch, size = z, replace = TRUE, prob = rep(1/lsp.size, lsp.size))
+    # determine to draw from local community or regional pool
+    source_pool <- sample(x = c("LC", "RP"), size = 1, prob = c(prob_local, (1-prob_local)))
+    
+    # draw new recruits either from the local community or the regional pool
+    if(source_pool == "LC") {
+      
+      z <- trunc_pois(n = 1, n_change)
+      new_recruits <- post_death[sample(x = 1:length(post_death), size = z, replace = FALSE)]
+      
+    } else {
+      
+      z <- trunc_pois(n = 1, n_change)
+      new_recruits <- sample(x = lsp.patch, size = z, replace = TRUE, prob = rep(1/lsp.size, lsp.size))
+      
+    }
+    
+    # join the post_death and new_recruits and write to second time-step
+    n_t[[m]] <- c(post_death, new_recruits)
     
   }
   
-  # join the post_death and new_recruits and write to second time-step
-  n_t[[m]] <- c(post_death, new_recruits)
+  # summarise model results into a data.frame
+  df.patch <- lapply(n_t, function(x) {
+    
+    sp.abun <- vector(length = rsp)
+    for (j in 1:rsp) {
+      
+      sp.abun[j] <- sum(j == x)
+      
+    }
+    
+    df <- data.frame(species = 1:rsp,
+                     abundance = sp.abun)
+    
+    return(df)
+    
+  })
   
-}
-
-
-
-
+  df.patch <- bind_rows(df.patch, .id = "time")
+  
+  # add local species pool information
+  df.patch$local_species_pool <- lsp.size
+  
+  df.patch
+  
+  
+})
 
 
 
