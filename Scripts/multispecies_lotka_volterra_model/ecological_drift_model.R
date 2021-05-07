@@ -262,22 +262,24 @@ drift_model <- function(lsp = c(2, 4, 6),
   # reorder the columns
   data_out <- 
     data_out %>%
-    select(model_run, patch, time, local_species_pool, composition, species, abundance)
+    dplyr::select(model_run, patch, time, local_species_pool, composition, species, abundance)
   
   return( data_out )
   
 }
 
 # test the ecological drift model
-x <- drift_model(lsp = c(2, 4, 6),
+x <- drift_model(lsp = c(2, 4, 6, 9),
                  mono = "all",
                  reps = 5,
-                 technical_reps = 2,
-                 rsp = 9,
+                 technical_reps = 1,
+                 rsp = 12,
                  t_steps = 1000,
-                 n0 = 50,
+                 n0 = 500,
                  prop_change = 0.05,
                  n_repeats = 1)
+
+x
 
 library(ggplot2)
 head(x)
@@ -318,6 +320,3 @@ df <-
             total_abundance = sum(abundance))
 
 summary(lm(total_abundance~local_species_pool, data = df))
-
-
-
