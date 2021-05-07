@@ -5,8 +5,13 @@
 
 # parameter definitions
 
-# lsp: gradient of local species pools (i.e. initial seeded diversity)
+# lsp: gradient of local species pools (i.e. initial seeded diversity) but not monocultures (must be positive integers)
+# mono: options for including monocultures:
+# - "all" includes all possible monocultures from the regional species pool (i.e. rsp)
+# - "random" draws monocultures randomly as per the other local species pool treatments
+# - "none" excludes monocultures
 # reps: number of replicates for each local species pool size
+# technical_reps: how many repeats of each treatment exactly
 # rsp: number of species in the regional species pool
 # t_steps: number of time steps to model
 # n0: initial abundance of all species (i.e. all species together)
@@ -16,9 +21,11 @@
 # n_repeats: how many times to run the model with current parameters
 
 # write an ecological drift model (sensu Hubbell 2001)
-drift_model <- function(lsp = c(1, 2, 4, 6),
-                        reps = 5,
-                        rsp = 12,
+drift_model <- function(lsp = c(2, 4, 6),
+                        mono = "all",
+                        reps = 3,
+                        technical_reps = 1,
+                        rsp = 9,
                         t_steps = 1000,
                         n0 = 500,
                         prop_change = 0.05,
@@ -34,24 +41,94 @@ drift_model <- function(lsp = c(1, 2, 4, 6),
     return(y)
   }
   
-  # set up the fixed model parameters
+  # perform error checking on arguments
   
-  # define the number of patches
-  patches <- reps*length(lsp)
+  # lsp values cannot be less than or equal to 1
+  if ( any(lsp <= 1) ) {
+    stop("error! lsp cannot be one because monocultures are specified via mono argument")
+  }
+  
+  if ( any(lsp%%1 != 0 ) ) {
+    stop("error! lsp must be integers")
+  }
+  
+  if (reps < 1) {
+    reps <- 1
+    print("reps set to less than 1 so assigning to a default of 1")
+  }
+  
+  
+  # set up the mixtures
   
   # assign a local species spool size to each patch
   lsp.p <- rep(lsp, each = reps)
   
   # get a list of patches with a sack of species for each patch
-  patch.sack <- vector("list", length = length(lsp.p))
+  mix.sack <- vector("list", length = length(lsp.p))
   for (i in 1:length(lsp.p)) {
     
     x <- sample(x = (1:rsp), size = lsp.p[i], replace = FALSE)
     
-    patch.sack[[i]] <- rep(x, each = round((n0/lsp.p[i]), 0))
+    mix.sack[[i]] <- rep(x, each = round((n0/lsp.p[i]), 0))
     
   }
   
+  # set up the monocultures
+  if (mono == "all") {
+    
+    mono.sack <- vector("list", length = rsp)
+    for (i in 1:rsp) {
+      
+      mono.sack[[i]] <- rep(i, each = round(n0, 0))
+      
+    }
+    
+  } else if (mono == "random") {
+    
+    mono.sack <- vector("list", length = reps)
+    for (i in 1:reps) {
+      
+      x <- sample(x = (1:rsp), size = 1, replace = FALSE)
+      
+      mono.sack[[i]] <- rep(x, each = round(n0, 0))
+      
+    } 
+    
+  } else if (mono == "none") {
+    
+    mono.sack <- NULL
+    
+  } else {
+    
+    stop("error! choose appropriate monoculture option")
+  }
+  
+  # add the monocultures to the mixtures
+  mono_mix <- c(mono.sack, mix.sack)
+  
+  # set the number of technical replicates i.e. replicates of same exact composition
+  if( technical_reps < 1) {
+    
+    stop("error! technical replicates cannot be less than one")
+    
+  } else if (technical_reps == 1) {
+    
+    patch.sack <- mono_mix  
+    
+  } else if (technical_reps > 1) {
+    
+    patch.sack <- c(mono_mix)
+    for (i in 1:(technical_reps - 1)) {
+      
+      patch.sack <- c(patch.sack, mono_mix)
+      
+    }
+    
+  } else {
+    
+    stop("error! choose appropriate technical replicate")
+    
+  }
   
   # run the model n-times
   
@@ -60,6 +137,7 @@ drift_model <- function(lsp = c(1, 2, 4, 6),
   for (i in 1:n_repeats){
     
     neutral_list <- 
+      
       lapply(patch.sack, function(patch) {
         
         # create an output list of species abundances for each time point
@@ -134,6 +212,9 @@ drift_model <- function(lsp = c(1, 2, 4, 6),
         # add local species pool information
         df.patch$local_species_pool <- length(unique(patch))
         
+        # add species composition information
+        df.patch$composition <- paste(unique(patch), collapse = "")
+        
         return(df.patch)
         
       })
@@ -150,21 +231,36 @@ drift_model <- function(lsp = c(1, 2, 4, 6),
     
   }
   
-  return( bind_rows(model_out, .id = "run") )
+  data_out <- bind_rows(model_out, .id = "run")
+  
+  # reorder the columns
+  data_out <- 
+    data_out %>%
+    select(run, patch, local_species_pool, composition, species, abundance)
+  
+  return( data_out )
   
 }
 
 # test the ecological drift model
-x <- drift_model(lsp = c(1, 2, 4, 6),
-                 reps = 5,
+x <- drift_model(lsp = c(2, 4, 6),
+                 mono = "all",
+                 reps = 3,
+                 technical_reps = 2,
                  rsp = 9,
-                 t_steps = 500,
-                 n0 = 20,
+                 t_steps = 1000,
+                 n0 = 500,
                  prop_change = 0.05,
                  n_repeats = 1)
 
 library(ggplot2)
 head(x)
+
+x %>%
+  filter(run == 1, composition == 1) %>%
+  pull(patch) %>%
+  unique()
+
 x %>%
   filter(abundance > 0) %>%
   mutate(species = as.character(species)) %>%
@@ -179,16 +275,6 @@ x %>%
   theme(legend.position = "bottom")
 
 x %>%
-  filter(abundance > 0) %>%
-  mutate(species = as.character(species)) %>%
-  group_by(local_species_pool, patch, time, species) %>%
-  summarise(abundance = median(abundance)) %>%
-  filter(patch == 5) %>%
-  filter(time > 450) %>%
-  View()
-
-
-x %>%
   filter(time == last(time)) %>%
   group_by(patch) %>%
   summarise(local_species_pool = mean(local_species_pool),
@@ -200,3 +286,16 @@ x %>%
   geom_smooth(method = "lm", se = FALSE) +
   theme_classic() +
   theme(legend.position = "bottom")
+
+df <- 
+  x %>%
+  filter(time == last(time)) %>%
+  group_by(patch) %>%
+  summarise(local_species_pool = mean(local_species_pool),
+            realised_richness = sum(if_else(abundance > 0, 1, 0)),
+            total_abundance = sum(abundance))
+
+summary(lm(total_abundance~local_species_pool, data = df))
+
+
+
