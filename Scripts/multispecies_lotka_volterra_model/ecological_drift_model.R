@@ -31,6 +31,11 @@ drift_model <- function(lsp = c(2, 4, 6),
                         prop_change = 0.05,
                         n_repeats = 1) {
   
+  # check that the correct packages are installed
+  if(! "dplyr" %in% installed.packages()[,1]) stop(
+    "this function requires dplyr to be installed"
+  )
+  
   # load the dplyr library
   library(dplyr)
   
@@ -226,7 +231,7 @@ drift_model <- function(lsp = c(2, 4, 6),
             
           }
           
-          df <- data.frame(species = 1:rsp,
+          df <- data.frame(species = as.character(1:rsp),
                            abundance = sp.abun)
           
           return(df)
@@ -262,7 +267,9 @@ drift_model <- function(lsp = c(2, 4, 6),
   # reorder the columns
   data_out <- 
     data_out %>%
-    dplyr::select(model_run, patch, time, local_species_pool, composition, species, abundance)
+    dplyr::select(model_run, patch, time, local_species_pool, composition, species, abundance) %>%
+    arrange(model_run, patch, time, local_species_pool, composition, species, abundance) %>%
+    as_tibble()
   
   return( data_out )
   
@@ -280,9 +287,11 @@ x <- drift_model(lsp = c(2, 4, 6, 9),
                  n_repeats = 1)
 
 x
+yx$data.raw
+
 
 library(ggplot2)
-head(x)
+head(x, 12)
 unique(x$composition)
 
 x %>%

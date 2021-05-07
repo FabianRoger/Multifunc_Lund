@@ -3,10 +3,20 @@
 
 # Title: Code the Stachova and Leps (2010) simulation model
 
+# next steps:
+
+# - add error checking as per neutral model
+
+
 # parameter definitions
 
 # lsp: gradient of local species pools (i.e. initial seeded diversity)
+# mono: options for including monocultures:
+# - "all" includes all possible monocultures from the regional species pool (i.e. rsp)
+# - "random" draws monocultures randomly as per the other local species pool treatments
+# - "none" excludes monocultures
 # reps: number of replicates for each local species pool size
+# technical_reps: how many repeats of each treatment exactly
 # rsp: number of species in the regional species pool
 # t_steps: number of time steps to model
 # n0: initial abundance of all species
@@ -25,15 +35,20 @@
 # rmin = minimum intrinsic growth rate (uniform distribution)
 # rmax = maximum intrinsic growth rate (uniform distribution)
 
+# n_repeats: how many times to run the model with current parameters
+
 s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
+                         mono = "all",
                          reps = 10,
+                         technical_reps = 1,
                          rsp = 50,
                          t_steps = 10,
                          n0 = 20,
                          a_mean = 0.8, a_sd = 0.2, a_min = 0.2,
                          a_max = 1.2, a_spp = 1, sim.comp = "sym", a_scale = 1,
                          k_min = 20, k_max = 150,
-                         r_min = 0.01, r_max = 0.5){
+                         r_min = 0.01, r_max = 0.5,
+                         n_repeats = 1){
   
   # check that the correct packages are installed
   if(! "dplyr" %in% installed.packages()[,1]) stop(
@@ -55,16 +70,13 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
   # install the pipe from dplyr to be used in further calculations
   `%>%` <- dplyr::`%>%`
   
-  # set-up the model
-  
-  # define the number of patches
-  patches <- reps*length(lsp)
+  # set-up the model parameters for the species
   
   # generate matrix of competition coefficients
   alpha <- matrix( (truncnorm::rtruncnorm(n = rsp*rsp, 
-                                        a = a_min, b = a_max, 
-                                        mean = rnorm(n = 1, mean = a_mean, sd = 0.01), 
-                                        sd = a_sd)), rsp, rsp)
+                                          a = a_min, b = a_max, 
+                                          mean = a_mean, 
+                                          sd = a_sd)), rsp, rsp)
   
   # make the matrix symmetric if chosen
   if (sim.comp == "sym") {
@@ -83,122 +95,185 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
   # generate growth rates values (r) for each species from the uniform distribution
   r <- runif(n = rsp, min = r_min, max = r_max)
   
-  # assign a local species spool size to each patch
-  lsp.p <- rep(lsp, each = reps)[sample(x = (1:patches), size = patches, replace = FALSE)]
+  # set up the mixtures
   
-  # put this into a data.frame
-  df.p <- data.frame(loc.sp.p = lsp.p)
-  df.p <- split(df.p, 1:nrow(df.p))
+  # assign a local species pool size to each mixture patch
+  lsp.p <- rep(lsp, each = reps)
   
-  # apply over all patches
-  sim.out <- 
-    lapply(df.p, function(patch) {
+  mix.patch <- vector("list", length = length(lsp.p))
+  for (i in 1:length(lsp.p)) {
+    
+    mix.patch[[i]] <- sample(x = (1:rsp), size = lsp.p[i], replace = FALSE)
+    
+  }
+  
+  # set up the monocultures
+  
+  if (mono == "all") {
+    
+    mono.patch <- vector("list", length = rsp)
+    for (i in 1:rsp) {
       
-      # get the local species pool size
-      lsp.size <- patch$loc.sp.p
+      mono.patch[[i]] <- i
       
-      # get a set of species from the regional species pool
-      lsp.patch <- sample(x = (1:rsp), size = lsp.size, replace = FALSE)
+    }
+    
+  } else if (mono == "random") {
+    
+    mono.patch <- vector("list", length = reps)
+    for (i in 1:reps) {
       
-      # code a nested for loop: for each time and for each species
+      mono.patch[[i]] <- sample(x = (1:rsp), size = 1, replace = FALSE)
       
-      # create a vector of starting values for each species in the regional species pool
-      n_vals <- rep(0, times = rsp)
+    } 
+    
+  } else if (mono == "none") {
+    
+    mono.patch <- NULL
+    
+  } else {
+    
+    stop("error! choose appropriate monoculture option")
+  }
+  
+  # add the monocultures to the mixtures
+  mono_mix <- c(mono.patch, mix.patch)
+  
+  # set the number of technical replicates i.e. replicates of same exact composition
+  if( technical_reps < 1) {
+    
+    stop("error! technical replicates cannot be less than one")
+    
+  } else if (technical_reps == 1) {
+    
+    patch.list <- mono_mix  
+    
+  } else if (technical_reps > 1) {
+    
+    patch.list <- c(mono_mix)
+    for (i in 1:(technical_reps - 1)) {
       
-      # add starting values for species in the lsp
-      n_vals[lsp.patch] <- (n0/lsp.size)
+      patch.list <- c(patch.list, mono_mix)
       
-      # create an output list of species abundances for each time point
-      n_t <- vector("list", length = t_steps)
-      
-      # fill the first time point with starting abundances
-      n_t[[1]] <- n_vals
-      
-      # for each time point m
-      for(m in seq(from = 2, to = t_steps, by = 1)){
+    }
+    
+  } else {
+    
+    stop("error! choose appropriate technical replicate")
+    
+  }
+  
+  
+  # run model n number of times
+  
+  model_out <- vector("list", length = n_repeats)
+  
+  for (i in 1:n_repeats){
+    
+    # apply over all patches
+    sim.out <- 
+      lapply(patch.list, function(patch) {
         
-        # for each species g
-        for (g in 1:rsp ) {
+        # get the local species pool size
+        lsp.size <- length(patch)
+        
+        # code a nested for loop: for each time and for each species
+        
+        # create a vector of starting values for each species in the regional species pool
+        n_vals <- rep(0, times = rsp)
+        
+        # add starting values for species in the lsp
+        n_vals[patch] <- (n0/lsp.size)
+        
+        # create an output list of species abundances for each time point
+        n_t <- vector("list", length = t_steps)
+        
+        # fill the first time point with starting abundances
+        n_t[[1]] <- n_vals
+        
+        # for each time point m
+        for(m in seq(from = 2, to = t_steps, by = 1)){
           
-          # get the intrinsic growth rate (r) for each species (g)
-          r.spp <- r[g]
-          
-          # get the carrying capacity (k) for each species (g)
-          k.spp <- k[g]
-          
-          # define the first term
-          t1 <- n_t[[m-1]][g] 
-          
-          # define the second term of the equation
-          t2 <- (t1*r.spp)*(1 - ( sum( alpha[, g]*n_t[[m-1]] )/k.spp )   )
-          
-          # combine these terms
-          t3 <- (t1 + t2)
-          
-          # use three terms in the full equation
-          if (t3 > 0) {
-            n_t[[m]][g] <- rpois(n = 1, lambda = t3)
-          } else {
-            n_t[[m]][g] <- 0
+          # for each species g
+          for (g in 1:rsp ) {
+            
+            # get the intrinsic growth rate (r) for each species (g)
+            r.spp <- r[g]
+            
+            # get the carrying capacity (k) for each species (g)
+            k.spp <- k[g]
+            
+            # define the first term
+            t1 <- n_t[[m-1]][g] 
+            
+            # define the second term of the equation
+            t2 <- (t1*r.spp)*(1 - ( sum( alpha[, g]*n_t[[m-1]] )/k.spp )   )
+            
+            # combine these terms
+            t3 <- (t1 + t2)
+            
+            # use three terms in the full equation
+            if (t3 > 0) {
+              n_t[[m]][g] <- rpois(n = 1, lambda = t3)
+            } else {
+              n_t[[m]][g] <- 0
+            }
+            
+            # if a species abundance drops below 0.2 it is considered extinct
+            # if (n_t[[m]][g] < ext.thresh) { n_t[[m]][g] <- 0 }
+            
           }
-          
-          # if a species abundance drops below 0.2 it is considered extinct
-          # if (n_t[[m]][g] < ext.thresh) { n_t[[m]][g] <- 0 }
           
         }
         
+        # collapse this into a dataframe
+        df_n_t <- as.data.frame(do.call(rbind, n_t))
+        names(df_n_t) <- 1:rsp
+        
+        # add a column for the time-point
+        df_n_t$time <- seq(from = 1, to = t_steps, by = 1)
+        
+        # pull this into two columns
+        df_n_t <- 
+          df_n_t %>%
+          tidyr::pivot_longer(cols = -time,
+                              names_to = "species",
+                              values_to = "abundance") %>%
+          dplyr::arrange(time, species)
+        
+        # add local species pool information
+        df_n_t$local_species_pool <- lsp.size
+        
+        # add species composition information
+        df_n_t$composition <- paste(unique(patch), collapse = "")
+        
+        return(df_n_t)
+        
       }
-      
-      # collapse this into a dataframe
-      df_n_t <- as.data.frame(do.call(rbind, n_t))
-      names(df_n_t) <- paste0("sp_", 1:rsp)
-      
-      # add a column for the time-point
-      df_n_t$time <- seq(from = 1, to = t_steps, by = 1)
-      
-      # pull this into two columns
-      df_n_t <- 
-        df_n_t %>%
-        tidyr::pivot_longer(cols = starts_with(match = "sp_"),
-                            names_to = "species",
-                            values_to = "abundance") %>%
-        dplyr::arrange(time, species)
-      
-      return(df_n_t)
-      
-    }
-    )
+      )
+    
+    library(dplyr)
+    
+    # bind the rows together
+    bef.res <- bind_rows(sim.out, .id = "patch")
+    
+    # reorder the columns
+    bef.res <- 
+      bef.res %>%
+      dplyr::select(patch, time, local_species_pool, composition, species, abundance)
+    
+    model_out[[i]] <- bef.res
+    
+  }
   
-  library(dplyr)
+  data_out <- bind_rows(model_out, .id = "model_run")
   
-  # bind the rows together
-  bef.res <- bind_rows(sim.out, .id = "patch")
-  
-  # add a column for the local species pool
-  lsp.patch <- 
-    bef.res %>%
-    filter(time == min(time)) %>%
-    group_by(patch) %>%
-    summarise(local.sp.pool = sum(if_else(abundance > 0, 1, 0)), .groups = "drop")
-  
-  bef.func <- 
-    bef.res %>%
-    filter(time == max(time)) %>%
-    group_by(patch, time) %>%
-    summarise(richness = sum(if_else(abundance > 0, 1, 0)),
-              total_abundance = sum(abundance), .groups = "drop")
-  
-  # join these data.frames together
-  sim.proc <- full_join(bef.func, lsp.patch, by = "patch")
-  
-  # individual species abundances
-  sim.spp <- 
-    bef.res %>%
-    filter(time == max(time))
+  data_out <- 
+    data_out %>%
+    arrange(model_run, patch, time, local_species_pool, composition, species, abundance)
   
   # write these outputs into a list
-  output.list <- list(data.summary = sim.proc,
-                      data.raw = sim.spp,
+  output.list <- list(data.raw = data_out,
                       spp.info = list(competition.coefficients = alpha,
                                       r.vals = r,
                                       k.vals = k))
