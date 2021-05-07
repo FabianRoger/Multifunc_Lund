@@ -29,7 +29,7 @@ drift_model <- function(lsp = c(2, 4, 6),
                         t_steps = 1000,
                         n0 = 500,
                         prop_change = 0.05,
-                        n_repeats = 5) {
+                        n_repeats = 1) {
   
   # load the dplyr library
   library(dplyr)
@@ -48,19 +48,45 @@ drift_model <- function(lsp = c(2, 4, 6),
     stop("error! lsp cannot be one because monocultures are specified via mono argument")
   }
   
+  # lsp values must be integers
   if ( any(lsp%%1 != 0 ) ) {
     stop("error! lsp must be integers")
   }
   
+  # number of replicates (reps) must be at least 1 otherwise a default of 1 is assigned
   if (reps < 1) {
-    reps <- 1
-    print("reps set to less than 1 so assigning to a default of 1")
+    stop("reps set to less than 1, choose appropriate number of replicates")
+  }
+  
+  # make sure proportion change is between 0 and 1
+  if ( (prop_change <= 0) | (prop_change >= 1) ) {
+    stop("proportion change argument must be between 0 and 1")
+  }
+  
+  # make sure that n0 is always greater than two times max lsp
+  if (n0 < 2*max(lsp)) {
+    stop("number of starting individuals (n0) must be at least twice as large as the maximum lsp")
+  }
+  
+  # make sure the rsp is greater than the maximum lsp
+  if (rsp < max(lsp)) {
+    stop("regional species pool (rsp) must be at greater than or equal to maximum diversity lsp")
+  }
+  
+  # make sure the number of time-steps is greater than or equal to 1
+  if (t_steps < 2 ) {
+    stop("time-steps less than 2, choose more time steps")
+  }
+  
+  # make sure there is at least one model run
+  if (n_repeats < 1) {
+    stop("fewer than one model repeat select")
   }
   
   
   # set up the mixtures
   
-  # assign a local species spool size to each patch
+  # assign a local species pool size to each mixture patch
   lsp.p <- rep(lsp, each = reps)
   
   # get a list of patches with a sack of species for each patch
@@ -231,12 +257,12 @@ drift_model <- function(lsp = c(2, 4, 6),
     
   }
   
-  data_out <- bind_rows(model_out, .id = "run")
+  data_out <- bind_rows(model_out, .id = "model_run")
   
   # reorder the columns
   data_out <- 
     data_out %>%
-    select(run, patch, local_species_pool, composition, species, abundance)
+    select(model_run, patch, time, local_species_pool, composition, species, abundance)
   
   return( data_out )
   
@@ -245,24 +271,20 @@ drift_model <- function(lsp = c(2, 4, 6),
 # test the ecological drift model
 x <- drift_model(lsp = c(2, 4, 6),
                  mono = "all",
-                 reps = 3,
+                 reps = 5,
                  technical_reps = 2,
                  rsp = 9,
                  t_steps = 1000,
-                 n0 = 500,
+                 n0 = 50,
                  prop_change = 0.05,
                  n_repeats = 1)
 
 library(ggplot2)
 head(x)
+unique(x$composition)
 
 x %>%
-  filter(run == 1, composition == 1) %>%
-  pull(patch) %>%
-  unique()
-
-x %>%
-  filter(abundance > 0) %>%
+  filter(abundance > 0, patch == 19) %>%
   mutate(species = as.character(species)) %>%
   group_by(local_species_pool, patch, time, species) %>%
   summarise(abundance = median(abundance)) %>%
@@ -270,7 +292,7 @@ x %>%
          mapping = aes(x = time, y = abundance, colour = species )) +
   geom_point() +
   scale_colour_viridis_d() +
-  facet_wrap(~patch, scales = "free") +
+  # facet_wrap(~patch, scales = "free") +
   theme_classic() +
   theme(legend.position = "bottom")
 
