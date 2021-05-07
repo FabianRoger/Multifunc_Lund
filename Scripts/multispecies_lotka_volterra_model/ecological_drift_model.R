@@ -3,12 +3,6 @@
 
 # Title: Code for an ecological drift model (sensu Hubbell 2001) but without dispersal or speciation
 
-# Next steps:
-
-# fix neutral model when abundances drop very low
-# sample abundances rather than individuals to fix this...
-
-
 # parameter definitions
 
 # lsp: gradient of local species pools (i.e. initial seeded diversity)
@@ -62,6 +56,7 @@ drift_model <- function(lsp = c(1, 2, 4, 6),
   # run the model n-times
   
   model_out <- vector("list", length = n_repeats)
+  
   for (i in 1:n_repeats){
     
     neutral_list <- 
@@ -73,22 +68,47 @@ drift_model <- function(lsp = c(1, 2, 4, 6),
         # fill the first time point with starting abundances
         n_t[[1]] <- patch
         
-        # for each time point m
         for(m in seq(from = 2, to = t_steps, by = 1)){
           
+          # get total number of individuals in patch
+          l <- length(n_t[[m-1]])
+          
           # round the proportion change variable
-          n_change <- round(length(n_t[[m-1]])*prop_change, 0)
-          n_change <- ifelse(n_change == 0, 1, n_change)
+          y <- round(l*prop_change, 0)
+          n_change <- ifelse(y == 0, 1, y)
           
-          # kill n individuals drawn from a poisson distribution
-          post_death <- n_t[[m-1]][-sample(x = 1:length(n_t[[m-1]]), size = trunc_pois(n = 1, n_change))]
+          # get the number of individuals to kill
+          n_kill <- trunc_pois(n = 1, n_change)
           
-          # draw new recruits
-          z <- trunc_pois(n = 1, n_change)
-          new_recruits <- post_death[sample(x = 1:length(post_death), size = z, replace = FALSE)]
-          
-          # join the post_death and new_recruits and write to second time-step
-          n_t[[m]] <- c(post_death, new_recruits)
+          # if total length is less than or equal to or if number killed exceeds total population
+          # assign an empty vector
+          if ( (l <= 1) | (n_kill >= l) ) {
+            
+            n_t[[m]] <- vector()
+            
+          } else {
+            
+            # kill n individuals drawn from a poisson distribution
+            post_death <- n_t[[m-1]][-sample(x = 1:l, size = n_kill)]
+            
+            # draw new recruits
+            z <- trunc_pois(n = 1, n_change)
+            
+            if (z > length(post_death)) {
+              
+              n_t[[m]] <- c(post_death)
+              
+            } else {
+              
+              # draw new recruits
+              new_recruits <- post_death[sample(x = 1:length(post_death), size = z, replace = FALSE)]
+              
+              # join the post_death and new_recruits and write to second time-step
+              n_t[[m]] <- c(post_death, new_recruits)
+              
+            }
+            
+          }
           
         }
         
@@ -139,7 +159,7 @@ x <- drift_model(lsp = c(1, 2, 4, 6),
                  reps = 5,
                  rsp = 9,
                  t_steps = 500,
-                 n0 = 30,
+                 n0 = 20,
                  prop_change = 0.05,
                  n_repeats = 1)
 
