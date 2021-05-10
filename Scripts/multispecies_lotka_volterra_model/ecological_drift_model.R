@@ -281,10 +281,10 @@ x <- drift_model(lsp = c(2, 4, 6, 9),
                  reps = 5,
                  technical_reps = 1,
                  rsp = 12,
-                 t_steps = 100,
+                 t_steps = 1000,
                  n0 = 500,
                  prop_change = 0.05,
-                 n_repeats = 1)
+                 n_repeats = 5)
 
 x
 yx$data.raw
