@@ -3,11 +3,6 @@
 
 # Title: Code the Stachova and Leps (2010) simulation model
 
-# next steps:
-
-# - add error checking as per neutral model
-
-
 # parameter definitions
 
 # lsp: gradient of local species pools (i.e. initial seeded diversity)
@@ -59,16 +54,50 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
     "this function requires tidyr to be installed"
   )
   
-  if(! "gtools" %in% installed.packages()[,1]) stop(
-    "this function requires gtools to be installed"
-  )
-  
   if(! "truncnorm" %in% installed.packages()[,1]) stop(
     "this function requires truncnorm to be installed"
   )
   
   # install the pipe from dplyr to be used in further calculations
   `%>%` <- dplyr::`%>%`
+  
+  # perform error checking on arguments
+  
+  # lsp values cannot be less than or equal to 1
+  if ( any(lsp <= 1) ) {
+    stop("error! lsp cannot be one because monocultures are specified via mono argument")
+  }
+  
+  # lsp values must be integers
+  if ( any(lsp%%1 != 0 ) ) {
+    stop("error! lsp must be integers")
+  }
+  
+  # number of replicates (reps) must be at least 1 otherwise a default of 1 is assigned
+  if (reps < 1) {
+    stop("reps set to less than 1, choose appropriate number of replicates")
+  }
+  
+  # make sure that n0 is always greater than two times max lsp
+  if (n0 < 2*max(lsp)) {
+    stop("number of starting individuals (n0) must be at least twice as large as the maximum lsp")
+  }
+  
+  # make sure the rsp is greater than the maximum lsp
+  if (rsp < max(lsp)) {
+    stop("regional species pool (rsp) must be at greater than or equal to maximum diversity lsp")
+  }
+  
+  # make sure the number of time-steps is greater than or equal to 1
+  if (t_steps < 2 ) {
+    stop("time-steps less than 2, choose more time steps")
+  }
+  
+  # make sure there is at least one model run
+  if (n_repeats < 1) {
+    stop("fewer than one model repeat select")
+  }
+  
   
   # set-up the model parameters for the species
   
@@ -219,16 +248,13 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
               n_t[[m]][g] <- 0
             }
             
-            # if a species abundance drops below 0.2 it is considered extinct
-            # if (n_t[[m]][g] < ext.thresh) { n_t[[m]][g] <- 0 }
-            
           }
           
         }
         
         # collapse this into a dataframe
         df_n_t <- as.data.frame(do.call(rbind, n_t))
-        names(df_n_t) <- 1:rsp
+        names(df_n_t) <- paste("sp_", 1:rsp, sep = "")
         
         # add a column for the time-point
         df_n_t$time <- seq(from = 1, to = t_steps, by = 1)
