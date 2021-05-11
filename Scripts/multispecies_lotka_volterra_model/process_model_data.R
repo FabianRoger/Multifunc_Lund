@@ -4,7 +4,7 @@
 # Title: Function to process the raw model data for the turnover approach
 
 # arguments:
-# model_data: cluster of data outputted from ecological_drift_model or stachova_leps_2010 model
+# model_data: cluster of data outputted from drift_model() or s_l_function()
 # func.mat: function matrix outputed from per_capita_function script
 # time_final: if TRUE then only the final time point gets outputted otherwise all time-points are retained
 # species_abun:
@@ -80,7 +80,8 @@ process_sim_data <- function(model_data, func.mat, time_final = TRUE, species_ab
     df_mf_w <- 
       df_mf_w %>%
       group_by(model_run, patch, time, local_species_pool, composition) %>%
-      mutate(abundance = abundance/sum(abundance))
+      mutate(abundance = abundance/sum(abundance)) %>%
+      ungroup()
     
   } else if (species_abun == "raw") {
     

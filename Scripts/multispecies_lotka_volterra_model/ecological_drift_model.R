@@ -286,46 +286,4 @@ x <- drift_model(lsp = c(2, 4, 6, 9),
                  prop_change = 0.05,
                  n_repeats = 5)
 
-x
-yx$data.raw
-
-
-library(ggplot2)
-head(x, 12)
-unique(x$composition)
-
-x %>%
-  filter(abundance > 0, patch == 19) %>%
-  mutate(species = as.character(species)) %>%
-  group_by(local_species_pool, patch, time, species) %>%
-  summarise(abundance = median(abundance)) %>%
-  ggplot(data = .,
-         mapping = aes(x = time, y = abundance, colour = species )) +
-  geom_point() +
-  scale_colour_viridis_d() +
-  # facet_wrap(~patch, scales = "free") +
-  theme_classic() +
-  theme(legend.position = "bottom")
-
-x %>%
-  filter(time == last(time)) %>%
-  group_by(patch) %>%
-  summarise(local_species_pool = mean(local_species_pool),
-            realised_richness = sum(if_else(abundance > 0, 1, 0)),
-            total_abundance = sum(abundance)) %>%
-  ggplot(data = .,
-         mapping = aes(x = local_species_pool, y = total_abundance)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE) +
-  theme_classic() +
-  theme(legend.position = "bottom")
-
-df <- 
-  x %>%
-  filter(time == last(time)) %>%
-  group_by(patch) %>%
-  summarise(local_species_pool = mean(local_species_pool),
-            realised_richness = sum(if_else(abundance > 0, 1, 0)),
-            total_abundance = sum(abundance))
-
-summary(lm(total_abundance~local_species_pool, data = df))
+### END

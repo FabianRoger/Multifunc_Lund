@@ -3,7 +3,6 @@
 
 # Title: Implement the turnover approach using the multifunc package and an analogue to Meyer et al. (2017)'s null model
 
-
 # set-up general functions
 
 # function to mix-up relationship between function and species
