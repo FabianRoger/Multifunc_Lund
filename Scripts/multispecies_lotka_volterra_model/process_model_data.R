@@ -15,6 +15,20 @@
 # get the simulated data cluster (i.e. n reps of a model with the same parameters)
 process_sim_data <- function(model_data, func.mat, time_final = TRUE, species_abun = "pa") {
   
+  # check that the correct packages are installed
+  if(! "dplyr" %in% installed.packages()[,1]) stop(
+    "this function requires dplyr to be installed"
+  )
+  
+  # check that the correct packages are installed
+  if(! "tidyr" %in% installed.packages()[,1]) stop(
+    "this function requires tidyr to be installed"
+  )
+  
+  # load the dplyr library
+  library(dplyr)
+  library(tidyr)
+  
   # write the model data set into an object called df 
   df <- model_data
   
