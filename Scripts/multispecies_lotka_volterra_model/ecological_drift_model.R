@@ -275,15 +275,4 @@ drift_model <- function(lsp = c(2, 4, 6),
   
 }
 
-# test the ecological drift model
-x <- drift_model(lsp = c(2, 4, 6, 9),
-                 mono = "all",
-                 reps = 5,
-                 technical_reps = 1,
-                 rsp = 12,
-                 t_steps = 1000,
-                 n0 = 500,
-                 prop_change = 0.05,
-                 n_repeats = 5)
-
 ### END

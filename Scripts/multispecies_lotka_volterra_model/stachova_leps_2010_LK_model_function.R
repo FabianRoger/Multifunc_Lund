@@ -22,7 +22,6 @@
 # a_min = min interspecific competition of a truncated normal distribution
 # a_max = max interspecific competition of a truncated normal distribution
 # a_spp = intraspecific competition for each species
-# a_scale = scaling coefficient of competition coefficients
 
 # kmin = minimum carrying capacity (uniform distribution)
 # kmax = maximum carrying capacity (unifrom distribution)
@@ -30,8 +29,77 @@
 # rmin = minimum intrinsic growth rate (uniform distribution)
 # rmax = maximum intrinsic growth rate (uniform distribution)
 
+# NBE = "selection" orders species r and K values by their average competition coefficient
+# random.seed = seed used to generate the random r, K and alpha parameters
+
 # n_repeats: how many times to run the model with current parameters
 
+
+# set-up the function to generate the Lotka-Volterra parameters
+lk_parameter_generator <- function(rsp = 12,
+                                   a_mean = 0.8, a_sd = 0.2, a_min = 0.2,
+                                   a_max = 1.2, a_spp = 1, sim.comp = "sym",
+                                   k_min = 20, k_max = 150,
+                                   r_min = 0.1, r_max = 0.5,
+                                   NBE = "selection",
+                                   random.seed = 123) {
+  
+  # make sure the truncnorm package is installed
+  if(! "truncnorm" %in% installed.packages()[,1]) stop(
+    "this function requires truncnorm to be installed"
+  )
+  
+  # choose a random seed
+  set.seed(random.seed)
+  
+  # generate matrix of competition coefficients
+  alpha <- matrix( (truncnorm::rtruncnorm(n = rsp*rsp, 
+                                          a = a_min, b = a_max, 
+                                          mean = a_mean, 
+                                          sd = a_sd)), rsp, rsp)
+  
+  # make the matrix symmetric if chosen
+  if (sim.comp == "sym") {
+    alpha[lower.tri(alpha)] = t(alpha)[lower.tri(alpha)]
+  }
+  
+  # make all intraspecific competition coefficients equal to 1
+  diag(alpha) <- rep(a_spp, rsp)
+  
+  # calculate the mean competition coefficient of each species
+  m.alpha <- apply(alpha, MARGIN = 2, mean)
+  
+  # order the mean competition coefficients
+  alpha.ord <- sapply(m.alpha, function(x) { 
+    y <- (x == sort(m.alpha, decreasing = TRUE))
+    which( y == TRUE ) } )
+  
+  # generate the carrying capacities (K) for each species from the uniform distribution
+  k <- runif(n = rsp, min = k_min, max = k_max)
+  
+  # generate growth rates values (r) for each species from the uniform distribution
+  r <- runif(n = rsp, min = r_min, max = r_max)
+  
+  # if NBE is chosen as selection then competitive species have the highest K and r
+  if (NBE == "selection") {
+    
+    k <- sort(k, decreasing = TRUE)[alpha.ord]
+    r <- sort(r, decreasing = TRUE)[alpha.ord]
+    
+  }
+  
+  # decouple rest of session from this seed
+  rm(.Random.seed, envir=.GlobalEnv)
+  
+  # pull these parameters into a list
+  lk_params <- list(alpha = alpha, k = k, r = r)
+  
+  return(lk_params)
+  
+}
+
+
+# set-up the model function
 s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
                          mono = "all",
                          reps = 10,
@@ -40,9 +108,10 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
                          t_steps = 10,
                          n0 = 20,
                          a_mean = 0.8, a_sd = 0.2, a_min = 0.2,
-                         a_max = 1.2, a_spp = 1, sim.comp = "sym", a_scale = 1,
+                         a_max = 1.2, a_spp = 1, sim.comp = "sym",
                          k_min = 20, k_max = 150,
                          r_min = 0.01, r_max = 0.5,
+                         NBE = "selection", random.seed = 123,
                          n_repeats = 1){
   
   # check that the correct packages are installed
@@ -52,10 +121,6 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
   
   if(! "tidyr" %in% installed.packages()[,1]) stop(
     "this function requires tidyr to be installed"
-  )
-  
-  if(! "truncnorm" %in% installed.packages()[,1]) stop(
-    "this function requires truncnorm to be installed"
   )
   
   # install the pipe from dplyr to be used in further calculations
@@ -99,30 +164,24 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
   }
   
   
-  # set-up the model parameters for the species
+  # set-up the model parameters for the species using lk_parameter_generator
+  lk_pars <- lk_parameter_generator(rsp = rsp,
+                                    a_mean = a_mean, a_sd = a_sd, a_min = a_min,
+                                    a_max = a_max, a_spp = a_spp, sim.comp = sim.comp,
+                                    k_min = k_min, k_max = k_max,
+                                    r_min = r_min, r_max = r_max,
+                                    NBE = NBE,
+                                    random.seed = random.seed)
+  
   
   # generate matrix of competition coefficients
-  alpha <- matrix( (truncnorm::rtruncnorm(n = rsp*rsp, 
-                                          a = a_min, b = a_max, 
-                                          mean = a_mean, 
-                                          sd = a_sd)), rsp, rsp)
-  
-  # make the matrix symmetric if chosen
-  if (sim.comp == "sym") {
-    alpha[lower.tri(alpha)] = t(alpha)[lower.tri(alpha)]
-  }
-  
-  # make all intraspecific competition coefficients equal to 1
-  diag(alpha) <- rep(a_spp, rsp)
-  
-  # scale the competition-coefficient matrix
-  alpha <- alpha*a_scale
+  alpha <- lk_pars$alpha
   
   # generate the carrying capacities (K) for each species from the uniform distribution
-  k <- runif(n = rsp, min = k_min, max = k_max)
+  k <- lk_pars$k
   
   # generate growth rates values (r) for each species from the uniform distribution
-  r <- runif(n = rsp, min = r_min, max = r_max)
+  r <- lk_pars$r
   
   # set up the mixtures
   
@@ -201,6 +260,7 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
     
     # apply over all patches
     sim.out <- 
+      
       lapply(patch.list, function(patch) {
         
         # get the local species pool size
@@ -307,3 +367,5 @@ s_l_function <- function(lsp = c(5, 10, 15, 20, 25),
   return(output.list)
     
 }
+
+### END
