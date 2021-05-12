@@ -18,101 +18,71 @@ source(here("Scripts/multispecies_lotka_volterra_model/turnover_approach_functio
 n.f <- 5
 
 # specialist
-set.seed(123)
-fm <- func_matrix_generator(species_list = unique(x$species), 
-                            func.n = n.f, func.spec = "specialist", prob.neg = 0.05)
+fm1 <- func_matrix_generator(species_list = unique(mod.list[[1]]$species),
+                             func.n = n.f, func.spec = "specialist", prob.neg = 0.05)
 
+# generalist
+fm2 <- func_matrix_generator(species_list = unique(mod.list[[1]]$species),
+                             func.n = n.f, func.spec = "generalist", prob.neg = 0.05)
 
-# simulated data cluster (e.g. neutral model with 1000 runs with same parameters)
-x
+func.list <- list(fm1, fm2)
+func.list
 
-# process the simulated cluster using: process_sim_data
-data_proc <- process_sim_data(model_data = x, func.mat = fm, time_final = TRUE, species_abun = "pa")
+# list of simulated data cluster (e.g. neutral model with 1000 runs with same parameters)
+mod.list
 
+# for each dataset in mod.list and for each function matrix in func.list, run the AIC and SES turnover approaches
 
-# function to compare AIC and SES-based turnover approaches: turnover_tester()
-
-# arguments:
-# model_dat: data.frame from functions: drift_model.R or stachova_leps_2010
-# that has been processed using the process_sim_data() function
-# function_matrix: data.frame with identity effect coefficients for all species in model_dat
-
-turnover_tester <- 
-  function(model_dat, function_matrix, ses_reps = 100) {
+mod.turnover.test <- vector("list", length = length(mod.list))
+for (i in 1:length(mod.list)) {
   
-  # check that the correct packages are installed
-  if(! "dplyr" %in% installed.packages()[,1]) stop(
-    "this function requires dplyr to be installed"
-  )
+  func.reps <- vector("list", length = length(func.list))
+  for (j in 1:length(func.list)) {
     
-  # load the dplyr library
-  library(dplyr)
+    # process the simulated cluster using: process_sim_data
+    df.proc <- 
+      process_sim_data(model_data = mod.list[[i]], 
+                       func.mat =  func.list[[j]], 
+                       time_final = TRUE, 
+                       species_abun = "pa")
     
-  # convert this data cluster into a list
-  model.list <- split(model_dat, model_dat$model_run)
+    # run the different turnover approaches
+    func.reps[[j]] <- turnover_tester(model_dat = df.proc, function_matrix = func.list[[j]], ses_reps = 1000) 
+    
+  }
   
-  # get a vector of function names from the function matrix
-  f.names <- names(function_matrix)[grepl(pattern = "F_", names(function_matrix))]
-  
-  turnover_list <- 
-    lapply(model.list, function(data.mf) {
-      
-      # get a vector of species names that are present for the chosen simulation
-      sp.present <- sapply(data.mf[, grepl("sp_", names(data.mf)) ], function(x) sum(ifelse(x > 0, 1, 0)))
-      sp.present <- names(sp.present[sp.present > 0])
-      
-      # subset the species that are present in the simulation
-      data.in <- 
-        data.mf %>%
-        select(model_run, patch, time, local_species_pool, composition,
-               all_of(sp.present), all_of(f.names))
-      
-      # subset the present species
-      func.in <- fm[fm$species %in% sp.present, ]
-      
-      
-      ### AIC-based turnover approach
-      
-      # implement the aic-based approach to get species effects on each function
-      aic.x <- AIC_sp(data = data.in, function_names = f.names, species_names = sp.present)
-      
-      # calculate the proportion of incorrect directions for each function
-      aic.dr <- mapply(compare.directions, func.in[, f.names], aic.x[, f.names])
-      
-      # calculate the spearman correlation
-      aic.spear <- mapply(function(x, y){cor(x, y, method = "spearman")}, func.in[, f.names], aic.x[, f.names])
-      
-      
-      ### SES-based turnover approach
-      
-      # implement the ses-based approach to get species effects on each function
-      ses.x <- SES_score(data = data.in, function_names = f.names, species_names = sp.present, n_ran = ses_reps )
-      
-      # calculate the proportion of incorrect directions for each function
-      ses.dr <- mapply(compare.directions, func.in[, f.names], ses.x[, f.names])
-      
-      # calculate the spearman correlation
-      ses.spear <- mapply(function(x, y){cor(x, y, method = "spearman")}, func.in[, f.names], ses.x[, f.names])
-      
-      # summary metric
-      summary_stats <- 
-        bind_rows(aic.dr, aic.spear, ses.dr, ses.spear) %>%
-        mutate(output_metric = rep(c("prop_incorrect", "spearman_r"), 2),
-               method = rep(c("AIC", "SES"), each = 2)) %>%
-        select(method, output_metric, all_of(f.names))
-      
-      return(summary_stats)
-      
-    })
-  
-  # bind the output list into a dataframe
-  turnover_summary <- bind_rows(turnover_list, .id = "model_run")
-  
-  return(turnover_summary)
+  mod.turnover.test[[i]] <- bind_rows(func.reps, .id = "function_matrix")
   
 }
 
-# test the turnover_tester() function
-turnover_tester(model_dat = mf.turnover, function_matrix = fm)
+# assign names to this object
+names(mod.turnover.test) <- names(mod.list)
+
+# bind this into one large data.frame
+mod.turnover.df <- bind_rows(mod.turnover.test, .id = "parameter_combination")
+
+# pull this into a longer data.frame
+library(ggplot2)
+
+df.plot <- 
+  mod.turnover.df %>%
+  pivot_longer(cols = starts_with("F_"),
+               names_to = "function_id",
+               values_to = "metric") %>%
+  mutate(mod_id = paste(parameter_combination, function_matrix, sep = "_"), .before = 1)
+
+df.plot$mod_id <- as.factor(df.plot$mod_id)
+levels(df.plot$mod_id) <- paste("m.", 1:length(unique(df.plot$mod_id)), sep = "")
+df.plot$mod_id <- as.character(df.plot$mod_id)
+
+df.plot %>%
+  ggplot(data = ., 
+       mapping = aes(x = method, y = metric, colour = mod_id)) +
+  geom_point(position = position_dodge(width = 0.9)) +
+  theme_classic() +
+  facet_wrap(~output_metric, scales = "free") +
+  scale_colour_viridis_d() +
+  theme(legend.position = "bottom",
+        axis.text = element_text(colour = "black"))
 
 ### END
