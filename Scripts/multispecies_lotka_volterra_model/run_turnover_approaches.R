@@ -11,27 +11,32 @@ source(here("Scripts/multispecies_lotka_volterra_model/process_model_data.R"))
 source(here("Scripts/multispecies_lotka_volterra_model/per_capita_function_matrix_functions.R"))
 source(here("Scripts/multispecies_lotka_volterra_model/turnover_approach_functions.R"))
 
-# Laura will provide function matrices so that the identity effects in the DI-models are the same
-# for now, I will use the func_matrix_generator function:
+# load Laura's function matrices
+f.list <- list.files(path = here("data"))
+fm_names <- f.list[grepl(pattern = "SpeciesIDs", f.list)]
 
-# choose the number of functions
-n.f <- 5
+# load these data.frames into a list
+library(readr)
 
-# specialist
-fm1 <- func_matrix_generator(species_list = unique(mod.list[[1]]$species),
-                             func.n = n.f, func.spec = "specialist", prob.neg = 0.05)
+func.list <- vector("list", length = length(fm_names))
+for (i in 1:length(func.list)) {
+  
+  x <- read_csv(file = paste(here("data"), fm_names[i], sep = "/") )
+  colnames(x)[1] <- "species"
+  
+  func.list[[i]] <- x
+  
+}
 
-# generalist
-fm2 <- func_matrix_generator(species_list = unique(mod.list[[1]]$species),
-                             func.n = n.f, func.spec = "generalist", prob.neg = 0.05)
-
-func.list <- list(fm1, fm2)
-func.list
 
 # list of simulated data cluster (e.g. neutral model with 1000 runs with same parameters)
+# this list is generated using the collate_model_data.R script
 mod.list
 
 # for each dataset in mod.list and for each function matrix in func.list, run the AIC and SES turnover approaches
+
+# set the number of reps for the SES method
+ses.r <- 100
 
 mod.turnover.test <- vector("list", length = length(mod.list))
 for (i in 1:length(mod.list)) {
@@ -47,7 +52,7 @@ for (i in 1:length(mod.list)) {
                        species_abun = "pa")
     
     # run the different turnover approaches
-    func.reps[[j]] <- turnover_tester(model_dat = df.proc, function_matrix = func.list[[j]], ses_reps = 1000) 
+    func.reps[[j]] <- turnover_tester(model_dat = df.proc, function_matrix = func.list[[j]], ses_reps = ses.r) 
     
   }
   
@@ -71,9 +76,20 @@ df.plot <-
                values_to = "metric") %>%
   mutate(mod_id = paste(parameter_combination, function_matrix, sep = "_"), .before = 1)
 
-df.plot$mod_id <- as.factor(df.plot$mod_id)
-levels(df.plot$mod_id) <- paste("m.", 1:length(unique(df.plot$mod_id)), sep = "")
-df.plot$mod_id <- as.character(df.plot$mod_id)
+View(df.plot)
+
+# df.plot$mod_id <- as.factor(df.plot$mod_id)
+# levels(df.plot$mod_id) <- paste("m.", 1:length(unique(df.plot$mod_id)), sep = "")
+# df.plot$mod_id <- as.character(df.plot$mod_id)
+
+df.plot %>%
+  group_by(mod_id, model_run, method, output_metric) %>%
+  summarise(mean_metric = mean(metric, na.rm = TRUE), .groups = "drop") %>%
+  filter(output_metric == "prop_incorrect") %>%
+  ggplot(data = .,
+         mapping = aes(x = method, y = mean_metric)) +
+  geom_jitter() +
+  facet_wrap(~mod_id)
 
 df.plot %>%
   ggplot(data = ., 

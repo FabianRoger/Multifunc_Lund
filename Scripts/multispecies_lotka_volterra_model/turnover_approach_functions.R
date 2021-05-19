@@ -223,6 +223,9 @@ turnover_tester <-
         # implement the aic-based approach to get species effects on each function
         aic.x <- AIC_sp(data = data.in, function_names = f.names, species_names = sp.present)
         
+        # reorder the aic.x to match with func.in
+        aic.x <- aic.x[match(func.in$species, aic.x$species),]
+        
         # calculate the proportion of incorrect directions for each function
         aic.dr <- mapply(compare.directions, func.in[, f.names], aic.x[, f.names])
         
@@ -234,6 +237,9 @@ turnover_tester <-
         
         # implement the ses-based approach to get species effects on each function
         ses.x <- SES_score(data = data.in, function_names = f.names, species_names = sp.present, n_ran = ses_reps )
+        
+        # reorder the aic.x to match with func.in
+        ses.x <- ses.x[match(func.in$species, ses.x$species), ]
         
         # calculate the proportion of incorrect directions for each function
         ses.dr <- mapply(compare.directions, func.in[, f.names], ses.x[, f.names])
