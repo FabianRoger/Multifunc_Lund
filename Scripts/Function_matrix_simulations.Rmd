@@ -1,0 +1,119 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(Matrix)
+library(corrplot)
+library(ggplot2)
+```
+
+# correlations
+
+```{r}
+# number of functions
+funcnum <- 10
+
+# range of average correlations among functions
+# also defines how many datframes will be generated
+
+# not that I go from -1 to 1 here but in practice only strong negative correlations aren't possible 
+
+min = seq(-1,1,0.1)
+max = seq(-1,1,0.1)
+
+limit_df <- 
+expand_grid(min,max) %>% 
+  filter(min < max)
+
+# make list of data frames with the (approximate) average correlations above
+Func_cor_list <- 
+limit_df %>% 
+  mutate(split = 1:n()) %>% 
+  split(., .$split) %>% 
+  lapply(., function(x) { 
+  
+  # make correlation matrix 
+cormat <- funcnum*(funcnum-1)/2
+cormat <- runif(cormat, min=x$min, max=x$max)
+M <- matrix(ncol = funcnum, nrow = funcnum)
+M[upper.tri(M,diag=F)] <- cormat
+M[lower.tri(M,diag=F)] <- t(M)[lower.tri(M, diag=F)]
+diag(M) <- 1
+
+ #make covariance matrix
+sd <- rnorm(10, 5 , 2)
+M <- M* (sd %*% t(sd))
+
+#find closest positive definite covariance matrix
+M <- nearPD(M)$mat
+
+#draw function values for 100 plots and 10 functions with the specified covariance structure
+Func <- MASS::mvrnorm(100, rep(0.5,10), Sigma = M)
+
+#shift to positive
+Func <- Func + abs(min(Func))
+
+#standardise by max
+Func <- apply(Func, 2, function(x) x/max(x))
+
+#add row names and col names
+colnames(Func) <- paste("Func", 1:ncol(Func), sep = "_")
+rownames(Func) <- paste("plot", 1:nrow(Func), sep = "_")
+
+return(Func)
+})
+
+names(Func_cor_list) <- unlist(apply(limit_df, 1, paste, collapse = "_"))
+```
+
+
+```{r}
+whichplots <- seq(1,length(Func_cor_list), length.out = 5)
+
+invisible(lapply(whichplots, function(x) corrplot(cor(Func_cor_list[[x]]), title = names(Func_cor_list)[x], mar = c(1, 1, 1, 1))))
+
+
+```
+
+# Eveness
+
+defining a function of exponentiual decay
+```{r}
+exp_decay <- function(x, lambda){
+      y = exp(1)^(-lambda * x)
+      DF <- tibble(x = x,
+                   y = y)
+      return(DF)
+    }
+```
+
+
+get samples of `nfunc` functions with specified evenness
+```{r}
+# steepness of exponential decay
+lambda <- seq(0,2,length.out = 100)
+
+nfunc <- 10
+
+for (i in seq_along(lambda)){
+  if(i == 1){
+    DF <- exp_decay(seq(0,nfunc,1), lambda[i])
+    DF$lambda <- lambda[i]
+  }
+  if(i > 1){
+    DF_t = exp_decay(seq(0,nfunc,1), lambda[i])
+    DF_t$lambda <- lambda[i]
+    DF <- bind_rows(DF, DF_t)
+  }
+}
+
+ggplot(DF, aes(x = x, y = y, colour = lambda))+
+  geom_line(aes(group = as.factor(lambda)))+
+  scale_color_viridis_c()+
+  theme_minimal()
+```
+
