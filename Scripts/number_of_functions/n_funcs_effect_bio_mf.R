@@ -123,6 +123,34 @@ get_BEF_mf_est <- function(adf.data,
 }
 
 
+### list with the ecological drift model
+
+f.names <- names(mod.df)[grepl(pattern = "F_", names(mod.df))]
+
+sim.n.func <- 
+  lapply(split(mod.df, mod.df$mod_id), function(data) {
+  
+  get_BEF_mf_est(adf.data = data, 
+                 mf.func.names = f.names, 
+                 standardise_funcs = TRUE,
+                 covariate_name = "local_species_pool")
+  
+})
+
+sim.n.df <- bind_rows(sim.n.func, .id = "mod_id")
+head(sim.n.df)
+
+ggplot(data = sim.n.df,
+       mapping = aes(x = number_of_functions, y = realised_diversity_mf_est, colour = mod_id)) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~multifunctionality_metric, scales = "free") +
+  theme_classic() +
+  theme(legend.position = "none")
+  
+
+
+
+
 ### load the Jena data
 
 # load the cleaned Jena data
@@ -172,81 +200,6 @@ p1
 
 ggsave(filename = here("Figures/fig_9_jena.png"), plot = p1,
        width = 16, height = 12, units = "cm", dpi = 450)
-  
-
-### load the simulated data
-
-# load the raw data
-sim.raw <- read_csv(file = here("data/multifunctionality_data.csv"))
-
-# define the variable groups
-sim.vars <- names(sim.raw)
-
-# subset the function names from that 
-sim.func.names <- sim.vars[ (grepl("F_", sim.vars) & nchar(sim.vars) == 3) ]
-
-# get the id variables
-sim.id.vars <- c("patch", "time", "richness", "total_abundance", "local.sp.pool")
-
-# subset the id variables and functions
-sim.dat <- 
-  sim.raw %>%
-  select(all_of( c(sim.id.vars, sim.func.names) ))
-
-sim.n.func <- 
-  lapply(split(sim.dat, sim.raw$sim.id), function(data) {
-  
-  get_BEF_mf_est(adf.data = data, 
-                 mf.func.names = sim.func.names, 
-                 standardise_funcs = FALSE,
-                 covariate_name = "richness")
-  
-})
-
-# bind this list into a single data.frame
-sim.n.func.dat <- bind_rows(sim.n.func, .id = "sim.id")
-sim.n.func.dat$sim.id <- as.numeric(sim.n.func.dat$sim.id)
-
-# load the simulated data parameters
-params <- read_csv(file = here("data/parameters_sim.csv"))
-
-# join the parameter data to the n_function data
-sim.n.func.dat <- full_join(sim.n.func.dat, params, by = "sim.id")
-head(sim.n.func.dat)
-
-# add descriptions of the simulations
-names(sim.n.func.dat)
-
-sim.n.func.dat <- 
-  sim.n.func.dat %>%
-  mutate(competition = if_else(a_mean == 0.25, "weak",
-                               if_else(a_mean == 0.5, "strong", "equal")),
-         specialisation = if_else(w.shape == 0.5, "specialisation", "generalism"))
-
-
-# plot the simulated data
-p2 <- 
-  ggplot(data = sim.n.func.dat,
-       mapping = aes(x = number_of_functions, 
-                     y = realised_diversity_mf_est,
-                     group = sim.id,
-                     colour = competition)) +
-  geom_smooth(aes(linetype = specialisation), method = "lm", se = FALSE, size = 0.75) +
-  ylab("multifunctional BEF-slope") +
-  xlab("number of functions") +
-  scale_colour_viridis_d(option = "C", end = 0.9) +
-  scale_linetype_manual(values=c("solid", "dotted"))+
-  facet_wrap(~multifunctionality_metric, scales = "free") +
-  theme_meta() +
-  theme(legend.position = "bottom",
-        legend.title = element_blank(),
-        legend.key = element_rect(fill = NA),
-        strip.background =element_rect(fill = "white", colour = "black")) 
-
-p2
-
-ggsave(filename = here("Figures/fig_8_sim.png"), plot = p2,
-       width = 16, height = 13.5, units = "cm", dpi = 450)
 
 
 
