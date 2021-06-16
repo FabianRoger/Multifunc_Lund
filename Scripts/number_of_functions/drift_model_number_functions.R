@@ -112,70 +112,96 @@ head(mod.df)
 library(purrr)
 library(broom)
 
+lm.cleaner <- function(data, response, explanatory) {
+  
+  x <- 
+    lm(reformulate(explanatory, response), data = data) %>% 
+    tidy %>% 
+    filter(term == explanatory) %>% 
+    select(!!paste("estimate_SR_", response, sep = "") := estimate )
+  
+  return(x)
+  
+  }
+
 bef_slopes <- 
   mod.df %>%
-  filter(function_matrix == first(function_matrix)) %>%
-  group_by(parameter_combination, model_run) %>% 
+  group_by(parameter_combination, model_run, function_matrix) %>% 
   nest() %>% 
-  mutate(model = map(data, ~lm(abundance ~ 1 + local_species_pool, data = .x) %>% 
-                       tidy)) %>% 
-  unnest(model) %>% 
-  filter(term == "local_species_pool") %>%
+  mutate(model_abun = map(data, ~lm.cleaner(data = .x, explanatory = "local_species_pool", response = "abundance")),
+         model_F1 = map(data, ~lm.cleaner(data = .x, explanatory = "local_species_pool", response = "F_1")),
+         model_F2 = map(data, ~lm.cleaner(data = .x, explanatory = "local_species_pool", response = "F_2")),
+         model_F3 = map(data, ~lm.cleaner(data = .x, explanatory = "local_species_pool", response = "F_3")),
+         model_F4 = map(data, ~lm.cleaner(data = .x, explanatory = "local_species_pool", response = "F_4")),
+         model_F5 = map(data, ~lm.cleaner(data = .x, explanatory = "local_species_pool", response = "F_5")) ) %>%
+  unnest(c("model_abun", paste("model_F", 1:5, sep = "" ))) %>% 
   select(-data) %>%
-  ungroup()
+  ungroup() %>%
+  pivot_longer(cols = starts_with("estimate"),
+               names_to = "response_var",
+               values_to = "estimate")
+View(bef_slopes)
 
 
 # make some preliminary figures
 source(here("Scripts/function_plotting_theme.R"))
+library(ggplot2)
 
-# plot first parameter combination
+# get the species richness ~ abundance slopes (do not depend on function matrix)
+sr_abun <- 
+  bef_slopes %>%
+  filter(function_matrix == first(function_matrix)) %>%
+  filter(response_var == "estimate_SR_abundance") %>%
+  select(-function_matrix)
+
+# calculate summary statistics
+sr_abun_ss <- 
+  sr_abun %>%
+  summarise(n = n(), 
+            mean = mean(estimate),
+            se = sd(estimate)/sqrt(n())) %>%
+  mutate(upp_ci = mean + qt(p = 0.975, df = n)*se,
+         low_ci = mean - qt(p = 0.975, df = n)*se)
+
+# plot a few relationships between species richness and abundance
+# plot the abundance and SR relationship
+names(mod.df)
 mod.df %>%
-  filter(function_matrix == 1) %>%
-  filter(parameter_combination == first(parameter_combination)) %>%
-  filter(model_run %in% sample(unique(mod.df$model_run), 5)) %>%
+  filter(mod_id %in% sample(unique(mod.df$mod_id), 5)) %>%
   ggplot(data = .,
-         mapping = aes(x = local_species_pool, y = abundance, colour = model_run)) +
+         mapping = aes(x = local_species_pool, y = abundance, colour = mod_id)) +
   geom_jitter(width = 0.2) +
   geom_smooth(method = "lm", se = FALSE) +
   scale_colour_viridis_d() +
   theme_meta() +
   theme(legend.position = "none")
 
-ggplot(data = filter(bef_slopes, parameter_combination == first(parameter_combination)) ,
-       mapping = aes(x = estimate)) +
-  geom_histogram() +
+# plot the different models
+ggplot(data = sr_abun,
+         mapping = aes(x = estimate)) +
+  geom_histogram(alpha = 0.3) +
   geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = c(sr_abun_ss$low_ci, sr_abun_ss$upp_ci), colour = "red") +
   xlab("abundance ~ SR est.") +
   theme_meta() +
   theme(legend.position = "none")
 
 
+# plot boxplots for each function
+sr_funcs <- 
+  bef_slopes %>%
+  filter(response_var != "estimate_SR_abundance")
 
+sr_funcs %>%
+  group_by(response_var, function_matrix) %>%
+  summarise(n = n())
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+ggplot(data = sr_funcs, 
+       mapping = aes(x = function_matrix, y = estimate)) +
+  geom_jitter(width = 0.1, alpha = 0.2) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~response_var) +
+  ylab("function ~ SR est.") +
+  xlab("function matrix") +
+  theme_meta()
 
