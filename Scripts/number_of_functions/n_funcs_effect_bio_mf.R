@@ -118,6 +118,22 @@ get_BEF_mf_est <- function(adf.data,
     # subset the multifunctionality metric names
     mf.names <- names(data.mf)[grepl(pattern = "MF", x = names(data.mf))]
     
+    # calculate summary statistics for the among function variation
+    data.f.summary <- 
+      dat.in %>%
+      mutate(row_id = 1:nrow(dat.in)) %>%
+      select(row_id, all_of(sample.func.names)) %>%
+      pivot_longer(cols = all_of(sample.func.names),
+                   names_to = "function_id",
+                   values_to = "function_value") %>%
+      group_by(row_id) %>%
+      summarise(F_sd = sd(function_value, na.rm = TRUE),
+                F_cv = (F_sd/mean(function_value)),
+                F_range = diff(range(function_value))) %>%
+      summarise(F_sd = mean(F_sd),
+                F_cv = mean(F_cv),
+                F_range = mean(F_range))
+    
     # for each multifunctionality metric, calculate the BEF-slope
     bef_mf_slope <- 
       sapply(mf.names, function(x){
@@ -131,8 +147,11 @@ get_BEF_mf_est <- function(adf.data,
       data.frame(func.comb.id = i,
                  n.func.id = paste(sample.func.names, collapse = ""),
                  number_of_functions = length(sample.func.names),
+                 sd_funcs = data.f.summary$F_sd,
+                 cv_funcs = data.f.summary$F_cv,
+                 range_funcs = data.f.summary$F_range,
                  multifunctionality_metric = mf.names,
-                 realised_diversity_mf_est = bef_mf_slope)
+                 diversity_mf_est = bef_mf_slope)
     
     # join the summary statistics to the BEF slope data
     df.out <- full_join(df.out, data.mf.summary, by = "multifunctionality_metric")
@@ -175,44 +194,145 @@ sim.n.out <-
               distinct(), by = "mod_id")
 head(sim.n.out)
 
-# plot a few illustrative examples
-sim.n.out %>%
-  filter(mod_id %in% sample(unique(sim.n.df$mod_id), 10 )) %>%
-  ggplot(data = .,
-         mapping = aes(x = number_of_functions, y = realised_diversity_mf_est, colour = mod_id)) +
-  geom_jitter(width = 0.1, alpha = 0.2) +
-  geom_smooth(method = "lm", se = FALSE) +
-  scale_colour_viridis_d() +
-  facet_wrap(~multifunctionality_metric, scales = "free") +
-  theme_meta() +
-  theme(legend.position = "none")
 
-# plot the expectations from all simulations
-head(sim.n.out)
+### plot these data
+
+# plot a few illustrative examples for each multifunctionality metric
+mf.metric.list <- unique(sim.n.out$multifunctionality_metric)
+mf.names <- c("sum MF", "ave. MF", "Pasari MF", "thresh 30 MF", "thresh 70 MF")
+
+dat.fx1 <- 
+  sim.n.out %>%
+  filter(mod_id %in% sample(unique(sim.n.df$mod_id), 10 ))
+
+plots.fx1 <- vector("list", length = length(mf.metric.list))
+for(i in 1:length(mf.metric.list)) {
   
-n_func.bef_slope <- 
+  df.x <- 
+    dat.fx1 %>%
+    filter(multifunctionality_metric == mf.metric.list[[i]]) %>%
+    ggplot(data = .,
+           mapping = aes(x = number_of_functions, y = realised_diversity_mf_est, # change to diversity if running again
+                         group = mod_id, colour = function_matrix)) +
+    geom_jitter(width = 0.1, alpha = 0.2) +
+    geom_smooth(method = "lm", se = FALSE) +
+    scale_colour_viridis_d() +
+    ggtitle(mf.names[i]) +
+    xlab("Number of functions") +
+    ylab("MF BEF-slope") +
+    theme_meta() +
+    theme(legend.position = "none",
+          title = element_text(size = 10))
+  
+  plots.fx1[[i]] <- df.x
+  
+}
+names(plots.fx1) <- mf.metric.list
+plots.fx1$sum_MF
+
+# plot the expectations from all simulations for each multifunctionality metric
+head(sim.n.out)
+
+library(purrr)
+library(broom)
+
+# define function to efficiently output the slope
+lm.cleaner <- function(data, response, explanatory) {
+  
+  x <- 
+    lm(reformulate(explanatory, response), data = data) %>% 
+    tidy %>% 
+    filter(term == explanatory) %>% 
+    select(!!paste("estimate_n_func_", response, sep = "") := estimate )
+  
+  return(x)
+  
+}
+
+# calculate the slope between number of functions and multifuncitonal BEF slope 
+# and other summary statistics for each multifunctionality metric
+nfunc_slopes <- 
   sim.n.out %>%
   group_by(parameter_combination, model_run, function_matrix, multifunctionality_metric) %>% 
   nest() %>% 
-  mutate(n_func_MF_BEF_est. = map(data, 
-                                  ~lm(realised_diversity_mf_est ~ number_of_functions, data = .x) %>% 
-                                    tidy %>% 
-                                    filter(term == "number_of_functions") ) ) %>%
-  unnest(n_func_MF_BEF_est.) %>% 
+  mutate(nfunc.bef_slope = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "realised_diversity_mf_est")),
+         nfunc.range = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "range_MF")),
+         nfunc.min = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "min_MF")),
+         nfunc.max = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "max_MF"))  ) %>%
+  unnest(starts_with("nfunc"))  %>% 
   select(-data) %>%
-  ungroup()
+  ungroup() %>%
+  pivot_longer(cols = starts_with("estimate"),
+               names_to = "response_var",
+               values_to = "estimate")
 
-head(n_func.bef_slope)
-names(n_func.bef_slope)
+# get the range of multifunctional BEF slopes
+nfunc_slopes %>%
+  filter(response_var == "estimate_n_func_realised_diversity_mf_est") %>%
+  pull(estimate) %>%
+  range()
 
-ggplot(data = n_func.bef_slope,
-       mapping = aes(x = estimate)) +
-  geom_histogram(alpha = 0.3) +
+plots.fx2 <- vector("list", length = length(mf.metric.list))
+for(i in 1:length(mf.metric.list)) {
+  
+  df.x <- 
+    nfunc_slopes %>%
+    filter(response_var == "estimate_n_func_realised_diversity_mf_est",
+           multifunctionality_metric == mf.metric.list[i]) %>%
+    ggplot(data = .,
+           mapping = aes(x = function_matrix, y = estimate, fill = function_matrix, colour = function_matrix)) +
+    geom_jitter(width = 0.1, alpha = 0.05) +
+    geom_boxplot(width = 0.1, outlier.shape = NA, colour = "black") +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    scale_fill_viridis_d() +
+    scale_y_continuous(limits = c(-0.1, 0.1)) +
+    ggtitle("") +
+    ylab("Est.") +
+    xlab("Function matrix") +
+    scale_colour_viridis_d() +
+    theme_meta() +
+    theme(legend.position = "none")
+  
+  plots.fx2[[i]] <- df.x
+  
+}
+names(plots.fx2) <- mf.metric.list
+
+
+# link these plots using patchwork
+library(patchwork)
+
+f.x1 <- 
+  plots.fx1$ave._MF + plots.fx2$ave._MF + 
+  plots.fx1$sum_MF + plots.fx2$sum_MF + 
+  plots.fx1$Pasari_MF + plots.fx2$Pasari_MF + 
+  plots.fx1$thresh.30_MF + plots.fx2$thresh.30_MF +
+  plots.fx1$thresh.70_MF + plots.fx2$thresh.70_MF + 
+  plot_layout(ncol = 4) +
+  plot_annotation(tag_levels = "a")
+
+ggsave(filename = here("Figures/fig_x1.png"), plot = f.x1, width = 27, height = 20,
+       units = "cm")
+
+
+
+# what about among-function variation?
+names(sim.n.out)
+sim.n.out %>%
+  select(parameter_combination, model_run, function_matrix, number_of_functions, sd_funcs) %>%
+  distinct() %>%
+  group_by(parameter_combination, model_run, function_matrix) %>% 
+  nest() %>% 
+  mutate(nfunc.among_sd = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "sd_funcs")) ) %>%
+  unnest(nfunc.among_sd)  %>% 
+  select(-data) %>%
+  ungroup() %>%
+  ggplot(data = .,
+         mapping = aes(x = estimate_n_func_sd_funcs)) +
+  geom_histogram(alpha = 0.2) +
   geom_vline(xintercept = 0, linetype = "dashed") +
-  facet_wrap(~multifunctionality_metric + function_matrix, scales = "free_y") +
+  facet_wrap(~function_matrix, scales = "free_y") +
   theme_meta()
-
-
 
 
 
@@ -249,7 +369,6 @@ jena.n.func <- get_BEF_mf_est(adf.data = jena.dat,
                               mf.func.names = jena.func.names, 
                               standardise_funcs = TRUE,
                               covariate_name = "realised_diversity")
-
 
 # plot the Jena data
 p1 <- 

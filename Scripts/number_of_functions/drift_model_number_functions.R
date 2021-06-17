@@ -16,7 +16,7 @@ n_reps <- 50
 # run the ecological drift model
 
 # drift model parameters
-p_change <- c(0.025, 0.05, 0.1)
+p_change <- c(0.025)
 
 drift.mod.list <- vector("list", length = length(p_change))
 for (i in 1:length(p_change)) {
@@ -78,7 +78,7 @@ for (i in 1:length(drift.mod.list)) {
     df.proc <- 
       process_sim_data(model_data = drift.mod.list[[i]], 
                        func.mat =  func.list[[j]], 
-                       time_final = TRUE, 
+                       time_final = FALSE, 
                        species_abun = "raw")
     
     # add this to a list
@@ -166,20 +166,22 @@ sr_abun_ss <-
 # plot a few relationships between species richness and abundance
 # plot the abundance and SR relationship
 names(mod.df)
-mod.df %>%
-  filter(mod_id %in% sample(unique(mod.df$mod_id), 5)) %>%
+fx.a <- 
+  mod.df %>%
+  filter(mod_id %in% sample(unique(mod.df$mod_id), 10)) %>%
   ggplot(data = .,
          mapping = aes(x = local_species_pool, y = abundance, colour = mod_id)) +
-  geom_jitter(width = 0.2) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
   geom_smooth(method = "lm", se = FALSE) +
   scale_colour_viridis_d() +
   theme_meta() +
   theme(legend.position = "none")
 
 # plot the different models
-ggplot(data = sr_abun,
+fx.b <- 
+  ggplot(data = sr_abun,
          mapping = aes(x = estimate)) +
-  geom_histogram(alpha = 0.3) +
+  geom_density(alpha = 0.3, fill = "black") +
   geom_vline(xintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = c(sr_abun_ss$low_ci, sr_abun_ss$upp_ci), colour = "red") +
   xlab("abundance ~ SR est.") +
@@ -196,13 +198,46 @@ sr_funcs %>%
   group_by(response_var, function_matrix) %>%
   summarise(n = n())
 
-ggplot(data = sr_funcs, 
-       mapping = aes(x = function_matrix, y = estimate)) +
-  geom_jitter(width = 0.1, alpha = 0.2) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  facet_wrap(~response_var) +
-  ylab("function ~ SR est.") +
-  xlab("function matrix") +
-  theme_meta()
+f.ests <- unique(sr_funcs$response_var)
+
+plots.fx3 <- vector("list", length = length(f.ests))
+for (i in 1:length(f.ests)) {
+  
+  df.x <- 
+    sr_funcs %>%
+    filter(response_var == f.ests[i]) %>%
+    ggplot(data = sr_funcs, 
+           mapping = aes(x = function_matrix, y = estimate, colour = function_matrix, fill = function_matrix)) +
+    geom_jitter(width = 0.1, alpha = 0.05) +
+    geom_boxplot(width = 0.1, outlier.shape = NA, colour = "black") +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    scale_colour_viridis_d() +
+    scale_fill_viridis_d() +
+    ylab("function ~ SR est.") +
+    xlab("function matrix") +
+    theme_meta() +
+    theme(legend.position = "none")
+  
+  plots.fx3[[i]] <- df.x
+  
+}
+names(plots.fx3) <- f.ests
+
+
+# combine these plots using patchwork
+p.y <- fx.a/fx.b +
+  plot_annotation(tag_levels = "a")
+
+p.x <- 
+  plots.fx3$estimate_SR_F_1 +  
+  plots.fx3$estimate_SR_F_2 + 
+  plots.fx3$estimate_SR_F_3 + 
+  plots.fx3$estimate_SR_F_4 + 
+  plots.fx3$estimate_SR_F_5 +
+  plot_annotation(tag_levels = list(c("c", "d", "e", "f", "g") ) )
+
+p.y - p.x + plot_layout(widths = c(1, 3.5))
+
+
 
 ### END
