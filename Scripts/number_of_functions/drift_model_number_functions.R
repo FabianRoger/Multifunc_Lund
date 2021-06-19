@@ -11,7 +11,7 @@ source(here("Scripts/turnover_approach/ecological_drift_model.R"))
 
 
 # how many model reps for each parameter combination?
-n_reps <- 50
+n_reps <- 100
 
 # run the ecological drift model
 
@@ -65,6 +65,35 @@ for (i in 1:length(func.list)) {
 # this list is generated using the collate_model_data.R script
 drift.mod.list
 
+# output raw abundance data for plot from one random model
+ran.runs <- sample(unique(drift.mod.list$drift_model_p_change_0.025$model_run), 1)
+
+raw_abun <- 
+  drift.mod.list$drift_model_p_change_0.025 %>%
+  filter(model_run %in% ran.runs) %>%
+  filter(abundance > 0)
+
+View(raw_abun)
+
+library(ggplot2)
+
+cmp <- sample(unique(raw_abun$composition), 5)
+
+raw_abun %>%
+  filter(composition %in% cmp) %>%
+  group_by(composition) %>%
+  filter(patch == first(patch)) %>%
+  ungroup() %>%
+  filter(time %in% seq(1, 500, 10) ) %>%
+  ggplot(data = ., 
+       mapping = aes(x = time, y = abundance, colour = species)) +
+  geom_line() +
+  facet_wrap(~composition, scales = "free") +
+  theme_classic() +
+  theme(legend.position = "none")
+  
+
+
 # for each dataset in mod.list and for each function matrix in func.list
 # process the data
 
@@ -78,7 +107,7 @@ for (i in 1:length(drift.mod.list)) {
     df.proc <- 
       process_sim_data(model_data = drift.mod.list[[i]], 
                        func.mat =  func.list[[j]], 
-                       time_final = FALSE, 
+                       time_final = TRUE, 
                        species_abun = "raw")
     
     # add this to a list
