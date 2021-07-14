@@ -15,7 +15,7 @@ library(ggplot2)
 
 ```{r}
 # number of functions
-funcnum <- 10
+funcnum <- 5
 
 # range of average correlations among functions
 # also defines how many datframes will be generated
@@ -45,14 +45,14 @@ M[lower.tri(M,diag=F)] <- t(M)[lower.tri(M, diag=F)]
 diag(M) <- 1
 
  #make covariance matrix
-sd <- rnorm(10, 5 , 2)
+sd <- rnorm(funcnum, 5 , 2)
 M <- M* (sd %*% t(sd))
 
 #find closest positive definite covariance matrix
 M <- nearPD(M)$mat
 
 #draw function values for 100 plots and 10 functions with the specified covariance structure
-Func <- MASS::mvrnorm(100, rep(0.5,10), Sigma = M)
+Func <- MASS::mvrnorm(100, rep(0.5,funcnum), Sigma = M)
 
 #shift to positive
 Func <- Func + abs(min(Func))
@@ -76,6 +76,9 @@ whichplots <- seq(1,length(Func_cor_list), length.out = 5)
 
 invisible(lapply(whichplots, function(x) corrplot(cor(Func_cor_list[[x]]), title = names(Func_cor_list)[x], mar = c(1, 1, 1, 1))))
 
+Func_cor_list %>% length()
+
+Func_cor_list[[1]]
 
 ```
 

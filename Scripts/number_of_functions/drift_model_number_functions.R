@@ -8,10 +8,11 @@ library(here)
 
 # link to scripts with the relevant functions
 source(here("Scripts/turnover_approach/ecological_drift_model.R"))
+source(here("Scripts/MF_functions_collated.R"))
 
 
 # how many model reps for each parameter combination?
-n_reps <- 100
+n_reps <- 1000
 
 # run the ecological drift model
 
@@ -32,7 +33,8 @@ for (i in 1:length(p_change)) {
                 n0 = 500,
                 prop_change = p_change[i],
                 n_repeats = n_reps
-    )
+    ) %>%
+    filter(time == max(time))
 }
 
 names(drift.mod.list) <- paste("drift_model_p_change_", p_change, sep = "" )
@@ -135,6 +137,7 @@ mod.df <-
 
 length(unique(mod.df$mod_id))
 head(mod.df)
+View(mod.df)
 
 # calculate the expected slope between local species pool diversity and abundance
 # filter out first function matrix because the models for different function matrices are the same
@@ -155,7 +158,9 @@ lm.cleaner <- function(data, response, explanatory) {
 
 bef_slopes <- 
   mod.df %>%
-  group_by(parameter_combination, model_run, function_matrix) %>% 
+  group_by(parameter_combination,function_matrix, model_run) %>% 
+  mutate( across(.cols = starts_with("F_"), standardise) ) %>%
+  mutate( abundance = standardise(abundance) ) %>%
   nest() %>% 
   mutate(model_abun = map(data, ~lm.cleaner(data = .x, explanatory = "local_species_pool", response = "abundance")),
          model_F1 = map(data, ~lm.cleaner(data = .x, explanatory = "local_species_pool", response = "F_1")),
@@ -235,7 +240,7 @@ for (i in 1:length(f.ests)) {
   df.x <- 
     sr_funcs %>%
     filter(response_var == f.ests[i]) %>%
-    ggplot(data = sr_funcs, 
+    ggplot(data = ., 
            mapping = aes(x = function_matrix, y = estimate, colour = function_matrix, fill = function_matrix)) +
     geom_jitter(width = 0.1, alpha = 0.05) +
     geom_boxplot(width = 0.1, outlier.shape = NA, colour = "black") +
@@ -254,6 +259,8 @@ names(plots.fx3) <- f.ests
 
 
 # combine these plots using patchwork
+library(patchwork)
+
 p.y <- fx.a/fx.b +
   plot_annotation(tag_levels = "a")
 
