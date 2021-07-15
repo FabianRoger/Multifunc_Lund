@@ -166,13 +166,13 @@ get_BEF_mf_est <- function(adf.data,
 
 # data.frame with ecological drift model
 # obtained from running drift_model_number_functions.R
-mod.df
+mod.out
 
 # output the function names
-f.names <- names(mod.df)[grepl(pattern = "F_", names(mod.df))]
+f.names <- names(mod.out)[grepl(pattern = "F_", names(mod.out))]
 
 sim.n.func <- 
-  lapply(split(mod.df, mod.df$mod_id), function(data) {
+  lapply(split(mod.out, mod.out$mod_id), function(data) {
   
   get_BEF_mf_est(adf.data = data, 
                  mf.func.names = f.names, 
@@ -189,8 +189,8 @@ View(sim.n.df)
 # join the identifying variables
 sim.n.out <- 
   left_join(sim.n.df,
-            mod.df %>%
-              select(mod_id, parameter_combination, function_matrix, model_run) %>%
+            mod.out %>%
+              select(mod_id, drift_parameter, function_matrix, model_run) %>%
               distinct(), by = "mod_id")
 head(sim.n.out)
 

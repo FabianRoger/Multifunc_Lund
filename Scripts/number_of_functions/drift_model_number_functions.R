@@ -6,24 +6,29 @@
 # load relevant libraries
 library(here)
 
+# clear the current memory
+rm(list = ls())
+
 # link to scripts with the relevant functions
 source(here("Scripts/turnover_approach/ecological_drift_model.R"))
 source(here("Scripts/MF_functions_collated.R"))
 
-
 # how many model reps for each parameter combination?
 n_reps <- 1000
+
 
 # run the ecological drift model
 
 # drift model parameters
-p_change <- c(0.025)
+p_change <- 0.025
 
-drift.mod.list <- vector("list", length = length(p_change))
-for (i in 1:length(p_change)) {
+drift.mod.list <- vector("list", length = n_reps)
+for (i in 1:n_reps) {
+  
+  library(dplyr)
   
   drift.mod.list[[i]] <- 
-    
+  
     drift_model(lsp = c(2, 4, 6, 9),
                 mono = "all",
                 reps = 5,
@@ -31,13 +36,24 @@ for (i in 1:length(p_change)) {
                 rsp = 12,
                 t_steps = 500,
                 n0 = 500,
-                prop_change = p_change[i],
-                n_repeats = n_reps
-    ) %>%
+                prop_change = p_change,
+                n_repeats = 1) %>%
     filter(time == max(time))
 }
 
-names(drift.mod.list) <- paste("drift_model_p_change_", p_change, sep = "" )
+# bind the list into a data.frame
+drift.mod.list <- bind_rows(drift.mod.list, .id = "model_run")
+drift.mod.list$drift_parameter <- p_change
+
+# reorganise the columns
+drift.mod.list <- 
+  drift.mod.list %>%
+  select(drift_parameter, model_run, time, patch, local_species_pool, composition,
+         species, abundance)
+
+# write this model data.frame into a .csv file so the model does not have to be re-run
+library(readr)
+write_csv(x = drift.mod.list, file = here("data/drift_model_n_functions.csv"))
 
 
 # process this model data
@@ -67,77 +83,38 @@ for (i in 1:length(func.list)) {
 # this list is generated using the collate_model_data.R script
 drift.mod.list
 
-# output raw abundance data for plot from one random model
-ran.runs <- sample(unique(drift.mod.list$drift_model_p_change_0.025$model_run), 1)
-
-raw_abun <- 
-  drift.mod.list$drift_model_p_change_0.025 %>%
-  filter(model_run %in% ran.runs) %>%
-  filter(abundance > 0)
-
-View(raw_abun)
-
-library(ggplot2)
-
-cmp <- sample(unique(raw_abun$composition), 5)
-
-raw_abun %>%
-  filter(composition %in% cmp) %>%
-  group_by(composition) %>%
-  filter(patch == first(patch)) %>%
-  ungroup() %>%
-  filter(time %in% seq(1, 500, 10) ) %>%
-  ggplot(data = ., 
-       mapping = aes(x = time, y = abundance, colour = species)) +
-  geom_line() +
-  facet_wrap(~composition, scales = "free") +
-  theme_classic() +
-  theme(legend.position = "none")
-  
-
 
 # for each dataset in mod.list and for each function matrix in func.list
 # process the data
 
-mod.out <- vector("list", length = length(drift.mod.list))
-for (i in 1:length(drift.mod.list)) {
+func.reps <- vector("list", length = length(func.list))
+for (j in 1:length(func.list)) {
   
-  func.reps <- vector("list", length = length(func.list))
-  for (j in 1:length(func.list)) {
-    
-    # process the simulated cluster using: process_sim_data
-    df.proc <- 
-      process_sim_data(model_data = drift.mod.list[[i]], 
-                       func.mat =  func.list[[j]], 
-                       time_final = TRUE, 
-                       species_abun = "raw")
-    
-    # add this to a list
-    func.reps[[j]] <- df.proc
-    
-  }
+  # process the simulated cluster using: process_sim_data
+  df.proc <- 
+    process_sim_data(model_data = drift.mod.list, 
+                     func.mat =  func.list[[j]], 
+                     time_final = TRUE, 
+                     species_abun = "raw")
   
-  mod.out[[i]] <- bind_rows(func.reps, .id = "function_matrix")
+  # add this to a list
+  func.reps[[j]] <- df.proc
   
 }
 
-# assign names to this object
-names(mod.out) <- names(drift.mod.list)
+# bind this list into a data.frame  
+mod.out <- bind_rows(func.reps, .id = "function_matrix")
+View(mod.out)
 
-# bind this into one large data.frame
-mod.df <- bind_rows(mod.out, .id = "parameter_combination")
-View(mod.df)
-head(mod.df)
+# add a unique model-ID variable
+mod.out <- 
+  mod.out %>%
+  mutate(mod_id = paste(drift_parameter, function_matrix, model_run, sep = ".")) %>%
+  select(mod_id, drift_parameter, function_matrix, model_run:F_5)
 
-# add a variable for a unique identifier variable
-mod.df <- 
-  mod.df %>%
-  mutate(mod_id = paste(parameter_combination, function_matrix, model_run, sep = ".")) %>%
-  select(mod_id, parameter_combination:F_5)
-
-length(unique(mod.df$mod_id))
-head(mod.df)
-View(mod.df)
+length(unique(mod.out$mod_id))
+head(mod.out)
+View(mod.out)
 
 # calculate the expected slope between local species pool diversity and abundance
 # filter out first function matrix because the models for different function matrices are the same
@@ -157,8 +134,8 @@ lm.cleaner <- function(data, response, explanatory) {
   }
 
 bef_slopes <- 
-  mod.df %>%
-  group_by(parameter_combination,function_matrix, model_run) %>% 
+  mod.out %>%
+  group_by(drift_parameter, function_matrix, model_run, mod_id) %>% 
   mutate( across(.cols = starts_with("F_"), standardise) ) %>%
   mutate( abundance = standardise(abundance) ) %>%
   nest() %>% 
@@ -193,16 +170,16 @@ sr_abun_ss <-
   sr_abun %>%
   summarise(n = n(), 
             mean = mean(estimate),
-            se = sd(estimate)/sqrt(n())) %>%
-  mutate(upp_ci = mean + qt(p = 0.975, df = n)*se,
-         low_ci = mean - qt(p = 0.975, df = n)*se)
+            se = sd(estimate)/sqrt(n()),
+            upp_ci = quantile(estimate, 0.975),
+            low_ci = quantile(estimate, 0.025))
 
 # plot a few relationships between species richness and abundance
 # plot the abundance and SR relationship
-names(mod.df)
+names(mod.out)
 fx.a <- 
-  mod.df %>%
-  filter(mod_id %in% sample(unique(mod.df$mod_id), 10)) %>%
+  mod.out %>%
+  filter(mod_id %in% sample(unique(mod.out$mod_id), 10)) %>%
   ggplot(data = .,
          mapping = aes(x = local_species_pool, y = abundance, colour = mod_id)) +
   geom_jitter(width = 0.2, alpha = 0.5) +
@@ -221,7 +198,7 @@ fx.b <-
   xlab("abundance ~ SR est.") +
   theme_meta() +
   theme(legend.position = "none")
-
+fx.b
 
 # plot boxplots for each function
 sr_funcs <- 
@@ -257,6 +234,13 @@ for (i in 1:length(f.ests)) {
 }
 names(plots.fx3) <- f.ests
 
+sr_funcs %>%
+  group_by(response_var, function_matrix) %>%
+  summarise(mean_est = mean(estimate),
+            median_est = median(estimate))
+
+plots.fx3[[5]]
+
 
 # combine these plots using patchwork
 library(patchwork)
@@ -277,3 +261,39 @@ p.y - p.x + plot_layout(widths = c(1, 3.5))
 
 
 ### END
+
+### Code for examples:
+
+# to do this, we will need to run the models again
+
+# output raw abundance data for plot from one random model
+ran.runs <- sample(unique(drift.mod.list$drift_model_p_change_0.025$model_run), 1)
+
+raw_abun <- 
+  drift.mod.list$drift_model_p_change_0.025 %>%
+  filter(model_run %in% ran.runs) %>%
+  filter(abundance > 0)
+
+View(raw_abun)
+
+library(ggplot2)
+
+cmp <- sample(unique(raw_abun$composition), 5)
+
+raw_abun %>%
+  filter(composition %in% cmp) %>%
+  group_by(composition) %>%
+  filter(patch == first(patch)) %>%
+  ungroup() %>%
+  filter(time %in% seq(1, 500, 10) ) %>%
+  ggplot(data = ., 
+         mapping = aes(x = time, y = abundance, colour = species)) +
+  geom_line() +
+  facet_wrap(~composition, scales = "free") +
+  theme_classic() +
+  theme(legend.position = "none")
+
+
+
+
+
