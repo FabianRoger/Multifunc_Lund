@@ -16,7 +16,6 @@ source(here("Scripts/MF_functions_collated.R"))
 # how many model reps for each parameter combination?
 n_reps <- 1000
 
-
 # run the ecological drift model
 
 # drift model parameters
@@ -53,68 +52,20 @@ drift.mod.list <-
 
 # write this model data.frame into a .csv file so the model does not have to be re-run
 library(readr)
+
+# make a folder to export the cleaned data
+if(! dir.exists(here("data"))){
+  dir.create(here("data"))
+}
+
 write_csv(x = drift.mod.list, file = here("data/drift_model_n_functions.csv"))
 
-
-# process this model data
-
-# load scripts with processing functions
-source(here("Scripts/turnover_approach/process_model_data.R"))
-
-# load Laura's function matrices
-f.list <- list.files(path = here("data"))
-fm_names <- f.list[grepl(pattern = "SpeciesIDs", f.list)]
-
-# load these data.frames into a list
-library(readr)
-
-func.list <- vector("list", length = length(fm_names))
-for (i in 1:length(func.list)) {
-  
-  x <- read_csv(file = paste(here("data"), fm_names[i], sep = "/") )
-  colnames(x)[1] <- "species"
-  
-  func.list[[i]] <- x
-  
-}
+### END
 
 
-# list of simulated data cluster (e.g. neutral model with 1000 runs with same parameters)
-# this list is generated using the collate_model_data.R script
-drift.mod.list
 
 
-# for each dataset in mod.list and for each function matrix in func.list
-# process the data
 
-func.reps <- vector("list", length = length(func.list))
-for (j in 1:length(func.list)) {
-  
-  # process the simulated cluster using: process_sim_data
-  df.proc <- 
-    process_sim_data(model_data = drift.mod.list, 
-                     func.mat =  func.list[[j]], 
-                     time_final = TRUE, 
-                     species_abun = "raw")
-  
-  # add this to a list
-  func.reps[[j]] <- df.proc
-  
-}
-
-# bind this list into a data.frame  
-mod.out <- bind_rows(func.reps, .id = "function_matrix")
-View(mod.out)
-
-# add a unique model-ID variable
-mod.out <- 
-  mod.out %>%
-  mutate(mod_id = paste(drift_parameter, function_matrix, model_run, sep = ".")) %>%
-  select(mod_id, drift_parameter, function_matrix, model_run:F_5)
-
-length(unique(mod.out$mod_id))
-head(mod.out)
-View(mod.out)
 
 # calculate the expected slope between local species pool diversity and abundance
 # filter out first function matrix because the models for different function matrices are the same

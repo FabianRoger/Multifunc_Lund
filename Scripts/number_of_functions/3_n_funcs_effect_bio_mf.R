@@ -3,6 +3,12 @@
 
 # Title: Does the number of functions matter?
 
+# Next steps:
+
+# make the plots to show what the neutral model looks like for a few plots
+# we need to make plots showing how the multifunctional BEF-slope varies
+# figure out why...
+
 # load relevant libraries
 library(dplyr)
 library(readr)
@@ -140,6 +146,7 @@ get_BEF_mf_est <- function(adf.data,
         lm.x <- lm(reformulate(covariate_name, as.name(x) ), data = data.mf)
         lm.x$coefficients[2]
       })
+    
     names(bef_mf_slope) <- NULL # remove names from the vector
     
     # bind this into a data.frame
@@ -163,6 +170,8 @@ get_BEF_mf_est <- function(adf.data,
   
 }
 
+
+# load the processed model data
 
 # data.frame with ecological drift model
 # obtained from running drift_model_number_functions.R
@@ -194,6 +203,9 @@ sim.n.out <-
               distinct(), by = "mod_id")
 head(sim.n.out)
 
+# write this to a csv so we don't have to run the model again
+write_csv(x = sim.n.out, file = here("data/sim_n_functions.csv"))
+
 
 ### plot these data
 
@@ -212,7 +224,7 @@ for(i in 1:length(mf.metric.list)) {
     dat.fx1 %>%
     filter(multifunctionality_metric == mf.metric.list[[i]]) %>%
     ggplot(data = .,
-           mapping = aes(x = number_of_functions, y = realised_diversity_mf_est, # change to diversity if running again
+           mapping = aes(x = number_of_functions, y = diversity_mf_est, # change to diversity if running again
                          group = mod_id, colour = function_matrix)) +
     geom_jitter(width = 0.1, alpha = 0.2) +
     geom_smooth(method = "lm", se = FALSE) +
@@ -228,7 +240,8 @@ for(i in 1:length(mf.metric.list)) {
   
 }
 names(plots.fx1) <- mf.metric.list
-plots.fx1$sum_MF
+plots.fx1$Pasari_MF
+
 
 # plot the expectations from all simulations for each multifunctionality metric
 head(sim.n.out)
@@ -253,9 +266,9 @@ lm.cleaner <- function(data, response, explanatory) {
 # and other summary statistics for each multifunctionality metric
 nfunc_slopes <- 
   sim.n.out %>%
-  group_by(parameter_combination, model_run, function_matrix, multifunctionality_metric) %>% 
+  group_by(drift_parameter, model_run, function_matrix, multifunctionality_metric) %>% 
   nest() %>% 
-  mutate(nfunc.bef_slope = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "realised_diversity_mf_est")),
+  mutate(nfunc.bef_slope = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "diversity_mf_est")),
          nfunc.range = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "range_MF")),
          nfunc.min = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "min_MF")),
          nfunc.max = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "max_MF"))  ) %>%
@@ -266,9 +279,13 @@ nfunc_slopes <-
                names_to = "response_var",
                values_to = "estimate")
 
+View(nfunc_slopes)
+
+nfunc_slopes$response_var %>% unique()
+
 # get the range of multifunctional BEF slopes
 nfunc_slopes %>%
-  filter(response_var == "estimate_n_func_realised_diversity_mf_est") %>%
+  filter(response_var == "estimate_n_func_diversity_mf_est") %>%
   pull(estimate) %>%
   range()
 
@@ -277,7 +294,7 @@ for(i in 1:length(mf.metric.list)) {
   
   df.x <- 
     nfunc_slopes %>%
-    filter(response_var == "estimate_n_func_realised_diversity_mf_est",
+    filter(response_var == "estimate_n_func_diversity_mf_est",
            multifunctionality_metric == mf.metric.list[i]) %>%
     ggplot(data = .,
            mapping = aes(x = function_matrix, y = estimate, fill = function_matrix, colour = function_matrix)) +
@@ -285,7 +302,6 @@ for(i in 1:length(mf.metric.list)) {
     geom_boxplot(width = 0.1, outlier.shape = NA, colour = "black") +
     geom_hline(yintercept = 0, linetype = "dashed") +
     scale_fill_viridis_d() +
-    scale_y_continuous(limits = c(-0.1, 0.1)) +
     ggtitle("") +
     ylab("Est.") +
     xlab("Function matrix") +
@@ -297,7 +313,7 @@ for(i in 1:length(mf.metric.list)) {
   
 }
 names(plots.fx2) <- mf.metric.list
-
+plots.fx2$thresh.70_MF
 
 # link these plots using patchwork
 library(patchwork)
