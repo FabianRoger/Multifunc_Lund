@@ -10,7 +10,7 @@ library(here)
 rm(list = ls())
 
 # link to scripts with the relevant functions
-source(here("Scripts/turnover_approach/ecological_drift_model.R"))
+source(here("Scripts//ecological_drift_model.R"))
 source(here("Scripts/MF_functions_collated.R"))
 
 # how many model reps for each parameter combination?

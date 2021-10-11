@@ -3,12 +3,6 @@
 
 # Title: Does the number of functions matter?
 
-# Next steps:
-
-# make the plots to show what the neutral model looks like for a few plots
-# we need to make plots showing how the multifunctional BEF-slope varies
-# figure out why...
-
 # load relevant libraries
 library(dplyr)
 library(readr)
@@ -18,7 +12,6 @@ library(here)
 
 # load functions from important scripts
 source(here("Scripts/MF_functions_collated.R"))
-source(here("Scripts/function_plotting_theme.R"))
 
 
 # BEF slope and n-functions
@@ -172,13 +165,14 @@ get_BEF_mf_est <- function(adf.data,
 
 
 # load the processed model data
-
-# data.frame with ecological drift model
-# obtained from running drift_model_number_functions.R
-mod.out
+mod.out <- read_csv(here("data/drift_model_n_functions_processed.csv"))
+View(head(mod.out))
 
 # output the function names
 f.names <- names(mod.out)[grepl(pattern = "F_", names(mod.out))]
+
+# get the BEF-multifunctional slope for each simulated dataset across all metrics
+# note this code can take up a long time to run (e.g. 20-40 mins depending on the speed of your computer)
 
 sim.n.func <- 
   lapply(split(mod.out, mod.out$mod_id), function(data) {
@@ -207,155 +201,8 @@ head(sim.n.out)
 write_csv(x = sim.n.out, file = here("data/sim_n_functions.csv"))
 
 
-### plot these data
 
-# plot a few illustrative examples for each multifunctionality metric
-mf.metric.list <- unique(sim.n.out$multifunctionality_metric)
-mf.names <- c("sum MF", "ave. MF", "Pasari MF", "thresh 30 MF", "thresh 70 MF")
-
-dat.fx1 <- 
-  sim.n.out %>%
-  filter(mod_id %in% sample(unique(sim.n.df$mod_id), 10 ))
-
-plots.fx1 <- vector("list", length = length(mf.metric.list))
-for(i in 1:length(mf.metric.list)) {
-  
-  df.x <- 
-    dat.fx1 %>%
-    filter(multifunctionality_metric == mf.metric.list[[i]]) %>%
-    ggplot(data = .,
-           mapping = aes(x = number_of_functions, y = diversity_mf_est, # change to diversity if running again
-                         group = mod_id, colour = function_matrix)) +
-    geom_jitter(width = 0.1, alpha = 0.2) +
-    geom_smooth(method = "lm", se = FALSE) +
-    scale_colour_viridis_d() +
-    ggtitle(mf.names[i]) +
-    xlab("Number of functions") +
-    ylab("MF BEF-slope") +
-    theme_meta() +
-    theme(legend.position = "none",
-          title = element_text(size = 10))
-  
-  plots.fx1[[i]] <- df.x
-  
-}
-names(plots.fx1) <- mf.metric.list
-plots.fx1$Pasari_MF
-
-
-# plot the expectations from all simulations for each multifunctionality metric
-head(sim.n.out)
-
-library(purrr)
-library(broom)
-
-# define function to efficiently output the slope
-lm.cleaner <- function(data, response, explanatory) {
-  
-  x <- 
-    lm(reformulate(explanatory, response), data = data) %>% 
-    tidy %>% 
-    filter(term == explanatory) %>% 
-    select(!!paste("estimate_n_func_", response, sep = "") := estimate )
-  
-  return(x)
-  
-}
-
-# calculate the slope between number of functions and multifuncitonal BEF slope 
-# and other summary statistics for each multifunctionality metric
-nfunc_slopes <- 
-  sim.n.out %>%
-  group_by(drift_parameter, model_run, function_matrix, multifunctionality_metric) %>% 
-  nest() %>% 
-  mutate(nfunc.bef_slope = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "diversity_mf_est")),
-         nfunc.range = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "range_MF")),
-         nfunc.min = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "min_MF")),
-         nfunc.max = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "max_MF"))  ) %>%
-  unnest(starts_with("nfunc"))  %>% 
-  select(-data) %>%
-  ungroup() %>%
-  pivot_longer(cols = starts_with("estimate"),
-               names_to = "response_var",
-               values_to = "estimate")
-
-View(nfunc_slopes)
-
-nfunc_slopes$response_var %>% unique()
-
-# get the range of multifunctional BEF slopes
-nfunc_slopes %>%
-  filter(response_var == "estimate_n_func_diversity_mf_est") %>%
-  pull(estimate) %>%
-  range()
-
-plots.fx2 <- vector("list", length = length(mf.metric.list))
-for(i in 1:length(mf.metric.list)) {
-  
-  df.x <- 
-    nfunc_slopes %>%
-    filter(response_var == "estimate_n_func_diversity_mf_est",
-           multifunctionality_metric == mf.metric.list[i]) %>%
-    ggplot(data = .,
-           mapping = aes(x = function_matrix, y = estimate, fill = function_matrix, colour = function_matrix)) +
-    geom_jitter(width = 0.1, alpha = 0.05) +
-    geom_boxplot(width = 0.1, outlier.shape = NA, colour = "black") +
-    geom_hline(yintercept = 0, linetype = "dashed") +
-    scale_fill_viridis_d() +
-    ggtitle("") +
-    ylab("Est.") +
-    xlab("Function matrix") +
-    scale_colour_viridis_d() +
-    theme_meta() +
-    theme(legend.position = "none")
-  
-  plots.fx2[[i]] <- df.x
-  
-}
-names(plots.fx2) <- mf.metric.list
-plots.fx2$thresh.70_MF
-
-# link these plots using patchwork
-library(patchwork)
-
-f.x1 <- 
-  plots.fx1$ave._MF + plots.fx2$ave._MF + 
-  plots.fx1$sum_MF + plots.fx2$sum_MF + 
-  plots.fx1$Pasari_MF + plots.fx2$Pasari_MF + 
-  plots.fx1$thresh.30_MF + plots.fx2$thresh.30_MF +
-  plots.fx1$thresh.70_MF + plots.fx2$thresh.70_MF + 
-  plot_layout(ncol = 4) +
-  plot_annotation(tag_levels = "a")
-
-ggsave(filename = here("Figures/fig_x1.png"), plot = f.x1, width = 27, height = 20,
-       units = "cm")
-
-
-
-# what about among-function variation?
-names(sim.n.out)
-sim.n.out %>%
-  select(parameter_combination, model_run, function_matrix, number_of_functions, sd_funcs) %>%
-  distinct() %>%
-  group_by(parameter_combination, model_run, function_matrix) %>% 
-  nest() %>% 
-  mutate(nfunc.among_sd = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "sd_funcs")) ) %>%
-  unnest(nfunc.among_sd)  %>% 
-  select(-data) %>%
-  ungroup() %>%
-  ggplot(data = .,
-         mapping = aes(x = estimate_n_func_sd_funcs)) +
-  geom_histogram(alpha = 0.2) +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  facet_wrap(~function_matrix, scales = "free_y") +
-  theme_meta()
-
-
-
-
-
-
-
+### Maybe we want to do this with the Jena data...
 
 ### load the Jena data
 
