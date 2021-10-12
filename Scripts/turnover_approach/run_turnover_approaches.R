@@ -1,15 +1,50 @@
 
 # Project: Review of multifunctionality in ecology, conservation and ecosystem service science
 
-# Title: Prepare cluster of model replicates (i.e. 1000 simulations of one set of parameters)
+# Title: Run the turnover approach test on 1000 neutral models for three function matrices
 
 # load relevant libraries
 library(here)
 
 # link to scripts with the relevant functions
-source(here("Scripts/multispecies_lotka_volterra_model/process_model_data.R"))
-source(here("Scripts/multispecies_lotka_volterra_model/per_capita_function_matrix_functions.R"))
-source(here("Scripts/multispecies_lotka_volterra_model/turnover_approach_functions.R"))
+source(here("Scripts/process_model_data.R"))
+source(here("Scripts/turnover_approach/turnover_approach_functions.R"))
+source(here("Scripts/ecological_drift_model.R"))
+source(here("Scripts/function_plotting_theme.R"))
+
+# run an example of an ecological drift model
+drift_exp <- 
+  drift_model(lsp = c(2, 4, 6, 9),
+              mono = "all",
+              reps = 5,
+              technical_reps = 2,
+              rsp = 12,
+              t_steps = 500,
+              n0 = 500,
+              prop_change = 0.025,
+              n_repeats = 1)
+
+# load packages
+library(dplyr)
+library(ggplot2)
+
+# plot the example of patches in the ecological drift model
+drift_exp %>%
+  filter(patch %in% sample(x = unique(d_mod$patch), size = 4 )) %>%
+  filter(abundance > 0) %>%
+  ggplot(data = .,
+         mapping = aes(x = time, y = abundance, colour = species)) +
+  geom_line() +
+  facet_wrap(~patch, scales = "free") +
+  theme_meta() +
+  theme(legend.position = "none")
+
+# load the readr library
+library(readr)
+
+# list of simulated data cluster (e.g. neutral model with 1000 runs with same parameters)
+# this list is generated using the 1_drift_model_number_functions.R script (number_of_functions folder)
+mod.list <- here("data/drift_model_n_functions.csv")
 
 # load Laura's function matrices
 f.list <- list.files(path = here("data"))
@@ -28,10 +63,6 @@ for (i in 1:length(func.list)) {
   
 }
 
-
-# list of simulated data cluster (e.g. neutral model with 1000 runs with same parameters)
-# this list is generated using the collate_model_data.R script
-mod.list
 
 # for each dataset in mod.list and for each function matrix in func.list, run the AIC and SES turnover approaches
 
