@@ -19,7 +19,7 @@ rm(list = ls())
 
 # get scripts to call functions from
 source(here("Scripts/function_plotting_theme.R"))
-
+source(here("Scripts/MF_functions_collated.R"))
 
 ### plot example of the ecological drift model
 source(here("Scripts/ecological_drift_model.R"))
@@ -37,8 +37,7 @@ drift_exp <-
               n_repeats = 1)
 
 # plot the example of patches in the ecological drift model
-p1 <- 
-  drift_exp %>%
+drift_exp %>%
   filter(patch %in% sample(x = unique(drift_exp$patch), size = 4 )) %>%
   filter(abundance > 0) %>%
   ggplot(data = .,
@@ -51,32 +50,32 @@ p1 <-
   theme_meta() +
   theme(legend.position = "none")
 
-p1
-
 # load the raw drift model data
 drift_mod_dat <- read_csv(here("data/drift_model_n_functions_processed.csv"))
-
-# define function to efficiently output the slope
-lm.cleaner <- function(data, response, explanatory) {
-  
-  x <- 
-    lm(reformulate(explanatory, response), data = data) %>% 
-    tidy %>% 
-    filter(term == explanatory) %>% 
-    select(!!paste("estimate_n_func_", response, sep = "") := estimate )
-  
-  return(x)
-  
-}
+head(drift_mod_dat)
 
 # calculate the slope between number of functions and multifuncitonal BEF slope 
 # and other summary statistics for each multifunctionality metric
 library(purrr)
 library(broom)
 
+# define function to efficiently output the slope
+lm.cleaner <- function(data, response, explanatory, output_prefix = "x") {
+  
+  x <- 
+    lm(reformulate(explanatory, response), data = data) %>% 
+    tidy %>% 
+    filter(term == explanatory) %>% 
+    select(!!paste(output_prefix, response, sep = "") := estimate )
+  
+  return(x)
+  
+}
+
 raw_slopes <- 
   drift_mod_dat %>%
-  group_by(mod_id) %>% 
+  group_by(function_matrix, mod_id) %>% 
+  mutate(across(.cols = c("abundance", "F_1", "F_2", "F_3", "F_4", "F_5"), standardise)) %>%
   nest() %>% 
   summarise(total_abun_slope = map(data, ~lm.cleaner(data = .x, explanatory = "local_species_pool", response = "abundance")),
          F1_slope = map(data, ~lm.cleaner(data = .x, explanatory = "local_species_pool", response = "F_1")),
@@ -86,18 +85,27 @@ raw_slopes <-
          F5_slope = map(data, ~lm.cleaner(data = .x, explanatory = "local_species_pool", response = "F_5")) ) %>%
   unnest(ends_with("slope"))
 
-hist(raw_slopes$estimate_n_func_abundance)
+# input data on total abundance for each function matrix is the same
+plot_df <- 
+  raw_slopes %>%
+  filter(function_matrix == 1)
 
+ggplot(data = plot_df,
+       mapping = aes(x = xabundance)) +
+  geom_histogram(colour = "transparent", alpha = 0.5) +
+  geom_vline(xintercept = mean(plot_df$xabundance), colour = "red") +
+  geom_vline(xintercept = 0, colour = "black", linetype = "dashed") +
+  theme_meta()
 
-
-
-
-
-
-
-
-
-
+# plot each line between abundance
+drift_mod_dat %>%
+  filter(mod_id %in% sample(x = unique(drift_mod_dat$mod_id), 500)) %>%
+  ggplot(data = .,
+       mapping = aes(x = local_species_pool, y = abundance, colour = mod_id)) +
+  geom_smooth(method = "lm", se = FALSE, size = 0.1, alpha = 0.1) +
+  scale_colour_viridis_d() +
+  theme_meta() +
+  theme(legend.position = "none")
 
 
 ### plot n-functions and multifunctionality
@@ -145,22 +153,6 @@ plots.fx1$Pasari_MF
 
 # plot the expectations from all simulations for each multifunctionality metric
 head(sim.n.out)
-
-library(purrr)
-library(broom)
-
-# define function to efficiently output the slope
-lm.cleaner <- function(data, response, explanatory) {
-  
-  x <- 
-    lm(reformulate(explanatory, response), data = data) %>% 
-    tidy %>% 
-    filter(term == explanatory) %>% 
-    select(!!paste("estimate_n_func_", response, sep = "") := estimate )
-  
-  return(x)
-  
-}
 
 # calculate the slope between number of functions and multifuncitonal BEF slope 
 # and other summary statistics for each multifunctionality metric
