@@ -67,10 +67,8 @@ mod.out <-
 # check the model parameters
 length(unique(mod.out$mod_id))
 head(mod.out)
-View(mod.out)
 
 # write this model data.frame into a .csv file so the model does not have to be re-run
-library(readr)
 
 # make a folder to export the cleaned data
 if(! dir.exists(here("data"))){

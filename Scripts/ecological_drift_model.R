@@ -203,20 +203,12 @@ drift_model <- function(lsp = c(2, 4, 6),
             # draw new recruits
             z <- trunc_pois(n = 1, n_change)
             
-            if (z > length(post_death)) {
+            # draw new recruits
+            new_recruits <- post_death[sample(x = 1:length(post_death), size = z, replace = TRUE)]
               
-              n_t[[m]] <- c(post_death)
-              
-            } else {
-              
-              # draw new recruits
-              new_recruits <- post_death[sample(x = 1:length(post_death), size = z, replace = FALSE)]
-              
-              # join the post_death and new_recruits and write to second time-step
-              n_t[[m]] <- c(post_death, new_recruits)
-              
-            }
-            
+            # join the post_death and new_recruits and write to second time-step
+            n_t[[m]] <- c(post_death, new_recruits)
+          
           }
           
         }

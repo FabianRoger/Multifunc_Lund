@@ -35,7 +35,7 @@ for (i in 1:n_reps) {
                 technical_reps = 2,
                 rsp = 12,
                 t_steps = 500,
-                n0 = 500,
+                n0 = 1000,
                 prop_change = p_change,
                 n_repeats = 1) %>%
     filter(time == max(time))
@@ -62,4 +62,54 @@ if(! dir.exists(here("data"))){
 write_csv(x = drift.mod.list, file = here("data/drift_model_n_functions.csv"))
 
 ### END
+
+### TEST THE DRIFT MODEL:
+
+
+drift.mod.list
+
+# calculate the slope between number of functions and multifuncitonal BEF slope 
+# and other summary statistics for each multifunctionality metric
+library(purrr)
+library(broom)
+
+# define function to efficiently output the slope
+lm.cleaner <- function(data, response, explanatory, output_prefix = "x") {
+  
+  x <- 
+    lm(reformulate(explanatory, response), data = data) %>% 
+    tidy %>% 
+    filter(term == explanatory) %>% 
+    select(!!paste(output_prefix, response, sep = "") := estimate )
+  
+  return(x)
+  
+}
+
+df_test <- 
+  drift.mod.list %>%
+  group_by(model_run, local_species_pool, patch) %>%
+  summarise(abundance = sum(abundance)) %>%
+  group_by(model_run) %>% 
+  mutate(across(.cols = c("abundance"), standardise)) %>%
+  nest() %>% 
+  summarise(total_abun_slope = map(data, ~lm.cleaner(data = .x, explanatory = "local_species_pool", response = "abundance")) ) %>%
+  unnest(ends_with("slope"))
+
+df_test
+
+range(df_test$xabundance)
+
+ggplot(data = df_test,
+       mapping = aes(x = xabundance)) +
+  geom_histogram(colour = "transparent", alpha = 0.5) +
+  geom_vline(xintercept = mean(df_test$xabundance), colour = "red") +
+  geom_vline(xintercept = 0, colour = "black", linetype = "dashed") +
+  theme_classic()
+
+
+
+
+
+
 

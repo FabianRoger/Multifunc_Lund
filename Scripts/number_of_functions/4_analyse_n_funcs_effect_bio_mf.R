@@ -161,13 +161,14 @@ nfunc_slopes <-
   group_by(drift_parameter, model_run, function_matrix, multifunctionality_metric) %>% 
   nest() %>% 
   mutate(nfunc.bef_slope = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "diversity_mf_est")),
+         nfunc.cv = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "cv_MF")),
          nfunc.range = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "range_MF")),
          nfunc.min = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "min_MF")),
          nfunc.max = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "max_MF"))  ) %>%
   unnest(starts_with("nfunc"))  %>% 
   select(-data) %>%
   ungroup() %>%
-  pivot_longer(cols = starts_with("estimate"),
+  pivot_longer(cols = starts_with("x"),
                names_to = "response_var",
                values_to = "estimate")
 
@@ -177,7 +178,7 @@ nfunc_slopes$response_var %>% unique()
 
 # get the range of multifunctional BEF slopes
 nfunc_slopes %>%
-  filter(response_var == "estimate_n_func_diversity_mf_est") %>%
+  filter(response_var == "xdiversity_mf_est") %>%
   pull(estimate) %>%
   range()
 
@@ -186,7 +187,7 @@ for(i in 1:length(mf.metric.list)) {
   
   df <- 
     nfunc_slopes %>%
-    filter(response_var == "estimate_n_func_diversity_mf_est",
+    filter(response_var == "xdiversity_mf_est",
            multifunctionality_metric == mf.metric.list[i]) %>%
     mutate(function_matrix = as.character(function_matrix))
   
@@ -217,6 +218,7 @@ for(i in 1:length(mf.metric.list)) {
   
 }
 names(plots.fx2) <- mf.metric.list
+plots.fx2$thresh.70_MF
 plots.fx2$thresh.70_MF
 
 # link these plots using patchwork
