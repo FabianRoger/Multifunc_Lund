@@ -147,6 +147,7 @@ x12 <-
 ggsave(filename = here("Figures/fig_x12.png"), plot = x12, width = 21, height = 10,
        units = "cm")
 
+
 ### plot n-functions and multifunctionality
 
 # read in the model data
@@ -213,14 +214,6 @@ nfunc_slopes <-
 
 View(nfunc_slopes)
 
-nfunc_slopes$response_var %>% unique()
-
-# get the range of multifunctional BEF slopes
-nfunc_slopes %>%
-  filter(response_var == "xdiversity_mf_est") %>%
-  pull(estimate) %>%
-  range()
-
 plots.fx2 <- vector("list", length = length(mf.metric.list))
 for(i in 1:length(mf.metric.list)) {
   
@@ -274,25 +267,67 @@ f.x1 <-
 ggsave(filename = here("Figures/fig_x1.png"), plot = f.x1, width = 20, height = 27,
        units = "cm")
 
-# what about among-function variation?
+
+# explore these patterns in more detail
+
+# how does variation among functions change as more functions are considered?
+View(sim.n.out)
 names(sim.n.out)
-sim.n.out %>%
-  select(parameter_combination, model_run, function_matrix, number_of_functions, sd_funcs) %>%
+
+raw_functions <- 
+  sim.n.out %>%
+  select(model_run, function_matrix, mod_id, func.comb.id, n.func.id, number_of_functions, sd_funcs, cv_funcs, range_funcs)
+
+raw_functions <- 
+  raw_functions %>%
   distinct() %>%
-  group_by(parameter_combination, model_run, function_matrix) %>% 
+  group_by(mod_id, model_run, function_matrix) %>% 
   nest() %>% 
-  mutate(nfunc.among_sd = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "sd_funcs")) ) %>%
-  unnest(nfunc.among_sd)  %>% 
+  mutate(nfunc.among_cv = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "cv_funcs")),
+         nfunc.among_range = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "range_funcs")),
+         nfunc.among_sd = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "sd_funcs"))) %>%
+  unnest(starts_with("nfunc") )  %>% 
   select(-data) %>%
-  ungroup() %>%
-  ggplot(data = .,
-         mapping = aes(x = estimate_n_func_sd_funcs)) +
+  ungroup()
+
+ggplot(data = raw_functions,
+       mapping = aes(x = xsd_funcs)) +
+  geom_histogram(alpha = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  facet_wrap(~function_matrix, scales = "free_y") +
+  theme_meta()
+  
+ggplot(data = raw_functions,
+       mapping = aes(x = xcv_funcs)) +
+  geom_histogram(alpha = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  facet_wrap(~function_matrix, scales = "free_y") +
+  theme_meta()
+
+ggplot(data = raw_functions,
+       mapping = aes(x = xrange_funcs)) +
   geom_histogram(alpha = 0.2) +
   geom_vline(xintercept = 0, linetype = "dashed") +
   facet_wrap(~function_matrix, scales = "free_y") +
   theme_meta()
 
 
+# examine how different metrics vary
+nfunc_slopes %>%
+  filter(response_var == "xrange_MF") %>%
+  ggplot(data = .,
+         mapping = aes(x = estimate, fill = function_matrix)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  geom_vline(xintercept = 0, linetype = "dashed") + 
+  facet_wrap(~multifunctionality_metric, scales = "free")
+
+nfunc_slopes %>%
+  filter(response_var == "xcv_MF") %>%
+  ggplot(data = .,
+         mapping = aes(x = estimate, fill = function_matrix)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  geom_vline(xintercept = 0, linetype = "dashed") + 
+  facet_wrap(~multifunctionality_metric, scales = "free")
 
 
 

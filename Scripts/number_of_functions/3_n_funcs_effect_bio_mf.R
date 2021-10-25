@@ -10,6 +10,8 @@ library(tidyr)
 library(ggplot2)
 library(here)
 
+rm(list = ls())
+
 # load functions from important scripts
 source(here("Scripts/MF_functions_collated.R"))
 
@@ -121,17 +123,20 @@ get_BEF_mf_est <- function(adf.data,
     data.f.summary <- 
       dat.in %>%
       mutate(row_id = 1:nrow(dat.in)) %>%
-      select(row_id, all_of(sample.func.names)) %>%
+      select(row_id, local_species_pool, all_of(sample.func.names)) %>%
       pivot_longer(cols = all_of(sample.func.names),
                    names_to = "function_id",
                    values_to = "function_value") %>%
-      group_by(row_id) %>%
+      group_by(local_species_pool, row_id) %>%
       summarise(F_sd = sd(function_value, na.rm = TRUE),
                 F_cv = (F_sd/mean(function_value)),
-                F_range = diff(range(function_value))) %>%
-      summarise(F_sd = mean(F_sd),
-                F_cv = mean(F_cv),
-                F_range = mean(F_range))
+                F_range = diff(range(function_value)), .groups = "drop") %>%
+      summarise(sd_funcs = mean(F_sd),
+                cv_funcs = mean(F_cv),
+                range_funcs = mean(F_range),
+                sd_cor = cor(local_species_pool, F_sd, method = "spearman"),
+                cv_cor = cor(local_species_pool, F_cv, method = "spearman"),
+                range_cor = cor(local_species_pool, F_cv, method = "spearman"))
     
     # for each multifunctionality metric, calculate the BEF-slope
     bef_mf_slope <- 
@@ -147,9 +152,12 @@ get_BEF_mf_est <- function(adf.data,
       data.frame(func.comb.id = i,
                  n.func.id = paste(sample.func.names, collapse = ""),
                  number_of_functions = length(sample.func.names),
-                 sd_funcs = data.f.summary$F_sd,
-                 cv_funcs = data.f.summary$F_cv,
-                 range_funcs = data.f.summary$F_range,
+                 sd_funcs = data.f.summary$sd_funcs,
+                 cv_funcs = data.f.summary$cv_funcs,
+                 range_funcs = data.f.summary$range_funcs,
+                 sd_cor = data.f.summary$sd_cor,
+                 cv_cor = data.f.summary$cv_cor,
+                 range_cor = data.f.summary$range_cor,
                  multifunctionality_metric = mf.names,
                  diversity_mf_est = bef_mf_slope)
     
@@ -199,6 +207,13 @@ head(sim.n.out)
 
 # write this to a csv so we don't have to run the model again
 write_csv(x = sim.n.out, file = here("data/sim_n_functions.csv"))
+
+
+
+
+
+
+
 
 
 
