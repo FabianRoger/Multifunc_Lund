@@ -37,7 +37,8 @@ drift_exp <-
               n_repeats = 1)
 
 # plot the example of patches in the ecological drift model
-drift_exp %>%
+p1 <- 
+  drift_exp %>%
   filter(patch %in% sample(x = unique(drift_exp$patch), size = 4 )) %>%
   filter(abundance > 0) %>%
   ggplot(data = .,
@@ -49,6 +50,9 @@ drift_exp %>%
   scale_colour_viridis_d() +
   theme_meta() +
   theme(legend.position = "none")
+
+ggsave(filename = here("Figures/fig_y1.png"), plot = p1, width = 20, height = 12,
+       units = "cm")
 
 # load the raw drift model data
 drift_mod_dat <- read_csv(here("data/drift_model_n_functions_processed.csv"))
@@ -90,23 +94,58 @@ plot_df <-
   raw_slopes %>%
   filter(function_matrix == 1)
 
-ggplot(data = plot_df,
+x1 <- 
+  ggplot(data = plot_df,
        mapping = aes(x = xabundance)) +
   geom_histogram(colour = "transparent", alpha = 0.5) +
   geom_vline(xintercept = mean(plot_df$xabundance), colour = "red") +
   geom_vline(xintercept = 0, colour = "black", linetype = "dashed") +
+  ylab("Count") +
+  xlab("Est. (richness ~ abundance)") +
   theme_meta()
 
-# plot each line between abundance
-drift_mod_dat %>%
-  filter(mod_id %in% sample(x = unique(drift_mod_dat$mod_id), 500)) %>%
-  ggplot(data = .,
-       mapping = aes(x = local_species_pool, y = abundance, colour = mod_id)) +
-  geom_smooth(method = "lm", se = FALSE, size = 0.1, alpha = 0.1) +
-  scale_colour_viridis_d() +
-  theme_meta() +
-  theme(legend.position = "none")
+# plot the different individual function distributions for each function matrix
+f1_5_plots <- 
+  raw_slopes %>%
+  select(-xabundance)
 
+names(f1_5_plots) <- c("mod_id", "function_matrix", "F1", "F2", "F3", "F4", "F5")
+
+f1_5_plots <- 
+  f1_5_plots %>%
+  pivot_longer(cols = starts_with("F", ignore.case = FALSE),
+               names_to = "variable",
+               values_to = "slope")
+
+f1_5_plots_sum <- 
+  f1_5_plots %>%
+  group_by(function_matrix, variable) %>%
+  summarise(slope = mean(slope, na.rm = TRUE),
+            n = n())
+
+x2 <- 
+  ggplot(data = f1_5_plots,
+         mapping = aes(x = slope, fill = variable)) +
+  geom_histogram(position = "identity", alpha = 0.4) + 
+  geom_vline(data = f1_5_plots_sum, mapping = aes(xintercept = slope, colour = variable)) +
+  geom_vline(xintercept = 0, colour = "black", linetype = "dashed") +
+  scale_fill_viridis_d() +
+  scale_colour_viridis_d() +
+  ylab(NULL) +
+  xlab("Est. (richness ~ function)") +
+  facet_wrap(~function_matrix) +
+  theme_meta() +
+  theme(legend.title = element_blank())
+
+# combine these plots using patchwork
+library(patchwork)
+
+x12 <- 
+  x1 + x2 + plot_layout(ncol = 2, widths = c(1, 1.6)) +
+  plot_annotation(tag_levels = "a")
+
+ggsave(filename = here("Figures/fig_x12.png"), plot = x12, width = 21, height = 10,
+       units = "cm")
 
 ### plot n-functions and multifunctionality
 
@@ -211,15 +250,14 @@ for(i in 1:length(mf.metric.list)) {
     facet_wrap(~function_matrix, scales = "free") +
     theme_meta() +
     theme(legend.position = "none",
-          plot.title = element_text(size = 10))
+          plot.title = element_text(size = 10),
+          axis.text.x = element_text(angle = 45, size = 10))
     
   
   plots.fx2[[i]] <- df.x
   
 }
 names(plots.fx2) <- mf.metric.list
-plots.fx2$thresh.70_MF
-plots.fx2$thresh.70_MF
 
 # link these plots using patchwork
 library(patchwork)
