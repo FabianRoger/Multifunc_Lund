@@ -128,15 +128,17 @@ get_BEF_mf_est <- function(adf.data,
                    names_to = "function_id",
                    values_to = "function_value") %>%
       group_by(local_species_pool, row_id) %>%
-      summarise(F_sd = sd(function_value, na.rm = TRUE),
-                F_cv = (F_sd/mean(function_value)),
+      summarise(F_mean = mean(function_value, na.rm = TRUE),
+                F_sd = sd(function_value, na.rm = TRUE),
+                F_cv = (sd(function_value, na.rm = TRUE)/mean(function_value, na.rm = TRUE)),
                 F_range = diff(range(function_value)), .groups = "drop") %>%
       summarise(sd_funcs = mean(F_sd),
                 cv_funcs = mean(F_cv),
                 range_funcs = mean(F_range),
+                mean_cor = cor(local_species_pool, F_mean, method = "spearman"),
                 sd_cor = cor(local_species_pool, F_sd, method = "spearman"),
                 cv_cor = cor(local_species_pool, F_cv, method = "spearman"),
-                range_cor = cor(local_species_pool, F_cv, method = "spearman"))
+                range_cor = cor(local_species_pool, F_range, method = "spearman"))
     
     # for each multifunctionality metric, calculate the BEF-slope
     bef_mf_slope <- 
@@ -155,6 +157,7 @@ get_BEF_mf_est <- function(adf.data,
                  sd_funcs = data.f.summary$sd_funcs,
                  cv_funcs = data.f.summary$cv_funcs,
                  range_funcs = data.f.summary$range_funcs,
+                 mean_cor = data.f.summary$mean_cor,
                  sd_cor = data.f.summary$sd_cor,
                  cv_cor = data.f.summary$cv_cor,
                  range_cor = data.f.summary$range_cor,
@@ -175,6 +178,11 @@ get_BEF_mf_est <- function(adf.data,
 # load the processed model data
 mod.out <- read_csv(here("data/drift_model_n_functions_processed.csv"))
 View(head(mod.out))
+
+# do this for a subset of the data i.e. n = 50
+mod.out <- 
+  mod.out %>%
+  filter(mod_id %in% sample(unique(mod.out$mod_id), 50))
 
 # output the function names
 f.names <- names(mod.out)[grepl(pattern = "F_", names(mod.out))]
