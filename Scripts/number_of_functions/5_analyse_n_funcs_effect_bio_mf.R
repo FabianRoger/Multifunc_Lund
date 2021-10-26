@@ -19,11 +19,12 @@ source(here("Scripts/MF_functions_collated.R"))
 source(here("Scripts/linear_model_slope_function.R"))
 
 
-### plot n-functions and multifunctionality
+# plot n-functions and multifunctionality
 
 # read in the model data
 sim.n.out <- read_csv(here("data/sim_n_functions.csv"))
 View(head(sim.n.out))
+dim(sim.n.out)
 
 # plot a few illustrative examples for each multifunctionality metric
 mf.metric.list <- unique(sim.n.out$multifunctionality_metric)
@@ -59,7 +60,7 @@ for(i in 1:length(mf.metric.list)) {
   
 }
 names(plots.fx1) <- mf.metric.list
-plots.fx1$sum_MF
+plots.fx1$Pasari_MF
 
 
 # plot the expectations from all simulations for each multifunctionality metric
@@ -74,17 +75,10 @@ nfunc_slopes <-
   sim.n.out %>%
   group_by(drift_parameter, model_run, function_matrix, multifunctionality_metric) %>% 
   nest() %>% 
-  mutate(nfunc.bef_slope = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "diversity_mf_est")),
-         nfunc.cv = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "cv_MF")),
-         nfunc.range = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "range_MF")),
-         nfunc.min = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "min_MF")),
-         nfunc.max = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "max_MF"))  ) %>%
+  mutate(nfunc.bef_slope = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "diversity_mf_est"))  ) %>%
   unnest(starts_with("nfunc"))  %>% 
   select(-data) %>%
-  ungroup() %>%
-  pivot_longer(cols = starts_with("x"),
-               names_to = "response_var",
-               values_to = "estimate")
+  ungroup()
 
 View(nfunc_slopes)
 
@@ -93,18 +87,17 @@ for(i in 1:length(mf.metric.list)) {
   
   df <- 
     nfunc_slopes %>%
-    filter(response_var == "xdiversity_mf_est",
-           multifunctionality_metric == mf.metric.list[i]) %>%
+    filter(multifunctionality_metric == mf.metric.list[i]) %>%
     mutate(function_matrix = as.character(function_matrix))
   
   df_sum <- 
     df %>%
     group_by(function_matrix) %>%
-    summarise(mean_estimate = mean(estimate, na.rm = TRUE))
+    summarise(mean_estimate = mean(number_of_functions_diversity_mf_est, na.rm = TRUE))
   
   df.x <- 
     ggplot(data = df,
-           mapping = aes(x = estimate, fill = function_matrix)) +
+           mapping = aes(x = number_of_functions_diversity_mf_est, fill = function_matrix)) +
     geom_histogram(alpha = 0.5, colour = "transparent") +
     geom_vline(xintercept = 0, linetype = "dashed") +
     geom_vline(data = df_sum, mapping = aes(xintercept = mean_estimate),
@@ -148,96 +141,35 @@ ggsave(filename = here("Figures/fig_x1.png"), plot = f.x1, width = 20, height = 
 View(sim.n.out)
 names(sim.n.out)
 
-sim.n.out %>%
-  select(model_run, function_matrix, mod_id, func.comb.id, n.func.id, number_of_functions, sd_funcs, cv_funcs, range_funcs, sd_cor, cv_cor, range_cor) %>%
-  distinct() %>%
-  summary()
-
-raw_functions <- 
+sim.n.sub <- 
   sim.n.out %>%
-  select(model_run, function_matrix, mod_id, func.comb.id, n.func.id, number_of_functions, sd_funcs, cv_funcs, range_funcs, sd_cor, cv_cor, range_cor, mean_cor)
+  select(model_run, function_matrix, mod_id, func.comb.id, n.func.id, number_of_functions, sd_funcs, cv_funcs, range_funcs, sd_cor, cv_cor, range_cor, mean_cor) %>%
+  distinct()
+head(sim.n.sub)
+names(sim.n.sub)
 
-raw_functions <- 
-  raw_functions %>%
-  distinct() %>%
+sim.n.slopes <- 
+  sim.n.sub %>%
   group_by(mod_id, model_run, function_matrix) %>% 
   nest() %>% 
-  mutate(nfunc.among_cv = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "cv_funcs")),
-         nfunc.among_range = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "range_funcs")),
-         nfunc.among_sd = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "sd_funcs")),
-         nfunc.cor_sd = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "sd_cor")),
-         nfunc.cor_cv = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "cv_cor")),
-         nfunc.cor_range = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "range_cor")),
+  mutate(nfunc.cor_sd = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "sd_cor")),
          nfunc.cor_mean = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "mean_cor")) ) %>%
-  unnest(starts_with("nfunc") )  %>% 
+  unnest(starts_with("nfunc"))  %>% 
   select(-data) %>%
   ungroup()
 
-ggplot(data = raw_functions,
-       mapping = aes(x = xsd_funcs)) +
+ggplot(data = sim.n.slopes,
+       mapping = aes(x = number_of_functions_sd_cor)) +
   geom_histogram(alpha = 0.2) +
   geom_vline(xintercept = 0, linetype = "dashed") +
   facet_wrap(~function_matrix, scales = "free_y") +
   theme_meta()
 
-
-ggplot(data = raw_functions,
-       mapping = aes(x = xcv_funcs)) +
+ggplot(data = sim.n.slopes,
+       mapping = aes(x = number_of_functions_mean_cor)) +
   geom_histogram(alpha = 0.2) +
   geom_vline(xintercept = 0, linetype = "dashed") +
   facet_wrap(~function_matrix, scales = "free_y") +
   theme_meta()
 
-ggplot(data = raw_functions,
-       mapping = aes(x = xrange_funcs)) +
-  geom_histogram(alpha = 0.2) +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  facet_wrap(~function_matrix, scales = "free_y") +
-  theme_meta()
-
-ggplot(data = raw_functions,
-       mapping = aes(x = xcv_cor)) +
-  geom_histogram(alpha = 0.2) +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  facet_wrap(~function_matrix, scales = "free_y") +
-  theme_meta()
-
-ggplot(data = raw_functions,
-       mapping = aes(x = xsd_cor)) +
-  geom_histogram(alpha = 0.2) +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  facet_wrap(~function_matrix, scales = "free_y") +
-  theme_meta()
-
-ggplot(data = raw_functions,
-       mapping = aes(x = xmean_cor)) +
-  geom_histogram(alpha = 0.2) +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  facet_wrap(~function_matrix, scales = "free_y") +
-  theme_meta()
-
-ggplot(data = raw_functions,
-       mapping = aes(x = xrange_cor)) +
-  geom_histogram(alpha = 0.2) +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  facet_wrap(~function_matrix, scales = "free_y") +
-  theme_meta()
-
-
-# examine how different metrics vary
-nfunc_slopes %>%
-  filter(response_var == "xrange_MF") %>%
-  ggplot(data = .,
-         mapping = aes(x = estimate, fill = function_matrix)) +
-  geom_histogram(position = "identity", alpha = 0.5) +
-  geom_vline(xintercept = 0, linetype = "dashed") + 
-  facet_wrap(~multifunctionality_metric, scales = "free")
-
-nfunc_slopes %>%
-  filter(response_var == "xcv_MF") %>%
-  ggplot(data = .,
-         mapping = aes(x = estimate, fill = function_matrix)) +
-  geom_histogram(position = "identity", alpha = 0.5) +
-  geom_vline(xintercept = 0, linetype = "dashed") + 
-  facet_wrap(~multifunctionality_metric, scales = "free")
 
