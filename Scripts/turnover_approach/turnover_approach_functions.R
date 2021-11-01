@@ -80,7 +80,7 @@ AIC_sp <- function(data, function_names, species_names) {
   sp.effect.aic <- cbind(species = rownames(sp.effect.aic), data.frame(sp.effect.aic, row.names = NULL))
   
   # return the data.frame with species effects
-  return(sp.effect.aic)
+  return(as_tibble(sp.effect.aic))
   
 }
 
@@ -153,7 +153,7 @@ SES_score <- function(data, function_names, species_names, n_ran) {
     summarise(across(.cols = all_of(function_names), mean ), .groups = "drop") %>%
     group_by(species) %>%
     summarise(across(.cols = all_of(function_names), diff ), .groups = "drop") %>%
-    pivot_longer(cols = starts_with("F_"),
+    pivot_longer(cols = all_of(function_names),
                  names_to = "function_name",
                  values_to = "d_value_obs") %>%
     arrange(species, function_name)
@@ -176,93 +176,65 @@ SES_score <- function(data, function_names, species_names, n_ran) {
   
 }
 
+# function to calculate proportion of the species pool required to drive function
 
-# function to compare AIC and SES-based turnover approaches: turnover_tester()
+data = jena.dat
+function_names = func.names
+species_names = spp
+n_ran = 10
 
-# arguments:
-# model_dat: data.frame from functions: drift_model.R or stachova_leps_2010
-# that has been processed using the process_sim_data() function
-# function_matrix: data.frame with identity effect coefficients for all species in model_dat
-
-turnover_tester <- 
-  function(model_dat, function_matrix, ses_reps = 100) {
+prop_species_pool <- function(data, function_names, species_names, method = "AIC", n_ran = 100) {
+  
+  # get the function combinations
+  f.combs <- c(function_names, get.function.combinations(function.names = function_names))
+  
+  # set up the list
+  prop_sp_out <- vector("list", length = length(f.combs))
+  
+  # for each function combination, calculate the proportion of the species pool 
+  # that has at least one positive effect using either:
+  # aic-based turnover approach
+  # SES-based turnover approach
+  
+  for(i in 1:length(f.combs)) {
     
-    # check that the correct packages are installed
-    if(! "dplyr" %in% installed.packages()[,1]) stop(
-      "this function requires dplyr to be installed"
-    )
+    if (method == "AIC") {
+      
+      df.in <- AIC_sp(data = data, function_names = f.combs[[i]], species_names = species_names)
+      
+    } else if (method == "SES") {
+      
+      df.in <- SES_score(data = data, function_names = f.combs[[i]], species_names = species_names, n_ran = n_ran)
+      
+    } else { stop("choose appropriate method for calculating the species pool") }
     
-    # load the dplyr library
-    library(dplyr)
+    x <- apply(df.in[ , -1], 1, function(z) { ifelse(any(z > 0), TRUE, FALSE) })
     
-    # convert this data cluster into a list
-    model.list <- split(model_dat, model_dat$model_run)
+    prop_pos <- length(df.in[x, ]$species)/length(species_names)
     
-    # get a vector of function names from the function matrix
-    f.names <- names(function_matrix)[grepl(pattern = "F_", names(function_matrix))]
-    
-    turnover_list <- 
-      lapply(model.list, function(data.mf) {
-        
-        # get a vector of species names that are present for the chosen simulation
-        sp.present <- sapply(data.mf[, grepl("sp_", names(data.mf)) ], function(x) sum(ifelse(x > 0, 1, 0)))
-        sp.present <- names(sp.present[sp.present > 0])
-        
-        # subset the species that are present in the simulation
-        data.in <- 
-          data.mf %>%
-          select(model_run, patch, time, local_species_pool, composition,
-                 all_of(sp.present), all_of(f.names))
-        
-        # subset the present species
-        func.in <- function_matrix[function_matrix$species %in% sp.present, ]
-        
-        
-        ### AIC-based turnover approach
-        
-        # implement the aic-based approach to get species effects on each function
-        aic.x <- AIC_sp(data = data.in, function_names = f.names, species_names = sp.present)
-        
-        # reorder the aic.x to match with func.in
-        aic.x <- aic.x[match(func.in$species, aic.x$species),]
-        
-        # calculate the proportion of incorrect directions for each function
-        aic.dr <- mapply(compare.directions, func.in[, f.names], aic.x[, f.names])
-        
-        # calculate the spearman correlation
-        aic.spear <- mapply(function(x, y){cor(x, y, method = "spearman")}, func.in[, f.names], aic.x[, f.names])
-        
-        
-        ### SES-based turnover approach
-        
-        # implement the ses-based approach to get species effects on each function
-        ses.x <- SES_score(data = data.in, function_names = f.names, species_names = sp.present, n_ran = ses_reps )
-        
-        # reorder the aic.x to match with func.in
-        ses.x <- ses.x[match(func.in$species, ses.x$species), ]
-        
-        # calculate the proportion of incorrect directions for each function
-        ses.dr <- mapply(compare.directions, func.in[, f.names], ses.x[, f.names])
-        
-        # calculate the spearman correlation
-        ses.spear <- mapply(function(x, y){cor(x, y, method = "spearman")}, func.in[, f.names], ses.x[, f.names])
-        
-        # summary metric
-        summary_stats <- 
-          bind_rows(aic.dr, aic.spear, ses.dr, ses.spear) %>%
-          mutate(output_metric = rep(c("prop_incorrect", "spearman_r"), 2),
-                 method = rep(c("AIC", "SES"), each = 2)) %>%
-          select(method, output_metric, all_of(f.names))
-        
-        return(summary_stats)
-        
-      })
-    
-    # bind the output list into a dataframe
-    turnover_summary <- bind_rows(turnover_list, .id = "model_run")
-    
-    return(turnover_summary)
+    prop_sp_out[[i]] <- tibble(number_functions = length(f.combs[[i]]),
+                               function_id = paste(f.combs[[i]], collapse = "."),
+                               prop_species_pool = prop_pos)
     
   }
+  
+  dplyr::bind_rows(prop_sp_out)
+  
+}
+
+data = jena.dat
+function_names = func.names
+species_names = spp
+n_ran = 10
+
+c(func.names, get.function.combinations(function.names = func.names))[1:50]
+
+
+
+x.test <- prop_species_pool(data = jena.dat, function_names = func.names[1:3], 
+                  species_names = spp, method = "SES", n_ran = 100) 
+
+plot(x.test$number_functions, x.test$prop_species_pool)
+
 
 ### END

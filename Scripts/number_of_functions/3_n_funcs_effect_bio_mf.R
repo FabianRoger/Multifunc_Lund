@@ -14,45 +14,10 @@ rm(list = ls())
 
 # load functions from important scripts
 source(here("Scripts/MF_functions_collated.R"))
+source(here("Scripts/process_model_data.R"))
 
 
-# BEF slope and n-functions
-
-# get the list of matrices of function combinations
-function.combinations <- function(vector.func.names) {
-  nested.list.matrices <- vector("list", length = (length(vector.func.names)-1) )
-  for (i in 2:length(vector.func.names)){
-    nested.list.matrices[[i-1]] <- combn(x = vector.func.names, m = i)
-  }
-  return(nested.list.matrices)
-}
-
-# write a function to flatten an individual part of a nested list
-flatten.list.matrices <- function(nested.list.matrices){
-  unnested.list <- split(nested.list.matrices, col(nested.list.matrices)) 
-  names(unnested.list) <- NULL 
-  return(unnested.list)
-}
-
-# combine function.combinations and flatten.list.matrices and loop over each n-func
-get.function.combinations <- function(function.names){
-  
-  # get list of matrices with function combinations
-  list.func.matrix <- function.combinations(vector.func.names = function.names)
-  
-  # flatten the first matrix in the list
-  list.combination <- flatten.list.matrices(nested.list.matrices = list.func.matrix[[1]])
-  
-  # loop over this and bind into a list
-  for (i in 2:length(list.func.matrix)){
-    x <- flatten.list.matrices(nested.list = list.func.matrix[[i]])
-    list.combination <- c(list.combination, x)
-  }
-  return(list.combination)
-}
-
-
-# using the defined functions:
+# using functions defined to get combinations of functions:
 
 # set up a function to calculate the realised diversity-multifunctionality slope
 # for each combination of a set of ecosystem functions

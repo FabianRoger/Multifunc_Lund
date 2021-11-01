@@ -1,68 +1,56 @@
 
 # Project: Review of multifunctionality in ecology, conservation and ecosystem service science
 
-# Title: Run the turnover approach test on 1000 neutral models for three function matrices
+# Title: Run the turnover approaches on the Jena data
 
 # load relevant libraries
 library(here)
-
-# link to scripts with the relevant functions
-source(here("Scripts/process_model_data.R"))
-source(here("Scripts/turnover_approach/turnover_approach_functions.R"))
-source(here("Scripts/ecological_drift_model.R"))
-source(here("Scripts/function_plotting_theme.R"))
-
-# run an example of an ecological drift model
-drift_exp <- 
-  drift_model(lsp = c(2, 4, 6, 9),
-              mono = "all",
-              reps = 5,
-              technical_reps = 2,
-              rsp = 12,
-              t_steps = 500,
-              n0 = 500,
-              prop_change = 0.025,
-              n_repeats = 1)
-
-# load packages
+library(readr)
 library(dplyr)
 library(ggplot2)
 
-# plot the example of patches in the ecological drift model
-drift_exp %>%
-  filter(patch %in% sample(x = unique(d_mod$patch), size = 4 )) %>%
-  filter(abundance > 0) %>%
-  ggplot(data = .,
-         mapping = aes(x = time, y = abundance, colour = species)) +
-  geom_line() +
-  facet_wrap(~patch, scales = "free") +
-  theme_meta() +
-  theme(legend.position = "none")
+# link to scripts with the relevant functions
+source(here("Scripts/turnover_approach/turnover_approach_functions.R"))
+source(here("Scripts/function_plotting_theme.R"))
+source(here("Scripts/process_model_data.R"))
 
-# load the readr library
-library(readr)
+# read in the Jena data
+jena.dat <- read_csv(file = here("data/jena_data_Jochum_2020_clean.csv"))
 
-# list of simulated data cluster (e.g. neutral model with 1000 runs with same parameters)
-# this list is generated using the 1_drift_model_number_functions.R script (number_of_functions folder)
-mod.list <- here("data/drift_model_n_functions.csv")
+# get a vector of species names
+col_names <- names(jena.dat)
 
-# load Laura's function matrices
-f.list <- list.files(path = here("data"))
-fm_names <- f.list[grepl(pattern = "SpeciesIDs", f.list)]
+spp <- col_names[grepl(pattern = "[A-Z][a-z]{2}[.][a-z]{3}", col_names)]
+length(spp)
+rm(col_names)
 
-# load these data.frames into a list
-library(readr)
+# check if all species are present in at least one plot
+any(colSums(jena.dat[, spp]) == 0)
+min(colSums(jena.dat[, spp]))
 
-func.list <- vector("list", length = length(fm_names))
-for (i in 1:length(func.list)) {
-  
-  x <- read_csv(file = paste(here("data"), fm_names[i], sep = "/") )
-  colnames(x)[1] <- "species"
-  
-  func.list[[i]] <- x
-  
-}
+# convert the species abundances into presence-absence data
+jena.dat <- 
+  jena.dat %>%
+  mutate(across(.cols = all_of(spp), ~if_else(. > 0, 1, 0)))
 
+# get a vector of function names
+names(jena.dat)
+func.names <- c("biomass", "plantCN", "soilC", "soilorgC", "herbi",
+                "micBMC", "phoact", "poll", "rootBM")
+
+
+
+# test the AIC_sp function
+df2 <- SES_score(data = jena.dat, function_names = func.names, species_names = spp, 
+          n_ran = 10)
+
+df2
+
+df <- AIC_sp(data = jena.dat, function_names = func.names[2], species_names = spp)
+
+x <- apply(df2[, -1], 1, function(x) { ifelse(any(x > 0), TRUE, FALSE) })
+
+df[x, ]$species
 
 # for each dataset in mod.list and for each function matrix in func.list, run the AIC and SES turnover approaches
 

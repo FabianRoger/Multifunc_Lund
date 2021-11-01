@@ -123,6 +123,16 @@ jena.all <-
   jena.all %>%
   filter(sowndiv < 60)
 
+length(names(jena.all)[grepl(pattern = "[A-Z][a-z]{2}[.][a-z]{3}", names(jena.all))])
+
+# check for NAs
+summary(jena.all)
+func.names <- c("biomass", "plantCN", "soilC", "soilorgC", "herbi", "micBMC", "phoact", "poll","rootBM")
+
+# get only the complete cases
+# we lose three plots
+jena.all <- jena.all[complete.cases(jena.all[, func.names]), ]
+
 # output this cleaned data file
 write_csv(x = jena.all, file = here("data/jena_data_Jochum_2020_clean.csv"))
 
