@@ -38,86 +38,77 @@ names(jena.dat)
 func.names <- c("biomass", "plantCN", "soilC", "soilorgC", "herbi",
                 "micBMC", "phoact", "poll", "rootBM")
 
+# get the random expectation for the jena data based on the AIC approach
+jena.aic.ran <- 
+  prop_species_pool_random(data = jena.dat, 
+                           function_names = func.names, 
+                           species_names = spp, 
+                           method = "AIC", n_ran = 100, n = 100
+                           )
+
+jena.aic.obs <- 
+  prop_species_pool(data = jena.dat, 
+                    function_names = func.names, 
+                    species_names = spp, 
+                    method = "AIC", n_ran = 100) 
 
 
-# test the AIC_sp function
-df2 <- SES_score(data = jena.dat, function_names = func.names, species_names = spp, 
-          n_ran = 10)
 
-df2
 
-df <- AIC_sp(data = jena.dat, function_names = func.names[2], species_names = spp)
 
-x <- apply(df2[, -1], 1, function(x) { ifelse(any(x > 0), TRUE, FALSE) })
 
-df[x, ]$species
+### plot this out
 
-# for each dataset in mod.list and for each function matrix in func.list, run the AIC and SES turnover approaches
+# check the max of the null data to see if it is below 1
+max(jena.null$div)
 
-# set the number of reps for the SES method
-ses.r <- 100
+# calculate the 97.5% and 2.5% quantiles for each number of functions
+# plot this as well
+jena.null.q <- 
+  jena.null %>% 
+  group_by(effect_direction, null.rep, nfunc) %>%
+  summarise(mean_div = mean(div, na.rm = TRUE), .groups = "drop") %>%
+  group_by(effect_direction, nfunc) %>%
+  summarise(quant_97.5 = quantile(mean_div, probs = c(0.975)),
+            quant_2.5 = quantile(mean_div, probs = c(0.025)),
+            .groups = "drop")
 
-mod.turnover.test <- vector("list", length = length(mod.list))
-for (i in 1:length(mod.list)) {
-  
-  func.reps <- vector("list", length = length(func.list))
-  for (j in 1:length(func.list)) {
-    
-    # process the simulated cluster using: process_sim_data
-    df.proc <- 
-      process_sim_data(model_data = mod.list[[i]], 
-                       func.mat =  func.list[[j]], 
-                       time_final = TRUE, 
-                       species_abun = "pa")
-    
-    # run the different turnover approaches
-    func.reps[[j]] <- turnover_tester(model_dat = df.proc, function_matrix = func.list[[j]], ses_reps = ses.r) 
-    
-  }
-  
-  mod.turnover.test[[i]] <- bind_rows(func.reps, .id = "function_matrix")
-  
-}
+# calculate mean and sd of the observed data
+jena.obs.s <- 
+  jena.obs %>%
+  group_by(effect_direction, nfunc) %>%
+  summarise(mean_div = mean(div, na.rm = TRUE),
+            sd_div = sd(div, na.rm = TRUE))
 
-# assign names to this object
-names(mod.turnover.test) <- names(mod.list)
-
-# bind this into one large data.frame
-mod.turnover.df <- bind_rows(mod.turnover.test, .id = "parameter_combination")
-
-# pull this into a longer data.frame
+# plot the null expectations versus the observed data
 library(ggplot2)
+g1 <- 
+  ggplot() +
+  geom_ribbon(data = jena.null.q,
+              mapping = aes(x = nfunc, ymax = quant_97.5, ymin = quant_2.5),
+              alpha = 0.25) +
+  geom_jitter(data = jena.obs,
+              mapping = aes(x = nfunc, y = div), 
+              width = 0.1, colour = "red", shape = 16, alpha = 0.1, size = 2) +
+  geom_line(data = jena.obs.s,
+            mapping = aes(x = nfunc, y = mean_div), size = 1, colour = "red") +
+  facet_wrap(~effect_direction, scales = "free") +
+  scale_y_continuous(breaks = seq(0, 1, 0.1)) +
+  scale_x_continuous(breaks = seq(0, 9, 1)) +
+  ylab("number of species") +
+  xlab("number of functions") +
+  theme_meta()
 
-df.plot <- 
-  mod.turnover.df %>%
-  pivot_longer(cols = starts_with("F_"),
-               names_to = "function_id",
-               values_to = "metric") %>%
-  mutate(mod_id = paste(parameter_combination, function_matrix, sep = "_"), .before = 1)
+g1
 
-View(df.plot)
+ggsave(filename = here("Figures/aic_turnover_null.png"), plot = g1,
+       width = 11, height = 7.5, units = "cm", dpi = 450)
 
-# df.plot$mod_id <- as.factor(df.plot$mod_id)
-# levels(df.plot$mod_id) <- paste("m.", 1:length(unique(df.plot$mod_id)), sep = "")
-# df.plot$mod_id <- as.character(df.plot$mod_id)
+# randomly assigning functions to plots generates the same pattern as the empirical data
+# why is this the case?
 
-df.plot %>%
-  group_by(mod_id, model_run, method, output_metric) %>%
-  summarise(mean_metric = mean(metric, na.rm = TRUE), .groups = "drop") %>%
-  filter(output_metric == "prop_incorrect") %>%
-  ggplot(data = .,
-         mapping = aes(x = method, y = mean_metric)) +
-  geom_jitter() +
-  facet_wrap(~mod_id)
+# maybe it is because the turnover approach is anti-conservative...
 
-df.plot %>%
-  ggplot(data = ., 
-       mapping = aes(x = method, y = metric, colour = mod_id)) +
-  geom_point(position = position_dodge(width = 0.9)) +
-  theme_classic() +
-  facet_wrap(~output_metric, scales = "free") +
-  scale_colour_viridis_d() +
-  theme(legend.position = "bottom",
-        axis.text = element_text(colour = "black"))
+
 
 ### END

@@ -28,24 +28,6 @@ row.randomiser <- function(func.names, species.names, adf.data) {
   
 }
 
-# function to test reliability
-
-# Q1: for detected species effects, how many species effects are in the incorrect direction?
-
-# true.function.vals: real function values (i.e. linear coefficient)
-# inferred.effects: inferred species effect (-1, 0 or 1)
-
-# note that this function ignores non-significant species effects (i.e. effect = 0)
-
-# outputs proportion of IN-correctly inferred directions
-compare.directions <- function(true.function.vals, inferred.effects){
-  n.incorrect.negative <- sum(true.function.vals[inferred.effects < 0] > 0)
-  n.incorrect.positive <- sum(true.function.vals[inferred.effects > 0] < 0)
-  n.incorrect.total <- (n.incorrect.negative + n.incorrect.positive)
-  
-  return( n.incorrect.total/sum(inferred.effects != 0) )
-}
-
 
 # functions to implement aic-based species effects and Gotelli et al. (2011) species effects
 
@@ -178,10 +160,11 @@ SES_score <- function(data, function_names, species_names, n_ran) {
 
 # function to calculate proportion of the species pool required to drive function
 
-data = jena.dat
-function_names = func.names
-species_names = spp
-n_ran = 10
+# data: data.frame with functions and species presence-absences as columns and samples as rows
+# function_names: vector of function names
+# species_names: vector of species names
+# method: method to calculate species effects ("AIC" or "SES")
+# n_ran: number of randomisations
 
 prop_species_pool <- function(data, function_names, species_names, method = "AIC", n_ran = 100) {
   
@@ -208,8 +191,10 @@ prop_species_pool <- function(data, function_names, species_names, method = "AIC
       
     } else { stop("choose appropriate method for calculating the species pool") }
     
+    # test if each species contributes positively to at least one function
     x <- apply(df.in[ , -1], 1, function(z) { ifelse(any(z > 0), TRUE, FALSE) })
     
+    # count the number of species positively contributing to each function and divide by total number of species
     prop_pos <- length(df.in[x, ]$species)/length(species_names)
     
     prop_sp_out[[i]] <- tibble(number_functions = length(f.combs[[i]]),
@@ -222,19 +207,41 @@ prop_species_pool <- function(data, function_names, species_names, method = "AIC
   
 }
 
-data = jena.dat
-function_names = func.names
-species_names = spp
-n_ran = 10
+# create a function to randomise the data and then calculate the proportion
+# of species pool
 
-c(func.names, get.function.combinations(function.names = func.names))[1:50]
+# data: data.frame with functions and species presence-absences as columns and samples as rows
+# function_names: vector of function names
+# species_names: vector of species names
+# method: method to calculate species effects ("AIC" or "SES")
+# n_ran: number of randomisations
 
+prop_species_pool_random <- function(data, function_names, species_names, method = "AIC", n_ran = 100, n = 10) {
 
-
-x.test <- prop_species_pool(data = jena.dat, function_names = func.names[1:3], 
-                  species_names = spp, method = "SES", n_ran = 100) 
-
-plot(x.test$number_functions, x.test$prop_species_pool)
-
+  # create n random datasets in a list
+  random_rows <- vector("list", length = n)
+  
+  for (i in 1:n) {
+    
+    random_rows[[i]] <- row.randomiser(func.names = function_names,
+                                       species.names = species_names,
+                                       adf.data = data)
+    
+  }
+  
+  # apply over this list
+  prop_list<- 
+    lapply(random_rows, function(x) {
+      
+      prop_species_pool(data = x, function_names = function_names,
+                        species_names = species_names, method = method, n_ran = n_ran)
+      
+    })
+  
+  # bind this into a data.frame
+  bind_rows(prop_list, .id = "run")
+  
+  
+}
 
 ### END
