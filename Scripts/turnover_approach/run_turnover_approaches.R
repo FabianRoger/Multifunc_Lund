@@ -45,7 +45,7 @@ jena.aic.ran <-
   prop_species_pool_random(data = jena.dat, 
                            function_names = func.names, 
                            species_names = spp, 
-                           method = "AIC", n_ran = 100, n = 100
+                           method = "AIC", n_ran = 100, n = 1000
                            )
 
 jena.aic.obs <- 
