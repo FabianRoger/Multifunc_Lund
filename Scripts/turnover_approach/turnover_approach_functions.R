@@ -168,6 +168,20 @@ SES_score <- function(data, function_names, species_names, n_ran) {
 
 prop_species_pool <- function(data, function_names, species_names, method = "AIC", n_ran = 100) {
   
+  # start by getting the effect of each species on the different functions using either:
+  # 1. AIC-approach based on the multifunc package
+  # 2. SES-approach of Gotelli et al. (2011)
+  
+  if (method == "AIC") {
+    
+    df.in <- AIC_sp(data = data, function_names = function_names, species_names = species_names)
+    
+  } else if (method == "SES") {
+    
+    df.in <- SES_score(data = data, function_names = function_names, species_names = species_names, n_ran = n_ran)
+    
+  } else { stop("choose appropriate method for calculating the species pool") }
+  
   # get the function combinations
   f.combs <- c(function_names, get.function.combinations(function.names = function_names))
   
@@ -175,35 +189,64 @@ prop_species_pool <- function(data, function_names, species_names, method = "AIC
   prop_sp_out <- vector("list", length = length(f.combs))
   
   # for each function combination, calculate the proportion of the species pool 
-  # that has at least one positive effect using either:
-  # aic-based turnover approach
-  # SES-based turnover approach
+  # that has at least one positive effect
   
   for(i in 1:length(f.combs)) {
     
-    if (method == "AIC") {
-      
-      df.in <- AIC_sp(data = data, function_names = f.combs[[i]], species_names = species_names)
-      
-    } else if (method == "SES") {
-      
-      df.in <- SES_score(data = data, function_names = f.combs[[i]], species_names = species_names, n_ran = n_ran)
-      
-    } else { stop("choose appropriate method for calculating the species pool") }
+    # subset the functions of interest
+    y <- df.in[, f.combs[[i]] ]
+    
+    # tally up positive effects
     
     # test if each species contributes positively to at least one function
-    x <- apply(df.in[ , -1], 1, function(z) { ifelse(any(z > 0), TRUE, FALSE) })
+    x <- apply(y, 1, function(z) { ifelse(any(z > 0), TRUE, FALSE) })
     
-    # count the number of species positively contributing to each function and divide by total number of species
-    prop_pos <- length(df.in[x, ]$species)/length(species_names)
+    # if there are no species contributing to function then set prop_pos FALSE
+    if (all(x == FALSE)) {
+      
+      prop_pos <- 0
+    
+    # count the number of species positively contributing to each function and divide by total number of species    
+    } else {
+      
+      prop_pos <- length(df.in[x, ]$species)/length(species_names)
+      
+    }
+    
+    # tally up negative effects
+    
+    # test if each contributes negatively to at least one function
+    x2 <- apply(y, 1, function(z) { ifelse(any(z < 0), TRUE, FALSE) })
+    
+    # if there are no species contributing to function then set prop_pos FALSE
+    if (all(x2 == FALSE)) {
+      
+      prop_neg <- 0
+      
+      # count the number of species positively contributing to each function and divide by total number of species    
+    } else {
+      
+      prop_neg <- length(df.in[x2, ]$species)/length(species_names)
+      
+    }
+    
     
     prop_sp_out[[i]] <- tibble(number_functions = length(f.combs[[i]]),
                                function_id = paste(f.combs[[i]], collapse = "."),
-                               prop_species_pool = prop_pos)
+                               positive_effect = prop_pos,
+                               negative_effect = prop_neg)
     
   }
   
-  dplyr::bind_rows(prop_sp_out)
+  df.out <- dplyr::bind_rows(prop_sp_out)
+  
+  df.out <- tidyr::pivot_longer(data = df.out,
+                                cols = c("positive_effect", "negative_effect"),
+                                names_to = "effect_direction",
+                                values_to = "proportion_species_pool")
+  
+  df.out <- dplyr::arrange(df.out, 
+                           effect_direction, number_functions, function_id)
   
 }
 
@@ -240,7 +283,6 @@ prop_species_pool_random <- function(data, function_names, species_names, method
   
   # bind this into a data.frame
   bind_rows(prop_list, .id = "run")
-  
   
 }
 

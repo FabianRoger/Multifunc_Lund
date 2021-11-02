@@ -129,18 +129,36 @@ flatten.list.matrices <- function(nested.list.matrices){
 # combine function.combinations and flatten.list.matrices and loop over each n-func
 get.function.combinations <- function(function.names){
   
-  # get list of matrices with function combinations
+  # test if the data has two separate functions
+  if (length(function.names) < 2) {
+    
+    stop("error, function requires at least two different ecosystem functions")
+    
+  }
+  
+  # get raw list of matrices
   list.func.matrix <- function.combinations(vector.func.names = function.names)
   
-  # flatten the first matrix in the list
-  list.combination <- flatten.list.matrices(nested.list.matrices = list.func.matrix[[1]])
-  
-  # loop over this and bind into a list
-  for (i in 2:length(list.func.matrix)){
-    x <- flatten.list.matrices(nested.list = list.func.matrix[[i]])
-    list.combination <- c(list.combination, x)
+  if (length(function.names) < 3) {
+    
+    # flatten the first matrix in the list
+    list.combination <- flatten.list.matrices(nested.list.matrices = list.func.matrix[[1]])
+    
+  } else {
+    
+    # flatten the first matrix in the list
+    list.combination <- flatten.list.matrices(nested.list.matrices = list.func.matrix[[1]])
+    
+    # loop over this and bind into a list
+    for (i in 2:length(list.func.matrix)){
+      x <- flatten.list.matrices(nested.list.matrices = list.func.matrix[[i]])
+      list.combination <- c(list.combination, x)
+    }
+    
   }
-  return(list.combination)
+  
+  list.combination
+  
 }
 
 ### END
