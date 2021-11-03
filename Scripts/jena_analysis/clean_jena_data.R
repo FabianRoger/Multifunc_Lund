@@ -136,4 +136,71 @@ jena.all <- jena.all[complete.cases(jena.all[, func.names]), ]
 # output this cleaned data file
 write_csv(x = jena.all, file = here("data/jena_data_Jochum_2020_clean.csv"))
 
+
+# prepare the dataset for Laura
+sp_comp <- read_delim(file = here("data/plotinfo.csv"), delim = ";")
+head(sp_comp)
+
+# get the relevant plotcodes
+sp_comp <- 
+  sp_comp %>%
+  filter(plotcode %in% unique(jena.all$plotcode) )
+
+nrow(sp_comp) == nrow(jena.all)
+
+sp.df <- 
+  sapply(sp_comp$composition, function(x) {
+  
+  strsplit(x, split = "[|]")
+  
+}, USE.NAMES = FALSE)
+
+# convert into a species list
+sp.list <- unique(unlist(sp.df))
+any( sort(sp.list) != sort(spp) )
+
+df <- data.frame(plotcode = sp_comp$plotcode)
+
+for (i in 1:length(sp.list)) {
+  
+  z <- 
+    lapply(sp.df, function(x) {
+      
+      if (sp.list[i] %in% x) {
+        
+        y <- 1/length(x)
+        
+      } else {
+        
+        y <- 0
+        
+      }
+      
+      y
+      
+    })
+  
+  df[, sp.list[i]] <- unlist(z)
+  
+}
+
+any(rowSums(df[, -1]) != 1)
+
+# join this dataset to a reduced version of jena.all
+jena.di <- 
+  full_join(jena.all %>%
+              select(-all_of(spp)),
+            df, by = "plotcode")
+
+names(jena.di)
+
+# reorder the columns to match Laura RPubs
+jena.di <- 
+  jena.di %>%
+  select(plotcode, block, sowndiv, realised_richness1, realised_richness2,
+         all_of(spp), 
+         all_of(func.names))
+
+write_csv(x = jena.di, file = here("data/jena_data_Jochum_2020_clean_di.csv"))
+
 ### END
