@@ -10,7 +10,7 @@ row.randomiser <- function(func.names, species.names, adf.data) {
   
   # subset a matrix of functions
   func.mat <- adf.data[, func.names]
-  func.mat.nrow <- nrow(func.mat) # calculat the number of rows in that matrix
+  func.mat.nrow <- nrow(func.mat) # calculate the number of rows in that matrix
   
   # use sample to get random row ids from the function matrix
   random.row.ids <- sample(x = 1:func.mat.nrow, size = func.mat.nrow , replace = FALSE)
