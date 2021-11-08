@@ -13,6 +13,7 @@ library(MASS)
 library(corrr)
 library(tidyr)
 library(forcats)
+library(viridis)
 
 rm(list = ls())
 
@@ -61,10 +62,13 @@ plot(lm.bm) # assumptions look good
 
 summary(lm.bm)
 
+
+
+
 # soilC
 hist(jena.dat$soilorgC)
 lm.sc <- glm(soilorgC ~ sowndiv_scale, data = jena.dat, family = "gaussian")
-plot(lm.sc)
+plot(lm.sc) # assumptions look good
 
 summary(lm.sc)
 
@@ -125,7 +129,7 @@ summary(lm.cn)
 
 # generate a correlation plot between these functions
 jena.corr.raw <- jena.dat[, func.names]
-names(jena.corr) <- c("Biomass", "Soil Org. C", "Pollination", "Root biomass", "C/N")
+names(jena.corr.raw) <- c("Biomass", "Soil Org. C", "Pollination", "Root biomass", "C/N")
 
 jena.corr <-
   jena.corr.raw %>%
@@ -174,23 +178,29 @@ p.out <-
   mutate(rowname = fct_inorder(term),
          colname = fct_inorder(colname))
 
-ggplot(jena.corr, aes(rowname, fct_rev(colname),
+jena.corr$p.val <- p.out$corr
+
+jena.corr.plot <- 
+  ggplot(jena.corr, aes(rowname, fct_rev(colname),
                  fill = corr)) +
   geom_tile() +
   geom_text(aes(
     label = format(round(corr, 2), nsmall = 2),
-    color = abs(corr) < .75
-  )) +
-  geom_text(data = p.out, 
-            mapping = aes(label = corr)) +
+    color = abs(corr) == 1
+  ), size = 4) +
+  geom_text(aes(
+    label = (p.val) 
+    ), nudge_y = 0.1,  nudge_x = 0.3, size = 6) +
   coord_fixed(expand = FALSE) +
-  scale_color_manual(values = c("white", "black"),
+  scale_color_manual(values = c("black", "white"),
                      guide = "none") +
-  scale_fill_distiller(
-    palette = "PuOr", na.value = "white",
-    direction = 1, limits = c(-1, 1)
-  ) +
+  scale_fill_viridis(
+    option = "D",
+    na.value = "white",
+    direction = -1, alpha = 0.8, begin = 0.1,
+    name = "rho") +
   labs(x = NULL, y = NULL) +
   theme(panel.border = element_rect(color = NA, fill = NA),
-        legend.position = c(.85, .8))
+        legend.position = c(.85, .8),
+        axis.text = element_text(colour = "black"))
 
