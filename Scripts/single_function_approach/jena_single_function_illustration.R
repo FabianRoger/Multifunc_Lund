@@ -36,9 +36,9 @@ jena.dat <-
   jena.dat %>%
   select(-all_of(spp))
 
-# choose four ecosystem functions to examine in the single function approach
+# choose three ecosystem functions to examine in the single function approach
 names(jena.dat)
-func.names <- c("biomass", "soilorgC", "poll", "rootBM", "plantCN")
+func.names <- c("biomass", "poll", "plantCN")
 
 jena.dat <- 
   jena.dat %>%
@@ -163,13 +163,6 @@ lm.bm <- lm((biomass) ~ sowndiv_scale, data = jena.dat)
 
 summary(lm.bm)
 
-# soilC
-hist(jena.dat$soilorgC)
-lm.sc <- lm(soilorgC ~ sowndiv_scale, data = jena.dat)
-# plot(lm.sc) # assumptions look good
-
-summary(lm.sc)
-
 # pollination
 hist(jena.dat$poll)
 lm.po <- glm(round(poll, 0) ~ sowndiv_scale, data = jena.dat, family = "poisson")
@@ -211,18 +204,6 @@ plot(sim_fmp)
 summary(lm.po2)
 drop1(lm.po2, test = "Chisq")
 
-# rootBN
-hist(jena.dat$rootBM)
-
-jena.dat <- 
-  jena.dat %>%
-  mutate(sqrt_rootBM = sqrt(rootBM))
-
-lm.rb <- lm( sqrt_rootBM ~ sowndiv_scale, data = jena.dat)
-# plot(lm.rb) # assumptions look good
-
-summary(lm.rb)
-
 # plantCN
 hist(jena.dat$plantCN)
 lm.cn <- lm(plantCN ~ sowndiv_scale, data = jena.dat)
@@ -231,10 +212,9 @@ lm.cn <- lm(plantCN ~ sowndiv_scale, data = jena.dat)
 summary(lm.cn)
 
 # generate bivariate plots for these five models and functions
-mod.list <- list(lm.bm, lm.sc, lm.po2, lm.rb, lm.cn)
-resp.list <- c("biomass", "soilorgC", "poll", "sqrt_rootBM", "plantCN")
-ylab.list <- c("Biomass, g m-2", "Soil carbon, %", "Pollinator abun.",
-               "sqrt(Root biomass, g m-2 )", "Plant C/N")
+mod.list <- list(lm.bm, lm.po2, lm.cn)
+resp.list <- c("biomass", "poll", "plantCN")
+ylab.list <- c("Biomass, g m-2", "Pollinator abun.", "Plant C/N")
 
 mod.plots <- vector("list", length = length(mod.list))
 for (i in 1:length(mod.list)) {
@@ -248,11 +228,11 @@ for (i in 1:length(mod.list)) {
   
 }
   
-mod.plots[[5]]
+mod.plots[[3]]
 
 # generate a correlation plot between these functions
 jena.corr.raw <- jena.dat[, func.names]
-names(jena.corr.raw) <- c("Biomass", "Soil Org. C", "Pollination", "Root biomass", "C/N")
+names(jena.corr.raw) <- c("BM", "PA", "CN")
 
 jena.corr <-
   jena.corr.raw %>%
@@ -321,16 +301,21 @@ jena.corr.plot <-
   scale_fill_viridis(
     option = "D",
     na.value = "white",
-    direction = -1, alpha = 0.8, begin = 0.1,
+    direction = -1, alpha = 0.8, begin = 0.2, end = 0.8,
     name = "rho") +
   labs(x = NULL, y = NULL) +
   theme(panel.border = element_rect(color = NA, fill = NA),
         legend.position = c(.85, .8),
         axis.text = element_text(colour = "black"))
+jena.corr.plot
 
 # merge these plots in a logical way that doesn't get too ridiculous space-wise
-mod.plots[[1]] + mod.plots[[2]] + mod.plots[[3]] +
-  mod.plots[[4]] + mod.plots[[5]] + jena.corr.plot +
-  plot_layout(ncol = 2, nrow = 3, widths = c(1, 1))
+p1 <- 
+  mod.plots[[1]] + mod.plots[[2]] + mod.plots[[3]] + jena.corr.plot +
+  plot_layout(ncol = 2, nrow = 2, widths = c(1, 1)) + 
+  plot_annotation(tag_levels = 'a')
+
+ggsave(filename = here("Figures/single_func.png"), p1, units = "cm",
+       width = 18, height = 16)
 
 ### END
