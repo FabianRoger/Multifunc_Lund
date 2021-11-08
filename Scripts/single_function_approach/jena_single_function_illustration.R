@@ -9,11 +9,11 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 library(DHARMa)
-library(MASS)
 library(corrr)
 library(tidyr)
 library(forcats)
 library(viridis)
+library(piecewiseSEM)
 
 rm(list = ls())
 
@@ -54,15 +54,116 @@ jena.dat <-
   mutate(sowndiv_scale = scale(sowndiv, center = TRUE, scale = TRUE)[,1])
 
 # fit models with each variable as a response and sowndiv as a predictor
+# plot a bivariate plot for each
+
+# write a function to do this
+
+# write a function to make a decent scatterplot with a fitted model
+
+biv_plotter <- function(data.in, model.input, 
+                        response, predictor.plot, predictor.mod, ylab, xlab,
+                        r2.method = "nagelkerke", mean.pred, sd.pred,
+                        x.breaks = c(1, 2, 4, 8, 12, 16) ) {
+  
+  if( class(model.input) == "lm") {
+    
+    x <- summary(model.input)
+    r <- paste("r2 = ", round(x$r.squared, 1) , sep = "")
+    
+    f <- x$fstatistic
+    fit.test <- paste("F(", f[2], ",", f[3], ")", " = ", round(f[1], 1), sep = "")
+    
+    p <- pf(f[1], df1 = f[2], df2 = f[3], lower.tail = F)
+    
+    if (p < 0.001) {
+      
+      p.val <- ("P < 0.001")
+      
+    } else {
+      
+      p.val <- paste("P = ", round(p, 3))
+      
+    }
+    
+  } else if ( class(model.input) %in% "glm" ) {
+    
+    r <- piecewiseSEM::rsquared(model.input, method = r2.method) 
+    r <- paste("r2 = ", round(r, 1), sep = "")
+    
+    y <- drop1(model.input, test = c("Chisq"))
+    
+    fit.test <- paste("chisq = ", round(y$LRT[2], 1))
+    
+    if (p < 0.001) {
+      
+      p.val <- ("P < 0.001")
+      
+    } else {
+      
+      p.val <- paste("P = ", round(y$`Pr(>Chi)`[2], 3))
+      
+    }
+    
+  } else {
+    
+    stop("error, function only works for lm and glm objects")
+    
+  }
+  
+  x.range <- range(data.in[[predictor.mod]])
+  new.dat <- data.frame(predictor.mod = seq(x.range[1], x.range[2], 0.01))
+  
+  pred.mod <- predict(lm.bm, newdata = new.dat, se = TRUE)
+  
+  pred.dat <- 
+    data.frame((new.dat[[predictor.mod]]*sd.pred) + mean.pred,
+               pred.mod$fit, 
+               pred.mod$fit - pred.mod$se.fit,
+               pred.mod$fit + pred.mod$se.fit )
+  
+  names(pred.dat) <- c(predictor.plot,
+                       paste(response, "pred", sep = "."),
+                       paste(response, "se.low", sep = "."),
+                       paste(response, "se.upp", sep = ".") )
+  
+  pred.names <- names(pred.dat)
+  
+  ggplot() +
+    geom_jitter(data = data.in,
+                mapping = aes_string(x = predictor.plot, y = response ), width = 0.1) +
+    geom_line(data = pred.dat,
+              mapping = aes_string(pred.names[1], pred.names[2] )) +
+    geom_ribbon(data = pred.dat,
+                mapping = aes_string(x = pred.names[1], ymax = pred.names[4],
+                                     ymin = pred.names[3] ), fill = "grey", alpha = 0.5 ) +
+    scale_x_continuous(breaks = x.breaks ) +
+    annotate(geom = 'text', label = r, x = Inf, y = -Inf, 
+             hjust = 1.25, vjust = -5, size = 3.5) +
+    annotate(geom = 'text', label = fit.test, x = Inf, y = -Inf, 
+             hjust = 1.1, vjust = -3.3, size = 3.5) +
+    annotate(geom = 'text', label = p.val, x = Inf, y = -Inf, 
+             hjust = 1.15, vjust = -1.6, size = 3.5) +
+    ylab(ylab) +
+    xlab(xlab) +
+    theme_meta()
+  
+}
+
 
 # biomass
 hist(sqrt(jena.dat$biomass) )
-lm.bm <- glm((biomass) ~ sowndiv_scale, data = jena.dat, family = "gaussian")
-plot(lm.bm) # assumptions look good
+lm.bm <- lm((biomass) ~ sowndiv_scale, data = jena.dat)
+# plot(lm.bm) # assumptions look good
 
 summary(lm.bm)
 
-
+# plot a bivariate plot
+p1 <- 
+  biv_plotter(data.in = jena.dat, model.input = lm.bm, 
+              response = "biomass", predictor.plot = "sowndiv", 
+              predictor.mod = "sowndiv_scale", ylab= "Biomass (g m-2)", xlab = "Sown species richness",
+              r2.method = "nagelkerke", mean.pred = mean(jena.dat$sowndiv), sd.pred = sd(jena.dat$sowndiv),
+              x.breaks = c(1, 2, 4, 8, 12, 16))
 
 
 # soilC
