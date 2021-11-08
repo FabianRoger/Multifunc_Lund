@@ -278,6 +278,7 @@ p.out[ (p.out == p.out | is.na(p.out)) ] <- ifelse(p.adjust(p = p.out, method = 
 p.out <- as_tibble(p.out)
 
 # prepare the correlation data for plotting
+# # https://www.cedricscherer.com/2019/08/05/a-ggplot2-tutorial-for-beautiful-plotting-in-r/#charts
 jena.corr <- 
   jena.corr %>%
   pivot_longer(
