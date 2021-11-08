@@ -14,6 +14,7 @@ library(tidyr)
 library(forcats)
 library(viridis)
 library(piecewiseSEM)
+library(patchwork)
 
 rm(list = ls())
 
@@ -85,14 +86,16 @@ biv_plotter <- function(data.in, model.input,
       
     }
     
-  } else if ( class(model.input) %in% "glm" ) {
+  } else if ( "glm" %in% class(model.input) ) {
     
     r <- piecewiseSEM::rsquared(model.input, method = r2.method) 
-    r <- paste("r2 = ", round(r, 1), sep = "")
+    r <- paste("r2 = ", round(r$R.squared, 1), sep = "")
     
     y <- drop1(model.input, test = c("Chisq"))
     
     fit.test <- paste("chisq = ", round(y$LRT[2], 1))
+    
+    p <- y$`Pr(>Chi)`[2]
     
     if (p < 0.001) {
       
@@ -111,9 +114,10 @@ biv_plotter <- function(data.in, model.input,
   }
   
   x.range <- range(data.in[[predictor.mod]])
-  new.dat <- data.frame(predictor.mod = seq(x.range[1], x.range[2], 0.01))
+  new.dat <- data.frame(seq(x.range[1], x.range[2], 0.01))
+  names(new.dat) <- predictor.mod
   
-  pred.mod <- predict(lm.bm, newdata = new.dat, se = TRUE)
+  pred.mod <- predict(model.input, newdata = new.dat, se = TRUE, type = "response")
   
   pred.dat <- 
     data.frame((new.dat[[predictor.mod]]*sd.pred) + mean.pred,
@@ -127,6 +131,8 @@ biv_plotter <- function(data.in, model.input,
                        paste(response, "se.upp", sep = ".") )
   
   pred.names <- names(pred.dat)
+  
+  # non-gaussian glm's
   
   ggplot() +
     geom_jitter(data = data.in,
@@ -157,19 +163,10 @@ lm.bm <- lm((biomass) ~ sowndiv_scale, data = jena.dat)
 
 summary(lm.bm)
 
-# plot a bivariate plot
-p1 <- 
-  biv_plotter(data.in = jena.dat, model.input = lm.bm, 
-              response = "biomass", predictor.plot = "sowndiv", 
-              predictor.mod = "sowndiv_scale", ylab= "Biomass (g m-2)", xlab = "Sown species richness",
-              r2.method = "nagelkerke", mean.pred = mean(jena.dat$sowndiv), sd.pred = sd(jena.dat$sowndiv),
-              x.breaks = c(1, 2, 4, 8, 12, 16))
-
-
 # soilC
 hist(jena.dat$soilorgC)
-lm.sc <- glm(soilorgC ~ sowndiv_scale, data = jena.dat, family = "gaussian")
-plot(lm.sc) # assumptions look good
+lm.sc <- lm(soilorgC ~ sowndiv_scale, data = jena.dat)
+# plot(lm.sc) # assumptions look good
 
 summary(lm.sc)
 
@@ -197,8 +194,7 @@ testOverdispersion(sim_fmp)
 # https://biometry.github.io/APES/LectureNotes/2016-JAGS/Overdispersion/OverdispersionJAGS.pdf
 
 # 2. use a negative binomial distribution
-library(MASS)
-lm.po2 <- glm.nb(round(poll, 0) ~ sowndiv_scale, data = jena.dat, link = log)
+lm.po2 <- MASS::glm.nb(round(poll, 0) ~ sowndiv_scale, data = jena.dat, link = log)
 
 # check for overdispersion
 lm.po2$deviance/lm.po2$df.residual
@@ -213,20 +209,46 @@ plot(sim_fmp)
 
 # run the summary function
 summary(lm.po2)
+drop1(lm.po2, test = "Chisq")
 
 # rootBN
 hist(jena.dat$rootBM)
-lm.rb <- glm(sqrt(rootBM) ~ sowndiv_scale, data = jena.dat, family = "gaussian")
-plot(lm.rb)
+
+jena.dat <- 
+  jena.dat %>%
+  mutate(sqrt_rootBM = sqrt(rootBM))
+
+lm.rb <- lm( sqrt_rootBM ~ sowndiv_scale, data = jena.dat)
+# plot(lm.rb) # assumptions look good
 
 summary(lm.rb)
 
 # plantCN
 hist(jena.dat$plantCN)
-lm.cn <- glm(plantCN ~ sowndiv_scale, data = jena.dat, family = "gaussian")
-plot(lm.cn)
+lm.cn <- lm(plantCN ~ sowndiv_scale, data = jena.dat)
+# plot(lm.cn) # assumptions are okay (normality a bit off)
 
 summary(lm.cn)
+
+# generate bivariate plots for these five models and functions
+mod.list <- list(lm.bm, lm.sc, lm.po2, lm.rb, lm.cn)
+resp.list <- c("biomass", "soilorgC", "poll", "sqrt_rootBM", "plantCN")
+ylab.list <- c("Biomass, g m-2", "Soil carbon, %", "Pollinator abun.",
+               "sqrt(Root biomass, g m-2 )", "Plant C/N")
+
+mod.plots <- vector("list", length = length(mod.list))
+for (i in 1:length(mod.list)) {
+  
+  mod.plots[[i]] <- 
+    biv_plotter(data.in = jena.dat, model.input = mod.list[[i]], 
+                response = resp.list[[i]], predictor.plot = "sowndiv", 
+                predictor.mod = "sowndiv_scale", ylab= ylab.list[[i]], xlab = "Sown species richness",
+                r2.method = "nagelkerke", mean.pred = mean(jena.dat$sowndiv), sd.pred = sd(jena.dat$sowndiv),
+                x.breaks = c(1, 2, 4, 8, 12, 16))
+  
+}
+  
+mod.plots[[5]]
 
 # generate a correlation plot between these functions
 jena.corr.raw <- jena.dat[, func.names]
@@ -305,3 +327,9 @@ jena.corr.plot <-
         legend.position = c(.85, .8),
         axis.text = element_text(colour = "black"))
 
+# merge these plots in a logical way that doesn't get too ridiculous space-wise
+mod.plots[[1]] + mod.plots[[2]] + mod.plots[[3]] +
+  mod.plots[[4]] + mod.plots[[5]] + jena.corr.plot +
+  plot_layout(ncol = 2, nrow = 3, widths = c(1, 1))
+
+### END
