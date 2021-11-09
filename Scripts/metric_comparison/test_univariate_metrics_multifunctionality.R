@@ -16,8 +16,7 @@ source(here("Scripts/function_plotting_theme.R"))
 source(here("Scripts/MF_functions_collated.R"))
 
 # write a function to generate these function distributions
-
-univariate_explorer <- function(funcnum = 5, grain = 0.05, error = 0.01) {
+univariate_explorer <- function(funcnum = 5, grain = 0.1, error = 0.01) {
   
   # generate n functions between 0 and 1
   x <- replicate(funcnum, seq(0, 1, grain), simplify = FALSE)
@@ -44,17 +43,19 @@ univariate_explorer <- function(funcnum = 5, grain = 0.05, error = 0.01) {
 }
 
 # simulate data for five ecosystem functions
+set.seed(43767)
 sim.dat <- univariate_explorer() 
-sim.dat
+head(sim.dat)
 
 # get a vector of names
 func.names <- names(sim.dat)
 
-sim.dat <- 
+sim.metric <- 
   sim.dat %>%
   mutate(`scal. MF` = MF_jing(adf = sim.dat, vars = func.names),
          `sum MF` = MF_sum(adf = sim.dat, vars = func.names),
          `ave. MF` = MF_av(adf = sim.dat, vars = func.names),
+         `sd. MF` = apply(sim.dat[, func.names], 1, sd),
          `MESLI MF` = MF_mesli(adf = sim.dat, vars = func.names),
          `Pasari MF` = MF_pasari(adf = sim.dat, vars = func.names),
          `SAM MF` = MF_dooley(adf = sim.dat, vars = func.names),
@@ -71,12 +72,22 @@ sim.dat <-
          `PCA MF` = pca_multifunc(adf = sim.dat, vars = func.names, standardise = FALSE) 
          )
 
+rm(sim.dat)
+
 # save this as a .rds file
-saveRDS(sim.dat, here("Scripts/metric_comparison/metric_sims.rds") )
+saveRDS(sim.metric, here("Scripts/metric_comparison/metric_sims.rds") )
 
+# count the number of rows
+nrow(sim.metric)
 
+# make a test plot
+ggplot(data = sim.metric[sample(1:nrow(sim.metric), 10000), ],
+       mapping = aes(x = `ave. MF`, y = `sd. MF`, colour = `PCA MF`)) +
+  geom_point(alpha = 0.2) +
+  scale_colour_viridis_c() +
+  theme_meta()
 
-
+cor(sim.metric[sample(1:nrow(sim.metric), 10000), -c(1, 2, 3, 4, 5)])
 
 
 
