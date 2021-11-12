@@ -8,12 +8,104 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(here)
+library(readr)
 
 rm(list = ls())
 
 # tell R where to call scripts from
 source(here("Scripts/function_plotting_theme.R"))
 source(here("Scripts/MF_functions_collated.R"))
+
+# load the jena data
+jena.dat <- read_csv(file = here("data/jena_data_Jochum_2020_clean.csv"))
+
+# check the column names
+col_names <- names(jena.dat)
+
+# remove the individual species abundances
+spp <- col_names[grepl(pattern = "[A-Z][a-z]{2}[.][a-z]{3}", col_names)]
+length(spp)
+rm(col_names)
+
+jena.dat <- 
+  jena.dat %>%
+  select(-all_of(spp))
+
+# fit distributions to these functions
+jena.dat$biomass
+
+library(fitdistrplus)
+Fit.dist <- function(func, dists = c("norm", "lnorm", "gamma", "unif", "weibull")) {
+  
+  x <- dists
+  y <- vector(length = length(x))
+  u <- vector("list", length(x))
+  for (i in 1:length(x)) {
+    
+    z <- fitdist(func, x[i])
+    u[[i]] <- z
+    z.sum <- summary(z)
+    y[[i]] <- z.sum$aic
+    
+  }
+  
+  u[which(y == min(y))][[1]]
+  
+}
+
+# choose six functions and find the best fitting distributions
+names(jena.dat)
+func.names <- c("biomass",  "plantCN", "soilC",             
+                "soilorgC", "herbi", "micBMC", "phoact",            
+                "poll", "rootBM")
+
+best.dist <- vector("list", length = length(func.names))
+for(i in 1:length(func.names)) {
+  
+  best.dist[[i]] <- Fit.dist(func = jena.dat[[func.names[i] ]])
+  
+}
+
+# choose distributions that represent a range of possible distributions
+best.dist.sub <- best.dist[c(1, 3, 5, 7, 8)]
+
+# set up the number of points to simulate
+n.sim <- 1000
+
+# weibull distribution
+best.dist.sub[[1]]
+x1 <- rweibull(n = n.sim, shape = best.dist.sub[[1]]$estimate[1], scale = best.dist.sub[[1]]$estimate[2])
+
+# uniform distribution
+best.dist.sub[[2]]
+x2 <- runif(n = n.sim, best.dist.sub[[2]]$estimate[1],best.dist.sub[[2]]$estimate[2] )
+
+# lnorm
+best.dist.sub[[3]]
+x3 <- rlnorm(n = n.sim, best.dist.sub[[3]]$estimate[1], best.dist.sub[[3]]$estimate[2])
+
+# weibull
+best.dist.sub[[4]]
+x4 <- rweibull(n = n.sim, best.dist.sub[[4]]$estimate[1], best.dist.sub[[4]]$estimate[2])
+
+# gamma
+best.dist.sub[[5]]
+x5 <- rgamma(n = n.sim, best.dist.sub[[5]]$estimate[1], best.dist.sub[[5]]$estimate[2])
+
+x.sim <- 
+  lapply(list(x1, x2, x3, x4, x5), function(x) {
+  
+  y <- scale(x)[,1]
+  y <- y + abs(min(y))
+  z <- range(y)
+  
+  seq(z[1], z[2], length.out = 10)
+  
+})
+
+x.sims <- do.call(expand.grid, x.sim)
+names(x.sims) <- paste("F_", 1:length(x.sim), sep = "")
+x.sims <- as_tibble(x.sims)
 
 # write a function to generate these function distributions
 univariate_explorer <- function(funcnum = 5, grain = 0.1, error = 0.01) {
@@ -42,16 +134,22 @@ univariate_explorer <- function(funcnum = 5, grain = 0.1, error = 0.01) {
   
 }
 
-# simulate data for five ecosystem functions
-set.seed(43767)
-sim.dat <- univariate_explorer() 
-head(sim.dat)
+# simulate data for five ecosystem functions using univariate simulator
+# set.seed(43767)
+# sim.dat <- univariate_explorer() 
+# head(sim.dat)
 
 # get a vector of names
-func.names <- names(sim.dat)
+# func.names <- names(sim.dat)
+
+# use the empirical distribution data
+func.names <- names(x.sims)
+sim.dat <- x.sims
+
+apply(sim.dat[1:20, ], 1, function(x) { sum(ifelse(x > 0, 1, 0)) })
 
 sim.metric <- 
-  sim.dat %>%
+  x.sims %>%
   mutate(`scal. MF` = MF_jing(adf = sim.dat, vars = func.names),
          `sum MF` = MF_sum(adf = sim.dat, vars = func.names),
          `ave. MF` = MF_av(adf = sim.dat, vars = func.names),
@@ -69,25 +167,84 @@ sim.metric <-
          `thresh.70 MF` = single_threshold_mf(adf = sim.dat, vars = func.names, thresh = 0.7),
          `Slade.10.90 MF` = MF_slade(adf = sim.dat, vars = func.names, A_quant = 0.10, B_quant = 0.90),
          `Slade.40.60 MF` = MF_slade(adf = sim.dat, vars = func.names, A_quant = 0.40, B_quant = 0.60),
-         `PCA MF` = pca_multifunc(adf = sim.dat, vars = func.names, standardise = FALSE) 
+         `PCA MF` = pca_multifunc(adf = sim.dat, vars = func.names, standardise = FALSE),
+         one_positive = apply(sim.dat, 1, function(x) { sum(sum(ifelse(x > 0, 1, 0)) == 1) }),
+         n_positive = apply(sim.dat, 1, function(x) { sum(ifelse(x > 0, 1, 0)) })
          )
 
 rm(sim.dat)
 
 # save this as a .rds file
-saveRDS(sim.metric, here("Scripts/metric_comparison/metric_sims.rds") )
+# saveRDS(sim.metric, here("Scripts/metric_comparison/metric_sims.rds") )
+
+# Pasari can go negative despite positive average
+
+# all metrics we tested are zero when all functions are zero
+
+
 
 # count the number of rows
 nrow(sim.metric)
 
+names(sim.metric)
+
+df <- sim.metric[sample(1:nrow(sim.metric), 5000), ]
+pos.df <- df %>% filter(`SAM MF` > 0)
+pos1.df <- df %>% filter(one_positive == 1)
+neg.df <- df %>% filter(`SAM MF` <= 0)
+
 # make a test plot
-ggplot(data = sim.metric[sample(1:nrow(sim.metric), 10000), ],
-       mapping = aes(x = `ave. MF`, y = `sd. MF`, colour = `PCA MF`)) +
-  geom_point(alpha = 0.2) +
-  scale_colour_viridis_c() +
+ggplot() +
+  geom_point(data = pos.df,
+             mapping = aes(x = `ave. MF`, y = `sd. MF`, colour = `SAM MF`), 
+             alpha = 0.5) +
+  geom_point(data = pos1.df, 
+             mapping = aes(x = `ave. MF`, y = `sd. MF`), 
+             size = 5, shape = 1, colour = "red") +
+  geom_point(data = neg.df, 
+             mapping = aes(x = `ave. MF`, y = `sd. MF`), colour = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  scale_colour_viridis_c() + 
   theme_meta()
 
+range(df$`Pasari MF`)
+range(df$`sd. MF`)
+
+df %>%
+  filter(`sd. MF` == max(`sd. MF`))
+
+# not all the metrics are maximised when all the functions are at their maximum
+# for a given set of plots
+
+# SAM metric
+# PCA metric
+# Simpson index
+
+sim.metric %>%
+  filter(F_1 == max(F_1), 
+         F_2 == max(F_2),
+         F_3 == max(F_3),
+         F_4 == max(F_4),
+         F_5 == max(F_5)) %>%
+  View()
+
+lapply(sim.metric, range, na.rm = TRUE)
+
 cor(sim.metric[sample(1:nrow(sim.metric), 10000), -c(1, 2, 3, 4, 5)])
+
+
+x <- rnorm(n = 1000, 100, 10)
+y <- runif(n = 1000, min = 0, max = 10)
+z <- rpois(n = 1000, 50)
+
+lapply(list(x, y, z), function(x){
+  
+  scale(x)[,1] %>% range()
+  
+})
+
+
+
 
 
 
