@@ -32,7 +32,7 @@ jena.dat <-
   select(-all_of(spp))
 
 # fit distributions to these functions
-jena.dat$biomass
+hist(jena.dat$biomass)
 
 library(fitdistrplus)
 Fit.dist <- function(func, dists = c("norm", "lnorm", "gamma", "unif", "weibull")) {
@@ -92,11 +92,28 @@ x4 <- rweibull(n = n.sim, best.dist.sub[[4]]$estimate[1], best.dist.sub[[4]]$est
 best.dist.sub[[5]]
 x5 <- rgamma(n = n.sim, best.dist.sub[[5]]$estimate[1], best.dist.sub[[5]]$estimate[2])
 
+standardisation <- "max"
+
 x.sim <- 
   lapply(list(x1, x2, x3, x4, x5), function(x) {
   
-  y <- scale(x)[,1]
-  y <- y + abs(min(y))
+    y <- c(0, x)
+    
+  if (standardisation == "z_score") {
+    
+    y <- scale(y)[,1]
+    y <- y + abs(min(y))
+    
+  }  else if (standardisation == "max_0_1") {
+    
+    y <- ( y - min(y) )/( max(y) - min(y) )
+    
+  } else if (standardisation == "max") {
+    
+    y <- y/max(y)
+    
+  }
+    
   z <- range(y)
   
   seq(z[1], z[2], length.out = 10)
@@ -105,51 +122,16 @@ x.sim <-
 
 x.sims <- do.call(expand.grid, x.sim)
 names(x.sims) <- paste("F_", 1:length(x.sim), sep = "")
-x.sims <- as_tibble(x.sims)
+sim.dat <- as_tibble(x.sims)
+rm(x.sims)
 
 # write a function to generate these function distributions
-univariate_explorer <- function(funcnum = 5, grain = 0.1, error = 0.01) {
-  
-  # generate n functions between 0 and 1
-  x <- replicate(funcnum, seq(0, 1, grain), simplify = FALSE)
-  
-  # put these functions into a matrix
-  y <- do.call("expand.grid", x)
-  
-  # add a small amount of error and set to zero if zero
-  nm <- nrow(y)*ncol(y)
-  y <- y + rnorm(n = nm, 0, error)
-  y[y < 0] <- 0
-  
-  names(y) <- paste("F_", 1:funcnum, sep = "")
-  
-  # convert y to a tibble
-  df <- tibble(y)
-  
-  # only get unique rows
-  df <- distinct(df)
-  
-  # output the df
-  df
-  
-}
-
-# simulate data for five ecosystem functions using univariate simulator
-# set.seed(43767)
-# sim.dat <- univariate_explorer() 
-# head(sim.dat)
-
-# get a vector of names
-# func.names <- names(sim.dat)
 
 # use the empirical distribution data
-func.names <- names(x.sims)
-sim.dat <- x.sims
-
-apply(sim.dat[1:20, ], 1, function(x) { sum(ifelse(x > 0, 1, 0)) })
+func.names <- names(sim.dat)
 
 sim.metric <- 
-  x.sims %>%
+  sim.dat %>%
   mutate(`scal. MF` = MF_jing(adf = sim.dat, vars = func.names),
          `sum MF` = MF_sum(adf = sim.dat, vars = func.names),
          `ave. MF` = MF_av(adf = sim.dat, vars = func.names),
@@ -188,15 +170,34 @@ nrow(sim.metric)
 
 names(sim.metric)
 
-df <- sim.metric[sample(1:nrow(sim.metric), 5000), ]
-pos.df <- df %>% filter(`SAM MF` > 0)
+df <- sim.metric[sample(1:nrow(sim.metric), 1000), ]
+df.max <- 
+  sim.metric %>%
+  filter(across(.cols = starts_with("F_"), ~.x == max(.x, na.rm = TRUE)))
+df.min <- 
+  sim.metric %>%
+  filter(across(.cols = starts_with("F_"), ~.x == min(.x, na.rm = TRUE)))
+df <- 
+  rbind(df, df.max, df.min) %>%
+  distinct()
+
+x <- "`Pasari MF`"
+range(df$`Pasari MF`, na.rm = TRUE)
+
+pos.df <- df %>% filter(eval(str2expression(x) ) > 0)
+pos.df
 pos1.df <- df %>% filter(one_positive == 1)
-neg.df <- df %>% filter(`SAM MF` <= 0)
+pos1.df
+neg.df <- df %>% filter(eval(str2expression(x) ) <= 0)
+neg.df
+
+pos.df %>%
+  filter(`ave. MF` == 1)
 
 # make a test plot
 ggplot() +
   geom_point(data = pos.df,
-             mapping = aes(x = `ave. MF`, y = `sd. MF`, colour = `SAM MF`), 
+             mapping = aes_string(x = "`ave. MF`", y = "`sd. MF`", colour = x ), 
              alpha = 0.5) +
   geom_point(data = pos1.df, 
              mapping = aes(x = `ave. MF`, y = `sd. MF`), 
@@ -204,10 +205,12 @@ ggplot() +
   geom_point(data = neg.df, 
              mapping = aes(x = `ave. MF`, y = `sd. MF`), colour = "black") +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "red") +
   scale_colour_viridis_c() + 
   theme_meta()
 
 range(df$`Pasari MF`)
+range(df$`SAM MF`)
 range(df$`sd. MF`)
 
 df %>%
@@ -245,6 +248,41 @@ lapply(list(x, y, z), function(x){
 
 
 
+# 0 - 1 sims
+
+univariate_explorer <- function(funcnum = 5, grain = 0.1, error = 0.01) {
+  
+  # generate n functions between 0 and 1
+  x <- replicate(funcnum, seq(0, 1, grain), simplify = FALSE)
+  
+  # put these functions into a matrix
+  y <- do.call("expand.grid", x)
+  
+  # add a small amount of error and set to zero if zero
+  nm <- nrow(y)*ncol(y)
+  y <- y + rnorm(n = nm, 0, error)
+  y[y < 0] <- 0
+  
+  names(y) <- paste("F_", 1:funcnum, sep = "")
+  
+  # convert y to a tibble
+  df <- tibble(y)
+  
+  # only get unique rows
+  df <- distinct(df)
+  
+  # output the df
+  df
+  
+}
+
+# simulate data for five ecosystem functions using univariate simulator
+# set.seed(43767)
+# sim.dat <- univariate_explorer() 
+# head(sim.dat)
+
+# get a vector of names
+# func.names <- names(sim.dat)
 
 
 
