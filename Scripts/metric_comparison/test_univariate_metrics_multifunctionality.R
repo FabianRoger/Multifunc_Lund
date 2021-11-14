@@ -3,6 +3,19 @@
 
 # Title: Code to compare different metrics of multifunctionality given different function distributions
 
+# what are the crucial characteristics?
+
+# should be zero if all functions are zero
+# should be maximised if all functions are their maximum
+# should be positive
+
+# must be defined for any possible functional distribution (i.e. cannot be undefined)
+
+# debatable characteristics
+
+# should be zero if there is only one positive function
+
+
 # load relevant libraries
 library(dplyr)
 library(tidyr)
@@ -156,65 +169,131 @@ sim.metric <-
 
 rm(sim.dat)
 
-# save this as a .rds file
-# saveRDS(sim.metric, here("Scripts/metric_comparison/metric_sims.rds") )
+# add a row.id column
+sim.metric$row_id <- 1:nrow(sim.metric)
 
-# Pasari can go negative despite positive average
+# what do we need?
 
-# all metrics we tested are zero when all functions are zero
+# 1. all values at max
+# 2. all values at zero
+# 3. all values where only one function is positive
+# 4. the rest
 
+# create the simulated dataset to plot
+df <- sim.metric[sample(1:nrow(sim.metric), 2000), ]
+df <- 
+  df %>%
+  mutate(fig.1.group = c(NA),
+         group.colours = 1)
 
-
-# count the number of rows
-nrow(sim.metric)
-
-names(sim.metric)
-
-df <- sim.metric[sample(1:nrow(sim.metric), 1000), ]
 df.max <- 
   sim.metric %>%
   filter(across(.cols = starts_with("F_"), ~.x == max(.x, na.rm = TRUE)))
+
+df.max <- 
+  df.max %>%
+  mutate(fig.1.group = c("a"),
+         group.colours = 2)
+
 df.min <- 
   sim.metric %>%
   filter(across(.cols = starts_with("F_"), ~.x == min(.x, na.rm = TRUE)))
+
+df.min <- 
+  df.min %>%
+  mutate(fig.1.group = c("b"),
+         group.colours = 3)
+
+# remove duplicates in the df data.frame
 df <- 
-  rbind(df, df.max, df.min) %>%
-  distinct()
+  df %>%
+  filter(!(row_id %in% c(df.max$row_id, df.min$row_id)))
 
-x <- "`Pasari MF`"
-range(df$`Pasari MF`, na.rm = TRUE)
+df.all <- 
+  rbind(df.min, df.one.positive, df, df.max)
 
-pos.df <- df %>% filter(eval(str2expression(x) ) > 0)
-pos.df
-pos1.df <- df %>% filter(one_positive == 1)
-pos1.df
-neg.df <- df %>% filter(eval(str2expression(x) ) <= 0)
-neg.df
+# get the median average MF and median
+df.med <- 
+  df %>%
+  filter(`ave. MF` == median(`ave. MF`)) %>%
+  filter(`sd. MF` == median(`sd. MF`) | `sd. MF` < quantile(`sd. MF`, 0.1) | `sd. MF` > quantile(`sd. MF`, 0.9)) %>%
+  group_by(`sd. MF`) %>%
+  sample_n(size = 1) %>%
+  ungroup()
 
-pos.df %>%
-  filter(`ave. MF` == 1)
+df.med <- 
+  df.med[c(1, round(nrow(df.med)/2, 0), nrow(df.med)), ] %>%
+  mutate(fig.1.group = c("f", "e", "d"))
+
+# make a data.frame for the labels
+df.label <- rbind(df.max, df.min, df.one.positive[round(nrow(df.one.positive)/2, 0), ], df.med)
 
 # make a test plot
-ggplot() +
-  geom_point(data = pos.df,
-             mapping = aes_string(x = "`ave. MF`", y = "`sd. MF`", colour = x ), 
-             alpha = 0.5) +
-  geom_point(data = pos1.df, 
-             mapping = aes(x = `ave. MF`, y = `sd. MF`), 
-             size = 5, shape = 1, colour = "red") +
-  geom_point(data = neg.df, 
-             mapping = aes(x = `ave. MF`, y = `sd. MF`), colour = "black") +
-  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
-  geom_hline(yintercept = 0, linetype = "dashed", colour = "red") +
+library(ggrepel)
+ggplot( mapping = aes(x = `ave. MF`, y = `sd. MF` ) ) +
+  geom_point(data = df, alpha = 0.1) +
+  geom_point(data = df.max, colour = "red", size = 2, shape = 17) +
+  geom_point(data = df.min, colour = "green", size = 3, shape = 18) +
+  geom_point(data = df.one.positive, colour = "orange", size = 2, shape = 15) +
+  geom_point(data = df.med, colour = "blue", size = 2) +
+  geom_label_repel(data = df.label, mapping = aes(label = fig.1.group ),
+                   segment.colour = "black", min.segment.length = 0.2,
+                   fill = "grey", colour = "white") +
+  ylab("SD among functions") +
+  xlab("Mean among functions") +
   scale_colour_viridis_c() + 
   theme_meta()
 
-range(df$`Pasari MF`)
-range(df$`SAM MF`)
-range(df$`sd. MF`)
+# plot each highlighted point in the test plot
+df.label.long <- 
+  df.label %>%
+  dplyr::select(fig.1.group, starts_with("F_") ) %>%
+  pivot_longer(cols = starts_with("F_"),
+               names_to = "function_id", 
+               values_to = "function_value")
 
-df %>%
-  filter(`sd. MF` == max(`sd. MF`))
+ggplot(data = df.label.long %>% filter(fig.1.group == "f"),
+       mapping = aes(x = function_id, y = function_value)) +
+  geom_bar(stat = "identity", width = 0.5) +
+  scale_y_continuous(limits = c(-0.05, 1.05), breaks = seq(0, 1, 0.2)) +
+  theme_meta()
+
+
+# for each metric, what do we want to plot separately?
+# set the metric
+names(df.all)
+metric <- "SAM MF"
+
+df.all <- 
+  df.all %>%
+  mutate(metric_negative = as.character(if_else(get(metric) < 0, 1, 0)) )
+
+df.undefined <- 
+  df.all %>%
+  filter(is.na(get(metric)) | get(metric) == Inf)
+
+ggplot() +
+  geom_point(data = df.all,
+             mapping = aes(x = `ave. MF`, y = `sd. MF`, shape = metric_negative, colour = get(metric) ),
+             size = 2) +
+  scale_colour_viridis_c() +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "black") +
+  geom_point(data = df.min, 
+             mapping = aes(x = `ave. MF`, y = `sd. MF`), 
+             colour = "red", shape = 17, alpha = 1, size = 3) +
+  geom_point(data = df.max,
+             mapping = aes(x = `ave. MF`, y = `sd. MF`),
+             colour = "red", shape = 16, alpha = 1, size = 3) +
+  geom_point(data = df.undefined,
+             mapping = aes(x = `ave. MF`, y = `sd. MF`),
+             colour = "black", shape = 21, alpha = 1, fill = "white", size = 3) +
+  scale_y_continuous(limits = c(-0.05, 0.55)) +
+  scale_x_continuous(limits = c(-0.05, 1.05)) +
+  theme_meta() +
+  theme(legend.position = "none")
+
+
 
 # not all the metrics are maximised when all the functions are at their maximum
 # for a given set of plots
