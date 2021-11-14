@@ -7,7 +7,7 @@
 
 # should be zero if all functions are zero
 # should be maximised if all functions are their maximum
-# should be positive
+# should be positive always because what does a negative multifunctionality mean?
 
 # must be defined for any possible functional distribution (i.e. cannot be undefined)
 
@@ -105,7 +105,7 @@ x4 <- rweibull(n = n.sim, best.dist.sub[[4]]$estimate[1], best.dist.sub[[4]]$est
 best.dist.sub[[5]]
 x5 <- rgamma(n = n.sim, best.dist.sub[[5]]$estimate[1], best.dist.sub[[5]]$estimate[2])
 
-standardisation <- "max"
+standardisation <- "z_score"
 
 x.sim <- 
   lapply(list(x1, x2, x3, x4, x5), function(x) {
@@ -210,23 +210,9 @@ df <-
   filter(!(row_id %in% c(df.max$row_id, df.min$row_id)))
 
 df.all <- 
-  rbind(df.min, df.one.positive, df, df.max)
+  rbind(df.min, df, df.max)
 
 # get the median average MF and median
-df.med <- 
-  df %>%
-  filter(`ave. MF` == median(`ave. MF`)) %>%
-  filter(`sd. MF` == median(`sd. MF`) | `sd. MF` < quantile(`sd. MF`, 0.1) | `sd. MF` > quantile(`sd. MF`, 0.9)) %>%
-  group_by(`sd. MF`) %>%
-  sample_n(size = 1) %>%
-  ungroup()
-
-df.med <- 
-  df.med[c(1, round(nrow(df.med)/2, 0), nrow(df.med)), ] %>%
-  mutate(fig.1.group = c("f", "e", "d"))
-
-# make a data.frame for the labels
-df.label <- rbind(df.max, df.min, df.one.positive[round(nrow(df.one.positive)/2, 0), ], df.med)
 
 # make a test plot
 library(ggrepel)
@@ -234,8 +220,6 @@ ggplot( mapping = aes(x = `ave. MF`, y = `sd. MF` ) ) +
   geom_point(data = df, alpha = 0.1) +
   geom_point(data = df.max, colour = "red", size = 2, shape = 17) +
   geom_point(data = df.min, colour = "green", size = 3, shape = 18) +
-  geom_point(data = df.one.positive, colour = "orange", size = 2, shape = 15) +
-  geom_point(data = df.med, colour = "blue", size = 2) +
   geom_label_repel(data = df.label, mapping = aes(label = fig.1.group ),
                    segment.colour = "black", min.segment.length = 0.2,
                    fill = "grey", colour = "white") +
@@ -262,34 +246,46 @@ ggplot(data = df.label.long %>% filter(fig.1.group == "f"),
 # for each metric, what do we want to plot separately?
 # set the metric
 names(df.all)
-metric <- "SAM MF"
+metric <- "Simp. MF"
 
-df.all <- 
+df.metric <- 
   df.all %>%
+  filter(!is.na(get(metric))) %>%
+  filter(get(metric) != Inf) %>%
+  filter(get(metric) != -Inf) %>%
   mutate(metric_negative = as.character(if_else(get(metric) < 0, 1, 0)) )
 
-df.undefined <- 
-  df.all %>%
-  filter(is.na(get(metric)) | get(metric) == Inf)
+df.metric.max <- 
+  df.metric %>%
+  filter(get(metric) != Inf) %>%
+  filter(get(metric) == max(get(metric)))
+
+df.metric.min <- 
+  df.metric %>%
+  filter(get(metric) != -Inf) %>%
+  filter(get(metric) == min(get(metric)))
 
 ggplot() +
-  geom_point(data = df.all,
+  geom_point(data = df.metric,
              mapping = aes(x = `ave. MF`, y = `sd. MF`, shape = metric_negative, colour = get(metric) ),
-             size = 2) +
+             size = 2, alpha = 0.5) +
   scale_colour_viridis_c() +
-  geom_hline(yintercept = 0, linetype = "dashed", colour = "black") +
-  geom_vline(xintercept = 0, linetype = "dashed", colour = "black") +
+  geom_hline(yintercept = df.min[["sd. MF"]], linetype = "dashed", colour = "black") +
+  geom_vline(xintercept = df.max[["ave. MF"]], linetype = "dashed", colour = "black") +
   geom_point(data = df.min, 
              mapping = aes(x = `ave. MF`, y = `sd. MF`), 
-             colour = "red", shape = 17, alpha = 1, size = 3) +
+             colour = "black", shape = 17, alpha = 1, size = 3) +
   geom_point(data = df.max,
              mapping = aes(x = `ave. MF`, y = `sd. MF`),
-             colour = "red", shape = 16, alpha = 1, size = 3) +
-  geom_point(data = df.undefined,
+             colour = "black", shape = 16, alpha = 1, size = 3) +
+  geom_point(data = df.metric.max,
              mapping = aes(x = `ave. MF`, y = `sd. MF`),
-             colour = "black", shape = 21, alpha = 1, fill = "white", size = 3) +
-  scale_y_continuous(limits = c(-0.05, 0.55)) +
-  scale_x_continuous(limits = c(-0.05, 1.05)) +
+             colour = "red", shape = 16, alpha = 1, size = 4) +
+  geom_point(data = df.metric.min,
+             mapping = aes(x = `ave. MF`, y = `sd. MF`),
+             colour = "red", shape = 17, alpha = 1, size = 4) +
+  # scale_y_continuous(limits = c(-0.05, 0.55)) +
+  # scale_x_continuous(limits = c(-0.05, 1.05)) +
   theme_meta() +
   theme(legend.position = "none")
 
