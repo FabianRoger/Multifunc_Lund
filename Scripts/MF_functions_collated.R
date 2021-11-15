@@ -1,6 +1,49 @@
 
 # functions to calculate multifunctionality
 
+# function to standardise functions to match the original paper
+# this function is built into all functions
+# therefore, the user can choose the standardisation method
+# the default is always the one that is most commonly used in the literature
+standardise_functions <- function(x, method) {
+  
+  if (method == "z_score") {
+    
+    y <- scale(x)[,1]
+    
+  } else if (method == "z_score_abs") {
+    
+    y <- scale(x)[,1]
+    y <- y + abs(min(y))
+    
+  } else if (method == "max_0_1") {
+    
+    y <- ( x - min(x) )/( max(x) - min(x) )
+    
+  } else if (method == "max") {
+    
+    y <- x/max(x)
+    
+  } else if (method == "max_5_%") {
+    
+    max_x <- x[x > quantile(x, 0.95)]
+    y <- x/mean(max_x)
+    
+  } else if (method == "none") {
+    
+    y <- x
+    
+  } else {
+    
+    stop("error, choose appropriate standardisation method", call. = FALSE)
+    
+  }
+  
+  y
+  
+}
+
+
 # key arguments for all functions:
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to be a named vector
@@ -13,8 +56,9 @@
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
 # scales is the order of diversity that should be calculated. default = 1
+# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
 
-hill_multifunc <- function(adf, vars, scale = 1, HILL = TRUE){
+hill_multifunc <- function(adf, vars, scale = 1, HILL = TRUE, stand_method = "z_score_abs"){
   
   if(! "vegan" %in% installed.packages()[,1]) stop(
     "this function requires vegan to be installed"
@@ -25,6 +69,9 @@ hill_multifunc <- function(adf, vars, scale = 1, HILL = TRUE){
   )
   
   adf_mat <- adf[,vars]
+  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- as.data.frame(adf_mat)
+  
   effN <- vegan::renyi(adf_mat, scales = scale, hill = TRUE)
   if(!HILL) effN <- effN/length(vars)
   meanFunc <- rowMeans(adf_mat) 
@@ -44,6 +91,7 @@ hill_multifunc <- function(adf, vars, scale = 1, HILL = TRUE){
 # ind is the index used to determine the optimal number of clusters using NbClust function (if multiple are included, the median of all of them is used)
 # met is the method used for clustering. This functions supports all methods in hclust() besides "kmeans"
 # thresh is the threshold for function assigngin a zero or one
+# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
 
 # this doesn't work with few functions
 
@@ -51,7 +99,8 @@ manning_multifunc <- function(adf, vars,
                               ind = c("mcclain", "cindex", "silhouette", "dunn"), 
                               met = "ward.D2",
                               dis = "euclidean",
-                              thresh = 0.5) {
+                              thresh = 0.5,
+                              stand_method = "max_5_%") {
   
   if(! "NbClust" %in% installed.packages()[,1]) stop(
     "this function requires NbClust to be installed and loaded"
@@ -67,6 +116,10 @@ manning_multifunc <- function(adf, vars,
   # transpose the adf matrix
   adf_mat_t <- as.data.frame(t((adf_mat[ , ]))) 
   
+  # scale the transposed matrix
+  adf_mat_t <- apply(adf_mat_t, 2, standardise_functions, method = "z_score")
+  adf_mat_t <- as.data.frame(adf_mat_t)
+
   # generate a distance matrix based on the transposed adf matrix
   adf_dist <- dist(adf_mat_t, method = dis)
   
@@ -101,7 +154,7 @@ manning_multifunc <- function(adf, vars,
     apply(X = adf_mat, MARGIN = 2,
           FUN = function(z) { 
             
-            y <- z/max(z)
+            y <- standardise_functions(x = z, method = stand_method)
             
             ifelse(y > thresh, 1, 0)
             
@@ -126,16 +179,20 @@ manning_multifunc <- function(adf, vars,
 
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector
-# standardise is a logical value (TRUE or FALSE)
 
-pca_multifunc <- function(adf, vars, standardise = FALSE){
+pca_multifunc <- function(adf, vars){
   
   if(! "vegan" %in% installed.packages()[,1]) stop(
     "this function requires vegan to be installed"
   )
   
+  warning("stand_method cannot be altered with this function as the PCA approach requires z_score standardised function data")
+  
   adf_mat <- adf[,vars]
-  pca2<-vegan::rda(adf_mat, scale = standardise)
+  adf_mat <- apply(adf_mat, 2, standardise_functions, method = "z_score")
+  adf_mat <- as.data.frame(adf_mat)
+  
+  pca2<-vegan::rda(adf_mat, scale = FALSE)
   
   pc_load <- prcomp(x = adf_mat)
   pc_load <- pc_load$rotation %*% diag(pc_load$sdev) 
@@ -166,31 +223,14 @@ pca_multifunc <- function(adf, vars, standardise = FALSE){
 
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
-# stand is the method of standardisation. three methods are supported: (1) no standardisation ("none") (2) z-score standardisation ("z_score") and (3) by the maximum ("max")
+# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
 
-MF_pasari <- function(adf, vars, stand = "none") {
+MF_pasari <- function(adf, vars, stand_method = "max") {
   
   # extract functions from input matrix: adf
-  adf_mat <- adf[, vars] 
-  
-  # standardise the functions using: (1) the z-score ("z_score") or (2) by the maximum ("max")
-  
-  if (stand == "none") {
-    
-  } else if (stand == "z_score") {
-    
-    adf_mat <- as.matrix(scale(x = adf_mat, center = TRUE, scale = TRUE))
-    
-  } else if (stand == "max") {
-    
-    adf_mat <- 
-      apply(X = adf_mat, MARGIN = 2, FUN = function(z) { z/max(z)} )
-    
-  } else { 
-    
-    stop("this function requires a standardisation method") 
-    
-  }
+  adf_mat <- adf[, vars]
+  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- as.data.frame(adf_mat)
   
   mf_pasari <- apply(adf_mat, MARGIN = 1, function(x) mean(x) ) - apply(adf_mat, MARGIN = 1, function(x) sd(x) ) 
   
@@ -205,31 +245,14 @@ MF_pasari <- function(adf, vars, stand = "none") {
 
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
-# stand is the method of standardisation. three methods are supported: (1) no standardisation ("none") (2) z-score standardisation ("z_score") and (3) by the maximum ("max")
+# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
 
-MF_dooley <- function(adf, vars, stand = "none") {
+MF_dooley <- function(adf, vars, stand_method = "max_5_%") {
   
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars] 
-  
-  # standardise the functions using: (1) the z-score ("z_score") or (2) by the maximum ("max")
-  
-  if (stand == "none") {
-    
-  } else if (stand == "z_score") {
-    
-    adf_mat <- as.matrix(scale(x = adf_mat, center = TRUE, scale = TRUE))
-    
-  } else if (stand == "max") {
-    
-    adf_mat <- 
-      apply(X = adf_mat, MARGIN = 2, FUN = function(z) { z/max(z)} )
-    
-  } else { 
-    
-    stop("this function requires a standardisation method") 
-    
-  }
+  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- as.data.frame(adf_mat)
   
   mf_dooley <- apply(adf_mat, MARGIN = 1, function(x) mean(x) )/apply(adf_mat, MARGIN = 1, function(x) sd(x) )
   
@@ -246,31 +269,16 @@ MF_dooley <- function(adf, vars, stand = "none") {
 # vars has to bee a named vector of functions to include which has to correspond to column names
 # stand is the method of standardisation. three methods are supported: (1) no standardisation ("none") (2) z-score standardisation ("z_score") and (3) by the maximum ("max")
 
-MF_jing <- function(adf, vars, stand = "none") {
+MF_jing <- function(adf, vars) {
   
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars] 
+  adf_mat <- apply(adf_mat, 2, standardise_functions, method = "z_score")
+  adf_mat <- as.data.frame(adf_mat)
   
-  # standardise the functions using: (1) the z-score ("z_score") or (2) by the maximum ("max")
+  warning("stand_method cannot be altered with this function as Jing et al.'s approach requires z_score standardised function data")
   
-  if (stand == "none") {
-    
-  } else if (stand == "z_score") {
-    
-    adf_mat <- as.matrix(scale(x = adf_mat, center = TRUE, scale = TRUE))
-    
-  } else if (stand == "max") {
-    
-    adf_mat <- 
-      apply(X = adf_mat, MARGIN = 2, FUN = function(z) { z/max(z)} )
-    
-  } else { 
-    
-    stop("this function requires a standardisation method") 
-    
-  }
-  
-  mf_jing <- as.numeric(scale(rowSums(adf_mat), center = TRUE, scale = TRUE))
+  mf_jing <- standardise_functions(x = rowSums(adf_mat), method = "z_score")
   
   return(mf_jing) 
   
@@ -283,9 +291,11 @@ MF_jing <- function(adf, vars, stand = "none") {
 
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
-MF_sum <- function(adf, vars) {
+MF_sum <- function(adf, vars, stand_method = "max") {
   
   adf_mat <- adf[, vars]
+  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- as.data.frame(adf_mat)
   
   mf_sum <- rowSums(adf_mat)
   
@@ -299,9 +309,13 @@ MF_sum <- function(adf, vars) {
 
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
-MF_av <- function(adf, vars) {
+# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
+
+MF_av <- function(adf, vars, stand_method = "z_score") {
   
   adf_mat <- adf[, vars]
+  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- as.data.frame(adf_mat)
   
   mf_av <- rowSums(adf_mat)/length(vars)
   
@@ -340,14 +354,17 @@ single_threshold_mf <- function(adf, vars = NA, thresh = 0.7, prepend = "Diversi
 
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
+# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
 
-MF_simpsons_div <- function(adf, vars) {
+MF_simpsons_div <- function(adf, vars, stand_method = "max") {
   
   if(! "vegan" %in% installed.packages()[,1]) stop(
     "this function requires vegan to be installed"
   )
   
   adf_mat <- adf[, vars]
+  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- as.data.frame(adf_mat)
   
   mf_simp <- vegan::diversity(x = adf_mat, index = "simpson", MARGIN = 1)
   
@@ -378,16 +395,11 @@ MF_simpsons_div <- function(adf, vars) {
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
 
-MF_mesli <- function(adf, vars) {
+MF_mesli <- function(adf, vars, stand_method = "max_0_1") {
   
   adf_mat <- adf[, vars]
-  
-  y <- 
-    apply(adf_mat, MARGIN = 2, FUN = function(x) {
-      
-      (x - min(x))/(max(x) - min(x))
-      
-    } )
+  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- as.data.frame(adf_mat)
   
   mf_mesli <- rowSums(y)
   
@@ -588,16 +600,5 @@ multifunc_calculator <-
     return( data.frame(cbind(adf, mf.df)) )
     
   }
-
-
-# function to standardise functions and translate them by minimum absolute value
-standardise <- function(x) {
-  mean.x <- mean(x)
-  sd.x <- sd(x)
-  x.standardised <- ((x-mean.x)/sd.x)
-  x.standardised.positive <- ( x.standardised + abs(min(x.standardised)) )
-  return(x.standardised.positive)
-}
-
 
 ### END
