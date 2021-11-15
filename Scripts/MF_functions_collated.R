@@ -401,7 +401,7 @@ MF_mesli <- function(adf, vars, stand_method = "max_0_1") {
   adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
   adf_mat <- as.data.frame(adf_mat)
   
-  mf_mesli <- rowSums(y)
+  mf_mesli <- rowSums(adf_mat)
   
   return(mf_mesli)
 

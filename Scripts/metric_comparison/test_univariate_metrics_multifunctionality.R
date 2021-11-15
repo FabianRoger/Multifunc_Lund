@@ -22,6 +22,7 @@ library(tidyr)
 library(ggplot2)
 library(here)
 library(readr)
+library(vegan)
 
 rm(list = ls())
 
@@ -42,7 +43,85 @@ rm(col_names)
 
 jena.dat <- 
   jena.dat %>%
-  select(-all_of(spp))
+  dplyr::select(-all_of(spp))
+
+# wrap this into a function
+calculate_MF <- function(data, func.names) {
+  
+  data %>%
+    mutate(`scal. MF` = MF_jing(adf = data, vars = func.names),
+           `sum MF` = MF_sum(adf = data, vars = func.names),
+           `ave. MF` = MF_av(adf = data, vars = func.names),
+           `sd. MF` = apply(data[, func.names], 1, sd),
+           `MESLI MF` = MF_mesli(adf = data, vars = func.names),
+           `Pasari MF` = MF_pasari(adf = data, vars = func.names),
+           `SAM MF` = MF_dooley(adf = data, vars = func.names),
+           `ENF MF` = hill_multifunc(adf = data, vars = func.names, scale = 1, HILL = TRUE),
+           `Simp. MF` = MF_simpsons_div(adf = data, vars = func.names),
+           `Manning.30 MF` = manning_multifunc(adf = data, vars = func.names, thresh = 0.3),
+           `Manning.50 MF` = manning_multifunc(adf = data, vars = func.names, thresh = 0.5),
+           `Manning.70 MF` = manning_multifunc(adf = data, vars = func.names, thresh = 0.7),
+           `thresh.30 MF` = single_threshold_mf(adf = data, vars = func.names, thresh = 0.3),
+           `thresh.50 MF` = single_threshold_mf(adf = data, vars = func.names, thresh = 0.5),
+           `thresh.70 MF` = single_threshold_mf(adf = data, vars = func.names, thresh = 0.7),
+           `Slade.10.90 MF` = MF_slade(adf = data, vars = func.names, A_quant = 0.10, B_quant = 0.90),
+           `Slade.40.60 MF` = MF_slade(adf = data, vars = func.names, A_quant = 0.40, B_quant = 0.60),
+           `PCA MF` = pca_multifunc(adf = data, vars = func.names)
+    )
+  
+}
+
+### perform a cluster analysis on the jena data
+names(jena.dat)
+
+# set up the func.names
+func.names <- c("biomass",  "plantCN", "soilC",             
+                "soilorgC", "herbi", "micBMC", "phoact",            
+                "poll", "rootBM")
+
+jena.mf <- 
+  calculate_MF(data = jena.dat, func.names = func.names)
+names(jena.mf)
+
+# perform the cluster analysis based on this subset of points
+jena.clust <- 
+  jena.mf %>% 
+  dplyr::select(ends_with(" MF"), -starts_with("sd"))
+
+mds_out <- 
+  jena.clust %>% 
+  mutate(across(.cols = everything(), ~(.-mean(., na.rm = TRUE))/sd(., na.rm = TRUE) ) ) %>% 
+  as.matrix(.) %>% 
+  t() %>% 
+  dist(x = ., method = "euclidean") %>% 
+  metaMDS(comm = .) 
+
+mds_out$points %>% 
+  as.data.frame(.) %>% 
+  tibble::rownames_to_column(var = "MF_metrics") %>% 
+  ggplot(data = .,
+         mapping = aes(x = MDS1, y = MDS2, colour = MF_metrics)) +
+  geom_point() +
+  ggrepel::geom_label_repel(mapping = aes(label = MF_metrics),
+                            show.legend = FALSE,
+                            size = 3,
+                            segment.alpha = 0.5,
+                            label.size = NA, fill = "white") +
+  scale_colour_viridis_d(option = "C", end = 0.9) +
+  guides(label = FALSE,
+         colour = guide_legend(override.aes = list(size = 3))) +
+  theme_meta() +
+  theme(legend.position = "bottom",
+        legend.key = element_blank(),
+        legend.text = element_text(colour = "black", size = 14, face = "plain"),
+        legend.title = element_blank())
+
+jena.clust %>%
+  cor(., use = "na.or.complete") %>%
+  corrplot::corrplot(method = "ellipse")
+
+
+### simulate data to test the performance of the metrics
 
 # fit distributions to these functions
 hist(jena.dat$biomass)
@@ -66,11 +145,8 @@ Fit.dist <- function(func, dists = c("norm", "lnorm", "gamma", "unif", "weibull"
   
 }
 
-# choose six functions and find the best fitting distributions
-names(jena.dat)
-func.names <- c("biomass",  "plantCN", "soilC",             
-                "soilorgC", "herbi", "micBMC", "phoact",            
-                "poll", "rootBM")
+# choose five functions and find the best fitting distributions
+func.names
 
 best.dist <- vector("list", length = length(func.names))
 for(i in 1:length(func.names)) {
@@ -81,6 +157,9 @@ for(i in 1:length(func.names)) {
 
 # choose distributions that represent a range of possible distributions
 best.dist.sub <- best.dist[c(1, 3, 5, 7, 8)]
+
+# set the seed
+set.seed(1248950483)
 
 # set up the number of points to simulate
 n.sim <- 1000
@@ -138,51 +217,16 @@ names(x.sims) <- paste("F_", 1:length(x.sim), sep = "")
 sim.dat <- as_tibble(x.sims)
 rm(x.sims)
 
-# write a function to generate these function distributions
-
 # use the empirical distribution data
 func.names <- names(sim.dat)
 
-sim.metric <- 
-  sim.dat %>%
-  mutate(`scal. MF` = MF_jing(adf = sim.dat, vars = func.names),
-         `sum MF` = MF_sum(adf = sim.dat, vars = func.names),
-         `ave. MF` = MF_av(adf = sim.dat, vars = func.names),
-         `sd. MF` = apply(sim.dat[, func.names], 1, sd),
-         `MESLI MF` = MF_mesli(adf = sim.dat, vars = func.names),
-         `Pasari MF` = MF_pasari(adf = sim.dat, vars = func.names),
-         `SAM MF` = MF_dooley(adf = sim.dat, vars = func.names),
-         `ENF MF` = hill_multifunc(adf = sim.dat, vars = func.names, scale = 1, HILL = TRUE),
-         `Simp. MF` = MF_simpsons_div(adf = sim.dat, vars = func.names),
-         `Manning.30 MF` = manning_multifunc(adf = sim.dat, vars = func.names, thresh = 0.3),
-         `Manning.50 MF` = manning_multifunc(adf = sim.dat, vars = func.names, thresh = 0.5),
-         `Manning.70 MF` = manning_multifunc(adf = sim.dat, vars = func.names, thresh = 0.7),
-         `thresh.30 MF` = single_threshold_mf(adf = sim.dat, vars = func.names, thresh = 0.3),
-         `thresh.50 MF` = single_threshold_mf(adf = sim.dat, vars = func.names, thresh = 0.5),
-         `thresh.70 MF` = single_threshold_mf(adf = sim.dat, vars = func.names, thresh = 0.7),
-         `Slade.10.90 MF` = MF_slade(adf = sim.dat, vars = func.names, A_quant = 0.10, B_quant = 0.90),
-         `Slade.40.60 MF` = MF_slade(adf = sim.dat, vars = func.names, A_quant = 0.40, B_quant = 0.60),
-         `PCA MF` = pca_multifunc(adf = sim.dat, vars = func.names, standardise = FALSE),
-         one_positive = apply(sim.dat, 1, function(x) { sum(sum(ifelse(x > 0, 1, 0)) == 1) }),
-         n_positive = apply(sim.dat, 1, function(x) { sum(ifelse(x > 0, 1, 0)) })
-         )
+# calculate the multifunctionality metrics on these simulated data using function
+
 
 rm(sim.dat)
 
 # add a row.id column
 sim.metric$row_id <- 1:nrow(sim.metric)
-
-# cluster analysis
-
-
-
-
-# what do we need?
-
-# 1. all values at max
-# 2. all values at zero
-# 3. all values that are undefined (i.e. Inf, -Inf or NA)
-# 4. the rest
 
 # create the simulated dataset to plot
 df <- sim.metric[sample(1:nrow(sim.metric), 1000), ]
@@ -202,6 +246,7 @@ df <-
 
 df.all <- 
   rbind(df.min, df, df.max)
+
 
 # get four random points
 ave.q <- quantile(df.all$`ave. MF`, c(0.1, 0.45, 0.55,  0.9))
