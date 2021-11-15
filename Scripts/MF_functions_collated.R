@@ -22,11 +22,12 @@ standardise_functions <- function(x, method) {
     
   } else if (method == "max") {
     
-    y <- x/max(x)
+    y <- x/max(x, na.rm = TRUE)
     
   } else if (method == "max_5_%") {
     
-    max_x <- x[x > quantile(x, 0.95)]
+    z <- x[ (x != Inf & x != -Inf & !is.na(x)) ]
+    max_x <- z[z >= quantile(z, 0.95, na.rm = TRUE)]
     y <- x/mean(max_x)
     
   } else if (method == "none") {
@@ -320,6 +321,24 @@ MF_av <- function(adf, vars, stand_method = "z_score") {
   mf_av <- rowSums(adf_mat)/length(vars)
   
   return(mf_av)
+  
+}
+
+# function to calculate standard deviation among functions
+
+# adf, is dataframe with plots in rows, and functions in columns
+# vars has to bee a named vector of functions to include which has to correspond to column names
+# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
+
+MF_sd <- function(adf, vars, stand_method = "z_score_abs") {
+  
+  adf_mat <- adf[, vars]
+  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- as.data.frame(adf_mat)
+  
+  mf_sd <- apply(adf_mat, 1, sd, na.rm = TRUE)
+  
+  return(mf_sd)
   
 }
 

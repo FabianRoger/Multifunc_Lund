@@ -51,8 +51,8 @@ calculate_MF <- function(data, func.names) {
   data %>%
     mutate(`scal. MF` = MF_jing(adf = data, vars = func.names),
            `sum MF` = MF_sum(adf = data, vars = func.names),
-           `ave. MF` = MF_av(adf = data, vars = func.names),
-           `sd. MF` = apply(data[, func.names], 1, sd),
+           `ave. MF` = MF_av(adf = data, vars = func.names, stand_method = "z_score_abs"),
+           `sd. MF` = MF_sd(adf = data, vars = func.names, stand_method = "z_score_abs"),
            `MESLI MF` = MF_mesli(adf = data, vars = func.names),
            `Pasari MF` = MF_pasari(adf = data, vars = func.names),
            `SAM MF` = MF_dooley(adf = data, vars = func.names),
@@ -123,9 +123,7 @@ jena.clust %>%
 
 ### simulate data to test the performance of the metrics
 
-# fit distributions to these functions
-hist(jena.dat$biomass)
-
+# fit distributions to the functions from the Jena data
 library(fitdistrplus)
 Fit.dist <- function(func, dists = c("norm", "lnorm", "gamma", "unif", "weibull")) {
   
@@ -148,6 +146,7 @@ Fit.dist <- function(func, dists = c("norm", "lnorm", "gamma", "unif", "weibull"
 # choose five functions and find the best fitting distributions
 func.names
 
+set.seed(548375)
 best.dist <- vector("list", length = length(func.names))
 for(i in 1:length(func.names)) {
   
@@ -158,11 +157,13 @@ for(i in 1:length(func.names)) {
 # choose distributions that represent a range of possible distributions
 best.dist.sub <- best.dist[c(1, 3, 5, 7, 8)]
 
-# set the seed
-set.seed(1248950483)
-
 # set up the number of points to simulate
-n.sim <- 1000
+n.sim <- 1001
+n.sim <- as.integer(n.sim)
+
+if ( (class(n.sim) != "integer") | (n.sim %% 2 == 0) ) {
+  warning("code is only robust if odd simulations are used because it is based on quantile distributions")
+}
 
 # weibull distribution
 best.dist.sub[[1]]
@@ -184,53 +185,53 @@ x4 <- rweibull(n = n.sim, best.dist.sub[[4]]$estimate[1], best.dist.sub[[4]]$est
 best.dist.sub[[5]]
 x5 <- rgamma(n = n.sim, best.dist.sub[[5]]$estimate[1], best.dist.sub[[5]]$estimate[2])
 
-standardisation <- "max"
-
 x.sim <- 
   lapply(list(x1, x2, x3, x4, x5), function(x) {
   
-    y <- c(0, x)
-    
-  if (standardisation == "z_score") {
-    
-    y <- scale(y)[,1]
-    y <- y + abs(min(y))
-    
-  }  else if (standardisation == "max_0_1") {
-    
-    y <- ( y - min(y) )/( max(y) - min(y) )
-    
-  } else if (standardisation == "max") {
-    
-    y <- y/max(y)
-    
-  }
-    
-  z <- range(y)
+  x <- c(0, x)  
   
-  seq(z[1], z[2], length.out = 10)
+  s1 <- seq(0, 0.005, 0.001)
+  s2 <- seq(0.01, 0.99, length = 10)
+  s3 <- seq(0.995, 1, 0.001)
+  
+  q1 <- round(quantile(1:length(x), c(s1, s2, s3)) , 0)
+          
+  sort(x)[q1]
+  
+  # seq(z[1], z[2], length.out = 10)
   
 })
 
 x.sims <- do.call(expand.grid, x.sim)
 names(x.sims) <- paste("F_", 1:length(x.sim), sep = "")
-sim.dat <- as_tibble(x.sims)
+x.sims <- as_tibble(x.sims)
+
+# create the simulated dataset to plot
+v <- apply(x.sims, 1, sum)
+v <- which(v == min(v) | v == max(v))
+
+sim.metric <- x.sims[c(v[1], sample(1:nrow( x.sims), 1000), v[2]), ]
 rm(x.sims)
 
 # use the empirical distribution data
-func.names <- names(sim.dat)
+func.names <- names(sim.metric)
 
 # calculate the multifunctionality metrics on these simulated data using function
-
-
-rm(sim.dat)
+sim.metric <- calculate_MF(data = sim.metric, func.names = func.names)
 
 # add a row.id column
 sim.metric$row_id <- 1:nrow(sim.metric)
+# View(sim.metric)
 
-# create the simulated dataset to plot
-df <- sim.metric[sample(1:nrow(sim.metric), 1000), ]
+# how to standardise the raw function data for plotting?
+stand <- "max"
+sim.metric <- 
+  sim.metric %>%
+  mutate(ave_MF = MF_av(adf = sim.metric, vars = func.names, stand_method = stand),
+         sd_MF = MF_sd(adf = sim.metric, vars = func.names, stand_method = stand),
+         across(.cols = starts_with("F_"), ~standardise_functions(.x, method = stand ) ) )
 
+# remove duplicates in the df data.frame
 df.max <- 
   sim.metric %>%
   filter(across(.cols = starts_with("F_"), ~.x == max(.x, na.rm = TRUE)))
@@ -239,38 +240,32 @@ df.min <-
   sim.metric %>%
   filter(across(.cols = starts_with("F_"), ~.x == min(.x, na.rm = TRUE)))
 
-# remove duplicates in the df data.frame
-df <- 
-  df %>%
-  filter(!(row_id %in% c(df.max$row_id, df.min$row_id)))
-
 df.all <- 
-  rbind(df.min, df, df.max)
-
+  sim.metric
 
 # get four random points
-ave.q <- quantile(df.all$`ave. MF`, c(0.1, 0.45, 0.55,  0.9))
-sd.q <- quantile(df.all$`sd. MF`, c(0.1, 0.45, 0.55, 0.9))
+ave.q <- quantile(df.all$ave_MF, c(0.1, 0.45, 0.55,  0.9))
+sd.q <- quantile(df.all$sd_MF, c(0.1, 0.45, 0.55, 0.9))
 
 df.plot.1 <- 
   df.all %>%
-  filter(get("ave. MF") < ave.q[1] | get("ave. MF") > ave.q[4]) %>%
-  filter(get("sd. MF") > sd.q[2], get("sd. MF") < sd.q[3] ) %>%
-  mutate(ave_low_high = if_else(get("ave. MF") < ave.q[1], "a", "b" )) %>%
+  filter(ave_MF < ave.q[1] | ave_MF > ave.q[4]) %>%
+  filter(sd_MF > sd.q[2], sd_MF < sd.q[3] ) %>%
+  mutate(ave_low_high = if_else(ave_MF < ave.q[1], "a", "b" )) %>%
   group_by(ave_low_high) %>%
   sample_n(size = 1, replace = TRUE) %>%
   ungroup() %>%
-  dplyr::select(row_id, "ave. MF", "sd. MF")
+  dplyr::select(row_id, ave_MF, sd_MF)
 
 df.plot.2 <- 
   df.all %>%
-  filter(get("sd. MF") < sd.q[1] | get("sd. MF") > sd.q[4]) %>%
-  filter(get("ave. MF") > ave.q[2], get("ave. MF") < ave.q[3]  ) %>%
-  mutate(sd_low_high = if_else(get("sd. MF") < sd.q[1], "a", "b" )) %>%
+  filter(sd_MF < sd.q[1] | sd_MF > sd.q[4]) %>%
+  filter(ave_MF > ave.q[2], ave_MF < ave.q[3]  ) %>%
+  mutate(sd_low_high = if_else( sd_MF < sd.q[1], "a", "b" ) ) %>%
   group_by(sd_low_high) %>%
   sample_n(size = 1, replace = TRUE) %>%
   ungroup() %>%
-  dplyr::select(row_id, "ave. MF", "sd. MF")
+  dplyr::select(row_id, ave_MF, sd_MF)
 
 df.plot <- rbind(df.plot.1, df.plot.2)
 
@@ -279,25 +274,25 @@ row_id_in <- c(df.min$row_id, df.max$row_id, df.plot$row_id)
 df.label <- 
   df.all %>%
   filter(row_id %in% row_id_in) %>%
-  dplyr::select(row_id, starts_with("F_"), "ave. MF", "sd. MF") %>%
-  mutate(label = letters[1:6])
+  dplyr::select(row_id, starts_with("F_"), ave_MF, sd_MF) %>%
+  mutate(label = letters[1:length(row_id_in)])
 
 
 # make a test plot
 library(ggrepel)
-ggplot( mapping = aes(x = `ave. MF`, y = `sd. MF` ) ) +
+ggplot( mapping = aes(x = ave_MF, y = sd_MF ) ) +
   geom_point(data = df.all %>% 
-               filter(get("ave. MF") != 1) %>%
-               filter(get("ave. MF") != 0), 
+               filter(ave_MF != max(ave_MF)) %>%
+               filter(ave_MF != 0), 
              size = 3, alpha = 0.2, position = position_jitter(width = 0.005)) +
-  geom_hline(yintercept = df.min[["sd. MF"]], linetype = "dashed", colour = "black") +
-  geom_vline(xintercept = df.max[["ave. MF"]], linetype = "dashed", colour = "black") +
+  geom_hline(yintercept = df.min[["sd_MF"]], linetype = "dashed", colour = "black") +
+  geom_vline(xintercept = df.max[["ave_MF"]], linetype = "dashed", colour = "black") +
   geom_point(data = df.min, 
              fill = "white", colour = "black", shape = 24, alpha = 1, size = 5, stroke = 1.25 ) +
   geom_point(data = df.max,
              fill = "white", colour = "black", shape = 21, alpha = 1, size = 5, stroke = 1.25 ) +
   geom_point(data = df.plot,
-             fill = "#3399FF", colour = "black", shape = 21, alpha = 1, size = 5, stroke = 1.25) +
+             fill = "#99CCFF", colour = "black", shape = 21, alpha = 1, size = 5, stroke = 1.25) +
   geom_text(data = df.label, 
             mapping = aes(label = label), size = 4, nudge_y = 0.0025) +
   ylab("SD among functions") +
@@ -313,7 +308,7 @@ df.label.long <-
                values_to = "function_value")
 
 # iterate this
-ggplot(data = df.label.long %>% filter(label == "e"),
+ggplot(data = df.label.long %>% filter(label == "f"),
        mapping = aes(x = function_id, y = function_value)) +
   geom_bar(stat = "identity", width = 0.5) +
   # scale_y_continuous(limits = c(-0.05, 1.05), breaks = seq(0, 1, 0.2)) +
