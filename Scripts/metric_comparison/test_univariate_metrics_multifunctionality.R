@@ -191,7 +191,7 @@ x.sim <-
   x <- c(0, x)  
   
   s1 <- seq(0, 0.005, 0.001)
-  s2 <- seq(0.01, 0.99, length = 10)
+  s2 <- seq(0.005, 0.995, length = 10)
   s3 <- seq(0.995, 1, 0.001)
   
   q1 <- round(quantile(1:length(x), c(s1, s2, s3)) , 0)
@@ -210,7 +210,11 @@ x.sims <- as_tibble(x.sims)
 v <- apply(x.sims, 1, sum)
 v <- which(v == min(v) | v == max(v))
 
-sim.metric <- x.sims[c(v[1], sample(1:nrow( x.sims), 1000), v[2]), ]
+u <- apply(x.sims, 1, sd)
+
+sim.metric1 <- x.sims[c(v[1], sample(1:nrow( x.sims), 1000), v[2]), ]
+sim.metric2 <- x.sims[-c(v[1], v[2]), ][sample(which(u < quantile(u, 0.1)), 100) , ]
+sim.metric <- rbind(sim.metric1, sim.metric2)
 rm(x.sims)
 
 # use the empirical distribution data
@@ -308,10 +312,10 @@ df.label.long <-
                values_to = "function_value")
 
 # iterate this
-ggplot(data = df.label.long %>% filter(label == "f"),
+ggplot(data = df.label.long %>% filter(label == "b"),
        mapping = aes(x = function_id, y = function_value)) +
   geom_bar(stat = "identity", width = 0.5) +
-  # scale_y_continuous(limits = c(-0.05, 1.05), breaks = seq(0, 1, 0.2)) +
+  scale_y_continuous(limits = c(-0.05, 1.05), breaks = seq(0, 1, 0.2)) +
   xlab("Function ID") +
   ylab("Function value") +
   theme_meta()
@@ -321,7 +325,7 @@ ggplot(data = df.label.long %>% filter(label == "f"),
 # for each metric, what do we want to plot separately?
 # set the metric
 names(df.all)
-metric <- "Simp. MF"
+metric <- "Pasari MF"
 
 df.metric <- 
   df.all %>%
@@ -346,28 +350,28 @@ df.metric.undefined <-
 
 ggplot() +
   geom_point(data = df.metric,
-             mapping = aes(x = `ave. MF`, y = `sd. MF`, shape = metric_negative, colour = get(metric) ),
+             mapping = aes(x = ave_MF, y = sd_MF, shape = metric_negative, colour = get(metric) ),
              size = 3, alpha = 0.5, position = position_jitter(width = 0.005)) +
   scale_colour_viridis_c(option = "D") +
   scale_shape_manual(values=c(16, 15), guide = FALSE)+
-  geom_hline(yintercept = df.min[["sd. MF"]], linetype = "dashed", colour = "black") +
-  geom_vline(xintercept = df.max[["ave. MF"]], linetype = "dashed", colour = "black") +
+  geom_hline(yintercept = df.min[["sd_MF"]], linetype = "dashed", colour = "black") +
+  geom_vline(xintercept = df.max[["ave_MF"]], linetype = "dashed", colour = "black") +
   geom_point(data = df.min, 
-             mapping = aes(x = `ave. MF`, y = `sd. MF`), 
+             mapping = aes(x = ave_MF, y = sd_MF), 
              fill = "white", colour = "black", shape = 24, alpha = 1, size = 3.5, 
              position = position_nudge(x = -0.025), stroke = 1.25 ) +
   geom_point(data = df.max,
-             mapping = aes(x = `ave. MF`, y = `sd. MF`),
+             mapping = aes(x = ave_MF, y = sd_MF),
              fill = "white", colour = "black", shape = 21, alpha = 1, size = 3.5,
              position = position_nudge(x = -0.025), stroke = 1.25 ) +
   geom_point(data = df.metric.max,
-             mapping = aes(x = `ave. MF`, y = `sd. MF`),
+             mapping = aes(x = ave_MF, y = sd_MF),
              colour = "black", fill = "#FF6600", shape = 21, alpha = 1, size = 3.5, stroke = 1.25) +
   geom_point(data = df.metric.min,
-             mapping = aes(x = `ave. MF`, y = `sd. MF`),
+             mapping = aes(x = ave_MF, y = sd_MF),
              colour = "black", fill =  "#FF6600", shape = 24, alpha = 1, size = 3.5, stroke = 1.25) +
   geom_point(data = df.metric.undefined,
-             mapping = aes(x = `ave. MF`, y = `sd. MF`), 
+             mapping = aes(x = ave_MF, y = sd_MF), 
              shape = 4, size = 3, position = position_nudge(x = 0.025) ) +
   ylab("SD among functions") +
   xlab("Mean among functions") +
