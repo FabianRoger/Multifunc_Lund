@@ -172,6 +172,11 @@ rm(sim.dat)
 # add a row.id column
 sim.metric$row_id <- 1:nrow(sim.metric)
 
+# cluster analysis
+
+
+
+
 # what do we need?
 
 # 1. all values at max
@@ -181,28 +186,14 @@ sim.metric$row_id <- 1:nrow(sim.metric)
 
 # create the simulated dataset to plot
 df <- sim.metric[sample(1:nrow(sim.metric), 1000), ]
-df <- 
-  df %>%
-  mutate(fig.1.group = c(NA),
-         group.colours = 1)
 
 df.max <- 
   sim.metric %>%
   filter(across(.cols = starts_with("F_"), ~.x == max(.x, na.rm = TRUE)))
 
-df.max <- 
-  df.max %>%
-  mutate(fig.1.group = c("a"),
-         group.colours = 2)
-
 df.min <- 
   sim.metric %>%
   filter(across(.cols = starts_with("F_"), ~.x == min(.x, na.rm = TRUE)))
-
-df.min <- 
-  df.min %>%
-  mutate(fig.1.group = c("b"),
-         group.colours = 3)
 
 # remove duplicates in the df data.frame
 df <- 
@@ -212,21 +203,58 @@ df <-
 df.all <- 
   rbind(df.min, df, df.max)
 
-# 
+# get four random points
+ave.q <- quantile(df.all$`ave. MF`, c(0.1, 0.45, 0.55,  0.9))
+sd.q <- quantile(df.all$`sd. MF`, c(0.1, 0.45, 0.55, 0.9))
 
+df.plot.1 <- 
+  df.all %>%
+  filter(get("ave. MF") < ave.q[1] | get("ave. MF") > ave.q[4]) %>%
+  filter(get("sd. MF") > sd.q[2], get("sd. MF") < sd.q[3] ) %>%
+  mutate(ave_low_high = if_else(get("ave. MF") < ave.q[1], "a", "b" )) %>%
+  group_by(ave_low_high) %>%
+  sample_n(size = 1, replace = TRUE) %>%
+  ungroup() %>%
+  dplyr::select(row_id, "ave. MF", "sd. MF")
 
+df.plot.2 <- 
+  df.all %>%
+  filter(get("sd. MF") < sd.q[1] | get("sd. MF") > sd.q[4]) %>%
+  filter(get("ave. MF") > ave.q[2], get("ave. MF") < ave.q[3]  ) %>%
+  mutate(sd_low_high = if_else(get("sd. MF") < sd.q[1], "a", "b" )) %>%
+  group_by(sd_low_high) %>%
+  sample_n(size = 1, replace = TRUE) %>%
+  ungroup() %>%
+  dplyr::select(row_id, "ave. MF", "sd. MF")
 
-# get the median average MF and median
+df.plot <- rbind(df.plot.1, df.plot.2)
+
+row_id_in <- c(df.min$row_id, df.max$row_id, df.plot$row_id) 
+
+df.label <- 
+  df.all %>%
+  filter(row_id %in% row_id_in) %>%
+  dplyr::select(row_id, starts_with("F_"), "ave. MF", "sd. MF") %>%
+  mutate(label = letters[1:6])
+
 
 # make a test plot
 library(ggrepel)
 ggplot( mapping = aes(x = `ave. MF`, y = `sd. MF` ) ) +
-  geom_point(data = df, alpha = 0.1) +
-  geom_point(data = df.max, colour = "red", size = 2, shape = 17) +
-  geom_point(data = df.min, colour = "green", size = 3, shape = 18) +
-  geom_label_repel(data = df.label, mapping = aes(label = fig.1.group ),
-                   segment.colour = "black", min.segment.length = 0.2,
-                   fill = "grey", colour = "white") +
+  geom_point(data = df.all %>% 
+               filter(get("ave. MF") != 1) %>%
+               filter(get("ave. MF") != 0), 
+             size = 3, alpha = 0.2, position = position_jitter(width = 0.005)) +
+  geom_hline(yintercept = df.min[["sd. MF"]], linetype = "dashed", colour = "black") +
+  geom_vline(xintercept = df.max[["ave. MF"]], linetype = "dashed", colour = "black") +
+  geom_point(data = df.min, 
+             fill = "white", colour = "black", shape = 24, alpha = 1, size = 5, stroke = 1.25 ) +
+  geom_point(data = df.max,
+             fill = "white", colour = "black", shape = 21, alpha = 1, size = 5, stroke = 1.25 ) +
+  geom_point(data = df.plot,
+             fill = "#3399FF", colour = "black", shape = 21, alpha = 1, size = 5, stroke = 1.25) +
+  geom_text(data = df.label, 
+            mapping = aes(label = label), size = 4, nudge_y = 0.0025) +
   ylab("SD among functions") +
   xlab("Mean among functions") +
   scale_colour_viridis_c() + 
@@ -235,18 +263,21 @@ ggplot( mapping = aes(x = `ave. MF`, y = `sd. MF` ) ) +
 # plot each highlighted point in the test plot
 df.label.long <- 
   df.label %>%
-  dplyr::select(fig.1.group, starts_with("F_") ) %>%
   pivot_longer(cols = starts_with("F_"),
                names_to = "function_id", 
                values_to = "function_value")
 
-ggplot(data = df.label.long %>% filter(fig.1.group == "f"),
+# iterate this
+ggplot(data = df.label.long %>% filter(label == "e"),
        mapping = aes(x = function_id, y = function_value)) +
   geom_bar(stat = "identity", width = 0.5) +
-  scale_y_continuous(limits = c(-0.05, 1.05), breaks = seq(0, 1, 0.2)) +
+  # scale_y_continuous(limits = c(-0.05, 1.05), breaks = seq(0, 1, 0.2)) +
+  xlab("Function ID") +
+  ylab("Function value") +
   theme_meta()
 
 
+# iterate this
 # for each metric, what do we want to plot separately?
 # set the metric
 names(df.all)
@@ -310,75 +341,4 @@ ggplot() +
   guides( colour = guide_colourbar(barwidth = 0.5, barheight = 10,
                                    frame.colour = "black", ticks = FALSE ) )
 
-
-
-# not all the metrics are maximised when all the functions are at their maximum
-# for a given set of plots
-
-# SAM metric
-# PCA metric
-# Simpson index
-
-sim.metric %>%
-  filter(F_1 == max(F_1), 
-         F_2 == max(F_2),
-         F_3 == max(F_3),
-         F_4 == max(F_4),
-         F_5 == max(F_5)) %>%
-  View()
-
-lapply(sim.metric, range, na.rm = TRUE)
-
-cor(sim.metric[sample(1:nrow(sim.metric), 10000), -c(1, 2, 3, 4, 5)])
-
-
-x <- rnorm(n = 1000, 100, 10)
-y <- runif(n = 1000, min = 0, max = 10)
-z <- rpois(n = 1000, 50)
-
-lapply(list(x, y, z), function(x){
-  
-  scale(x)[,1] %>% range()
-  
-})
-
-
-
-# 0 - 1 sims
-
-univariate_explorer <- function(funcnum = 5, grain = 0.1, error = 0.01) {
-  
-  # generate n functions between 0 and 1
-  x <- replicate(funcnum, seq(0, 1, grain), simplify = FALSE)
-  
-  # put these functions into a matrix
-  y <- do.call("expand.grid", x)
-  
-  # add a small amount of error and set to zero if zero
-  nm <- nrow(y)*ncol(y)
-  y <- y + rnorm(n = nm, 0, error)
-  y[y < 0] <- 0
-  
-  names(y) <- paste("F_", 1:funcnum, sep = "")
-  
-  # convert y to a tibble
-  df <- tibble(y)
-  
-  # only get unique rows
-  df <- distinct(df)
-  
-  # output the df
-  df
-  
-}
-
-# simulate data for five ecosystem functions using univariate simulator
-# set.seed(43767)
-# sim.dat <- univariate_explorer() 
-# head(sim.dat)
-
-# get a vector of names
-# func.names <- names(sim.dat)
-
-
-
+### END
