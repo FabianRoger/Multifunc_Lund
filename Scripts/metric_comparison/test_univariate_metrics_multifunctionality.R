@@ -105,7 +105,7 @@ x4 <- rweibull(n = n.sim, best.dist.sub[[4]]$estimate[1], best.dist.sub[[4]]$est
 best.dist.sub[[5]]
 x5 <- rgamma(n = n.sim, best.dist.sub[[5]]$estimate[1], best.dist.sub[[5]]$estimate[2])
 
-standardisation <- "z_score"
+standardisation <- "max"
 
 x.sim <- 
   lapply(list(x1, x2, x3, x4, x5), function(x) {
@@ -176,11 +176,11 @@ sim.metric$row_id <- 1:nrow(sim.metric)
 
 # 1. all values at max
 # 2. all values at zero
-# 3. all values where only one function is positive
+# 3. all values that are undefined (i.e. Inf, -Inf or NA)
 # 4. the rest
 
 # create the simulated dataset to plot
-df <- sim.metric[sample(1:nrow(sim.metric), 2000), ]
+df <- sim.metric[sample(1:nrow(sim.metric), 1000), ]
 df <- 
   df %>%
   mutate(fig.1.group = c(NA),
@@ -211,6 +211,10 @@ df <-
 
 df.all <- 
   rbind(df.min, df, df.max)
+
+# 
+
+
 
 # get the median average MF and median
 
@@ -265,29 +269,46 @@ df.metric.min <-
   filter(get(metric) != -Inf) %>%
   filter(get(metric) == min(get(metric)))
 
+df.metric.undefined <- 
+  df.all %>%
+  filter(is.na(get(metric)) | get(metric) == Inf | get(metric) == -Inf )
+
 ggplot() +
   geom_point(data = df.metric,
              mapping = aes(x = `ave. MF`, y = `sd. MF`, shape = metric_negative, colour = get(metric) ),
-             size = 2, alpha = 0.5) +
-  scale_colour_viridis_c() +
+             size = 3, alpha = 0.5, position = position_jitter(width = 0.005)) +
+  scale_colour_viridis_c(option = "D") +
+  scale_shape_manual(values=c(16, 15), guide = FALSE)+
   geom_hline(yintercept = df.min[["sd. MF"]], linetype = "dashed", colour = "black") +
   geom_vline(xintercept = df.max[["ave. MF"]], linetype = "dashed", colour = "black") +
   geom_point(data = df.min, 
              mapping = aes(x = `ave. MF`, y = `sd. MF`), 
-             colour = "black", shape = 17, alpha = 1, size = 3) +
+             fill = "white", colour = "black", shape = 24, alpha = 1, size = 3.5, 
+             position = position_nudge(x = -0.025), stroke = 1.25 ) +
   geom_point(data = df.max,
              mapping = aes(x = `ave. MF`, y = `sd. MF`),
-             colour = "black", shape = 16, alpha = 1, size = 3) +
+             fill = "white", colour = "black", shape = 21, alpha = 1, size = 3.5,
+             position = position_nudge(x = -0.025), stroke = 1.25 ) +
   geom_point(data = df.metric.max,
              mapping = aes(x = `ave. MF`, y = `sd. MF`),
-             colour = "red", shape = 16, alpha = 1, size = 4) +
+             colour = "black", fill = "#FF6600", shape = 21, alpha = 1, size = 3.5, stroke = 1.25) +
   geom_point(data = df.metric.min,
              mapping = aes(x = `ave. MF`, y = `sd. MF`),
-             colour = "red", shape = 17, alpha = 1, size = 4) +
+             colour = "black", fill =  "#FF6600", shape = 24, alpha = 1, size = 3.5, stroke = 1.25) +
+  geom_point(data = df.metric.undefined,
+             mapping = aes(x = `ave. MF`, y = `sd. MF`), 
+             shape = 4, size = 3, position = position_nudge(x = 0.025) ) +
+  ylab("SD among functions") +
+  xlab("Mean among functions") +
+  ggtitle(metric) +
   # scale_y_continuous(limits = c(-0.05, 0.55)) +
   # scale_x_continuous(limits = c(-0.05, 1.05)) +
   theme_meta() +
-  theme(legend.position = "none")
+  theme(legend.position = "right",
+        legend.title = element_blank(),
+        legend.text = element_text(size = 9)) +
+  guides( colour = guide_colourbar(barwidth = 0.5, barheight = 10,
+                                   frame.colour = "black", ticks = FALSE ) )
 
 
 
