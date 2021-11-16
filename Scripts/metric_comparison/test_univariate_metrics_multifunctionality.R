@@ -185,13 +185,16 @@ x4 <- rweibull(n = n.sim, best.dist.sub[[4]]$estimate[1], best.dist.sub[[4]]$est
 best.dist.sub[[5]]
 x5 <- rgamma(n = n.sim, best.dist.sub[[5]]$estimate[1], best.dist.sub[[5]]$estimate[2])
 
+x6 <- runif(n = n.sim, 0, 100)
+
 x.sim <- 
-  lapply(list(x1, x2, x3, x4, x5), function(x) {
+  lapply(list(x6, x6, x6, x6, x6), function(x) {
   
-  x <- c(0, x)  
+  # translate the distribution so that it starts at zero
+  x <- (x - min(x)) 
   
   s1 <- seq(0, 0.005, 0.001)
-  s2 <- seq(0.005, 0.995, length = 10)
+  s2 <- seq(0, 1, length = 12)
   s3 <- seq(0.995, 1, 0.001)
   
   q1 <- round(quantile(1:length(x), c(s1, s2, s3)) , 0)
@@ -202,6 +205,9 @@ x.sim <-
   
 })
 
+# create a grid of means and sd's and sample points around that grid
+# grid can be based on quantiles of the max-standardised functions
+
 x.sims <- do.call(expand.grid, x.sim)
 names(x.sims) <- paste("F_", 1:length(x.sim), sep = "")
 x.sims <- as_tibble(x.sims)
@@ -210,15 +216,8 @@ x.sims <- as_tibble(x.sims)
 v <- apply(x.sims, 1, sum)
 v <- which(v == min(v) | v == max(v))
 
-u <- apply(x.sims, 1, sd)
-
-sim.metric1 <- x.sims[c(v[1], sample(1:nrow( x.sims), 1000), v[2]), ]
-sim.metric2 <- x.sims[-c(v[1], v[2]), ][sample(which(u < quantile(u, 0.1)), 100) , ]
-sim.metric <- rbind(sim.metric1, sim.metric2)
-rm(x.sims)
-
-# use the empirical distribution data
-func.names <- names(sim.metric)
+sim.metric <- x.sims[c(v[1], sample(1:nrow( x.sims), 1000), v[length(v)]), ]
+# rm(x.sims)
 
 # calculate the multifunctionality metrics on these simulated data using function
 sim.metric <- calculate_MF(data = sim.metric, func.names = func.names)
@@ -235,6 +234,8 @@ sim.metric <-
          sd_MF = MF_sd(adf = sim.metric, vars = func.names, stand_method = stand),
          across(.cols = starts_with("F_"), ~standardise_functions(.x, method = stand ) ) )
 
+plot(sim.metric$ave_MF, sim.metric$sd_MF)
+
 # remove duplicates in the df data.frame
 df.max <- 
   sim.metric %>%
@@ -248,7 +249,7 @@ df.all <-
   sim.metric
 
 # get four random points
-ave.q <- quantile(df.all$ave_MF, c(0.1, 0.45, 0.55,  0.9))
+ave.q <- quantile(df.all$ave_MF, c(0.2, 0.45, 0.55,  0.9))
 sd.q <- quantile(df.all$sd_MF, c(0.1, 0.45, 0.55, 0.9))
 
 df.plot.1 <- 
@@ -325,7 +326,7 @@ ggplot(data = df.label.long %>% filter(label == "b"),
 # for each metric, what do we want to plot separately?
 # set the metric
 names(df.all)
-metric <- "Pasari MF"
+metric <- "SAM MF"
 
 df.metric <- 
   df.all %>%
