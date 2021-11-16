@@ -185,46 +185,66 @@ x4 <- rweibull(n = n.sim, best.dist.sub[[4]]$estimate[1], best.dist.sub[[4]]$est
 best.dist.sub[[5]]
 x5 <- rgamma(n = n.sim, best.dist.sub[[5]]$estimate[1], best.dist.sub[[5]]$estimate[2])
 
-x6 <- runif(n = n.sim, 0, 100)
-
 x.sim <- 
-  lapply(list(x6, x6, x6, x6, x6), function(x) {
+  lapply(list(x1, x2, x3, x4, x5), function(x) {
   
   # translate the distribution so that it starts at zero
   x <- (x - min(x)) 
   
-  s1 <- seq(0, 0.005, 0.001)
-  s2 <- seq(0, 1, length = 12)
-  s3 <- seq(0.995, 1, 0.001)
-  
-  q1 <- round(quantile(1:length(x), c(s1, s2, s3)) , 0)
-          
-  sort(x)[q1]
-  
-  # seq(z[1], z[2], length.out = 10)
+  seq(min(x), max(x), length = 20)
   
 })
-
-# create a grid of means and sd's and sample points around that grid
-# grid can be based on quantiles of the max-standardised functions
 
 x.sims <- do.call(expand.grid, x.sim)
 names(x.sims) <- paste("F_", 1:length(x.sim), sep = "")
 x.sims <- as_tibble(x.sims)
 
+# standardise the data
+x <- apply(x.sims, 2, standardise_functions, method = "max")
+x.m <- apply(x, 1, mean)
+x.sd <- apply(x, 1, sd)
+
+s1 <- seq(min(x.m), max(x.m), length = 20)
+s2 <- seq(min(x.sd), max(x.sd), length = 20)
+
+sim.sampler <- expand.grid(s1, s2)
+nrow(sim.sampler)
+
+sampled_rows <- 
+  mapply(function(x, y) {
+  
+  u <- which( near(x, x.m, tol = 0.05) & near(y, x.sd, tol = 0.05) )
+  
+  if( sum(u) > 0) {
+    
+    sample(u, 5, replace = TRUE)
+    
+  } else {
+    
+    NULL
+    
+  }
+  
+}, sim.sampler$Var1, sim.sampler$Var2 )
+
+head(sampled_rows)
+length(sampled_rows)
+
 # create the simulated dataset to plot
 v <- apply(x.sims, 1, sum)
 v <- which(v == min(v) | v == max(v))
 
-sim.metric <- x.sims[c(v[1], sample(1:nrow( x.sims), 1000), v[length(v)]), ]
+sim.metric <- x.sims[c(v[1], unlist(sampled_rows), v[length(v)]) , ]
 # rm(x.sims)
+
+# get a vector of functions names
+func.names <- names(sim.metric)
 
 # calculate the multifunctionality metrics on these simulated data using function
 sim.metric <- calculate_MF(data = sim.metric, func.names = func.names)
 
 # add a row.id column
 sim.metric$row_id <- 1:nrow(sim.metric)
-# View(sim.metric)
 
 # how to standardise the raw function data for plotting?
 stand <- "max"
@@ -285,19 +305,20 @@ df.label <-
 
 # make a test plot
 library(ggrepel)
-ggplot( mapping = aes(x = ave_MF, y = sd_MF ) ) +
+p.1 <-
+  ggplot( mapping = aes(x = ave_MF, y = sd_MF ) ) +
   geom_point(data = df.all %>% 
                filter(ave_MF != max(ave_MF)) %>%
                filter(ave_MF != 0), 
-             size = 3, alpha = 0.2, position = position_jitter(width = 0.005)) +
+             size = 3, alpha = 0.5, position = position_jitter(width = 0.005), colour = "grey") +
   geom_hline(yintercept = df.min[["sd_MF"]], linetype = "dashed", colour = "black") +
   geom_vline(xintercept = df.max[["ave_MF"]], linetype = "dashed", colour = "black") +
   geom_point(data = df.min, 
-             fill = "white", colour = "black", shape = 24, alpha = 1, size = 5, stroke = 1.25 ) +
+             fill = "white", colour = "black", shape = 24, alpha = 1, size = 6, stroke = 1.25 ) +
   geom_point(data = df.max,
-             fill = "white", colour = "black", shape = 21, alpha = 1, size = 5, stroke = 1.25 ) +
+             fill = "white", colour = "black", shape = 21, alpha = 1, size = 6, stroke = 1.25 ) +
   geom_point(data = df.plot,
-             fill = "#99CCFF", colour = "black", shape = 21, alpha = 1, size = 5, stroke = 1.25) +
+             fill = "#99CCFF", colour = "black", shape = 21, alpha = 1, size = 6, stroke = 1.25) +
   geom_text(data = df.label, 
             mapping = aes(label = label), size = 4, nudge_y = 0.0025) +
   ylab("SD among functions") +
@@ -313,77 +334,115 @@ df.label.long <-
                values_to = "function_value")
 
 # iterate this
-ggplot(data = df.label.long %>% filter(label == "b"),
-       mapping = aes(x = function_id, y = function_value)) +
-  geom_bar(stat = "identity", width = 0.5) +
-  scale_y_continuous(limits = c(-0.05, 1.05), breaks = seq(0, 1, 0.2)) +
-  xlab("Function ID") +
-  ylab("Function value") +
-  theme_meta()
+
+df.label.long$function_id <- rep(paste("F", 1:5, sep = ""), 6)
+
+p.list <- vector("list", length = nrow(df.label.long))
+p.labels <- unique(df.label.long$label)
+for (i in 1:length(p.labels )) {
+  
+  p.list[[i]] <- 
+    ggplot(data = df.label.long %>% filter(label == p.labels[i] ),
+         mapping = aes(x = function_id, y = function_value)) +
+    geom_bar(stat = "identity", width = 0.5) +
+    scale_y_continuous(limits = c(0, 1.05), breaks = seq(0, 1, 0.2)) +
+    xlab("Function ID") +
+    ylab("Function value") +
+    theme_meta()
+  
+}
+
+library(patchwork)
+p.full <- 
+  (p.1 + (p.list[[1]] + p.list[[2]]) + 
+     plot_layout(ncol = 1, nrow = 2 ) 
+   ) | (p.list[[3]] + p.list[[4]] + p.list[[5]] + p.list[[6]] + 
+     plot_layout(ncol = 2, nrow = 2) )
+
+p.full <- p.full + plot_annotation(tag_levels = list(c("", letters[1:6])) )
+
+ggsave(filename = here("Figures/metric_comparison.png"), p.full,
+       units = "cm", width = 20, height = 14)
 
 
 # iterate this
 # for each metric, what do we want to plot separately?
 # set the metric
 names(df.all)
-metric <- "SAM MF"
+metric_even <- c("Pasari MF", "SAM MF", "Simp. MF", "ENF MF")
+metric_thresh <- c("Manning.30 MF", "Manning.70 MF", 
+                   "thresh.30 MF", "thresh.70 MF",
+                   "Slade.10.90 MF", "Slade.40.60 MF")
 
-df.metric <- 
-  df.all %>%
-  filter(!is.na(get(metric))) %>%
-  filter(get(metric) != Inf) %>%
-  filter(get(metric) != -Inf) %>%
-  mutate(metric_negative = as.character(if_else(get(metric) < 0, 1, 0)) )
+list.even <- vector("list", length = length(metric_even))
+for(i in 1:length(metric_even)) {
+  
+  metric <- metric_even[i]
+  
+  df.metric <- 
+    df.all %>%
+    filter(!is.na(get(metric))) %>%
+    filter(get(metric) != Inf) %>%
+    filter(get(metric) != -Inf) %>%
+    mutate(metric_negative = as.character(if_else( get(metric) < 0, 1, 0)) )
+  
+  df.metric.max <- 
+    df.metric %>%
+    filter(get(metric) != Inf) %>%
+    filter(get(metric) == max(get(metric)))
+  
+  df.metric.min <- 
+    df.metric %>%
+    filter(get(metric) != -Inf) %>%
+    filter(get(metric) == min(get(metric)))
+  
+  df.metric.undefined <- 
+    df.all %>%
+    filter(is.na(get(metric)) | get(metric) == Inf | get(metric) == -Inf )
+  
+  list.even[[i]] <- 
+    ggplot() +
+    geom_point(data = df.metric,
+               mapping = aes(x = ave_MF, y = sd_MF, shape = metric_negative, colour = !!sym(metric) ),
+               size = 2, alpha = 0.25, position = position_jitter(width = 0.005)) +
+    scale_colour_viridis_c(option = "D", name = metric) +
+    scale_shape_manual(values=c(16, 15), guide = FALSE)+
+    geom_hline(yintercept = df.min[["sd_MF"]], linetype = "dashed", colour = "black") +
+    geom_vline(xintercept = df.max[["ave_MF"]], linetype = "dashed", colour = "black") +
+    geom_point(data = df.min, 
+               mapping = aes(x = ave_MF, y = sd_MF), 
+               fill = "white", colour = "black", shape = 24, alpha = 1, size = 2.5, 
+               position = position_nudge(x = -0.025), stroke = 1 ) +
+    geom_point(data = df.max,
+               mapping = aes(x = ave_MF, y = sd_MF),
+               fill = "white", colour = "black", shape = 21, alpha = 1, size = 2.5,
+               position = position_nudge(x = -0.025), stroke = 1 ) +
+    geom_point(data = df.metric.max,
+               mapping = aes(x = ave_MF, y = sd_MF),
+               colour = "black", fill = "black", shape = 21, alpha = 1, size = 2.5, stroke = 1) +
+    geom_point(data = df.metric.min,
+               mapping = aes(x = ave_MF, y = sd_MF),
+               colour = "black", fill =  "black", shape = 24, alpha = 1, size = 2.5, stroke = 1) +
+    geom_point(data = df.metric.undefined,
+               mapping = aes(x = ave_MF, y = sd_MF), 
+               shape = 4, size = 3, position = position_nudge(x = 0.025) ) +
+    ylab("SD among functions") +
+    xlab("Mean among functions") +
+    theme_meta() +
+    guides( colour = guide_colourbar(barwidth = 0.5, barheight = 10,
+                                     frame.colour = "black", ticks = FALSE,
+                                     title = guide_legend(title = metric)) ) +
+    theme(legend.position = "right",
+          legend.text = element_text(size = 9))
+  
+}
+  
+even.full <- 
+  list.even[[1]] + list.even[[2]] + list.even[[3]] + list.even[[4]] +
+  plot_layout(nrow = 2, ncol = 2) +
+  plot_annotation(tag_levels = "a")
 
-df.metric.max <- 
-  df.metric %>%
-  filter(get(metric) != Inf) %>%
-  filter(get(metric) == max(get(metric)))
-
-df.metric.min <- 
-  df.metric %>%
-  filter(get(metric) != -Inf) %>%
-  filter(get(metric) == min(get(metric)))
-
-df.metric.undefined <- 
-  df.all %>%
-  filter(is.na(get(metric)) | get(metric) == Inf | get(metric) == -Inf )
-
-ggplot() +
-  geom_point(data = df.metric,
-             mapping = aes(x = ave_MF, y = sd_MF, shape = metric_negative, colour = get(metric) ),
-             size = 3, alpha = 0.5, position = position_jitter(width = 0.005)) +
-  scale_colour_viridis_c(option = "D") +
-  scale_shape_manual(values=c(16, 15), guide = FALSE)+
-  geom_hline(yintercept = df.min[["sd_MF"]], linetype = "dashed", colour = "black") +
-  geom_vline(xintercept = df.max[["ave_MF"]], linetype = "dashed", colour = "black") +
-  geom_point(data = df.min, 
-             mapping = aes(x = ave_MF, y = sd_MF), 
-             fill = "white", colour = "black", shape = 24, alpha = 1, size = 3.5, 
-             position = position_nudge(x = -0.025), stroke = 1.25 ) +
-  geom_point(data = df.max,
-             mapping = aes(x = ave_MF, y = sd_MF),
-             fill = "white", colour = "black", shape = 21, alpha = 1, size = 3.5,
-             position = position_nudge(x = -0.025), stroke = 1.25 ) +
-  geom_point(data = df.metric.max,
-             mapping = aes(x = ave_MF, y = sd_MF),
-             colour = "black", fill = "#FF6600", shape = 21, alpha = 1, size = 3.5, stroke = 1.25) +
-  geom_point(data = df.metric.min,
-             mapping = aes(x = ave_MF, y = sd_MF),
-             colour = "black", fill =  "#FF6600", shape = 24, alpha = 1, size = 3.5, stroke = 1.25) +
-  geom_point(data = df.metric.undefined,
-             mapping = aes(x = ave_MF, y = sd_MF), 
-             shape = 4, size = 3, position = position_nudge(x = 0.025) ) +
-  ylab("SD among functions") +
-  xlab("Mean among functions") +
-  ggtitle(metric) +
-  # scale_y_continuous(limits = c(-0.05, 0.55)) +
-  # scale_x_continuous(limits = c(-0.05, 1.05)) +
-  theme_meta() +
-  theme(legend.position = "right",
-        legend.title = element_blank(),
-        legend.text = element_text(size = 9)) +
-  guides( colour = guide_colourbar(barwidth = 0.5, barheight = 10,
-                                   frame.colour = "black", ticks = FALSE ) )
+ggsave(filename = here("Figures/metric_comparison_even.png"), even.full,
+       units = "cm", width = 18, height = 14)
 
 ### END
