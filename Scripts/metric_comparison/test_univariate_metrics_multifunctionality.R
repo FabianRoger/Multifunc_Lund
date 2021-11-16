@@ -96,17 +96,18 @@ mds_out <-
   dist(x = ., method = "euclidean") %>% 
   metaMDS(comm = .) 
 
-mds_out$points %>% 
+mds.plot <- 
+  mds_out$points %>% 
   as.data.frame(.) %>% 
   tibble::rownames_to_column(var = "MF_metrics") %>% 
+  mutate(group = c(rep("sum/ave.", 4), rep("eveness", 4), rep("thresh.", 8), "other")) %>%
   ggplot(data = .,
-         mapping = aes(x = MDS1, y = MDS2, colour = MF_metrics)) +
+         mapping = aes(x = MDS1, y = MDS2, colour = group)) +
   geom_point() +
-  ggrepel::geom_label_repel(mapping = aes(label = MF_metrics),
+  ggrepel::geom_text_repel(mapping = aes(label = MF_metrics),
                             show.legend = FALSE,
                             size = 3,
-                            segment.alpha = 0.5,
-                            label.size = NA, fill = "white") +
+                            segment.alpha = 0.5, min.segment.length = 0.01) +
   scale_colour_viridis_d(option = "C", end = 0.9) +
   guides(label = FALSE,
          colour = guide_legend(override.aes = list(size = 3))) +
@@ -119,6 +120,9 @@ mds_out$points %>%
 jena.clust %>%
   cor(., use = "na.or.complete") %>%
   corrplot::corrplot(method = "ellipse")
+
+ggsave(filename = here("Figures/nmds_out.png"), mds.plot,
+       units = "cm", width = 12, height = 10)
 
 
 ### simulate data to test the performance of the metrics
@@ -362,7 +366,7 @@ p.full <-
 p.full <- p.full + plot_annotation(tag_levels = list(c("", letters[1:6])) )
 
 ggsave(filename = here("Figures/metric_comparison.png"), p.full,
-       units = "cm", width = 20, height = 14)
+       units = "cm", width = 18, height = 14)
 
 
 # iterate this
