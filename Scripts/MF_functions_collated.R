@@ -59,7 +59,7 @@ standardise_functions <- function(x, method) {
 # scales is the order of diversity that should be calculated. default = 1
 # stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
 
-hill_multifunc <- function(adf, vars, scale = 1, HILL = TRUE, stand_method = "z_score_abs"){
+hill_multifunc <- function(adf, vars, scale = 2, HILL = TRUE, stand_method = "z_score_abs"){
   
   if(! "vegan" %in% installed.packages()[,1]) stop(
     "this function requires vegan to be installed"
@@ -292,7 +292,7 @@ MF_jing <- function(adf, vars) {
 
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
-MF_sum <- function(adf, vars, stand_method = "max") {
+MF_sum <- function(adf, vars, stand_method = "z_score_abs") {
   
   adf_mat <- adf[, vars]
   adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)

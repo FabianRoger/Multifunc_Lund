@@ -3,19 +3,6 @@
 
 # Title: Code to compare different metrics of multifunctionality given different function distributions
 
-# what are the crucial characteristics?
-
-# should be zero if all functions are zero
-# should be maximised if all functions are their maximum
-# should be positive always because what does a negative multifunctionality mean?
-
-# must be defined for any possible functional distribution (i.e. cannot be undefined)
-
-# debatable characteristics
-
-# should be zero if there is only one positive function
-
-
 # load relevant libraries
 library(dplyr)
 library(tidyr)
@@ -23,6 +10,8 @@ library(ggplot2)
 library(here)
 library(readr)
 library(vegan)
+library(forcats)
+library(patchwork)
 
 rm(list = ls())
 
@@ -103,26 +92,75 @@ mds.plot <-
   mutate(group = c(rep("sum/ave.", 4), rep("eveness", 4), rep("thresh.", 8), "other")) %>%
   ggplot(data = .,
          mapping = aes(x = MDS1, y = MDS2, colour = group)) +
-  geom_point() +
+  geom_point(size = 2) +
   ggrepel::geom_text_repel(mapping = aes(label = MF_metrics),
                             show.legend = FALSE,
-                            size = 3,
+                            size = 2,
                             segment.alpha = 0.5, min.segment.length = 0.01) +
   scale_colour_viridis_d(option = "C", end = 0.9) +
   guides(label = FALSE,
-         colour = guide_legend(override.aes = list(size = 3))) +
+         colour = guide_legend(override.aes = list(size = 1.5))) +
   theme_meta() +
-  theme(legend.position = "bottom",
+  theme(legend.position = "top",
         legend.key = element_blank(),
-        legend.text = element_text(colour = "black", size = 14, face = "plain"),
+        legend.text = element_text(colour = "black", size = 6, face = "plain"),
         legend.title = element_blank())
 
-jena.clust %>%
-  cor(., use = "na.or.complete") %>%
-  corrplot::corrplot(method = "ellipse")
+mds.plot
 
-ggsave(filename = here("Figures/nmds_out.png"), mds.plot,
-       units = "cm", width = 12, height = 10)
+# generate a correlation plot between these functions
+jena.mf.raw <- 
+  jena.clust %>% 
+  mutate(across(.cols = everything(), ~(.-mean(., na.rm = TRUE))/sd(., na.rm = TRUE) ) )
+
+jena.mf <-
+  jena.mf.raw %>%
+  corrr::correlate(diagonal = 1) %>%
+  corrr::shave(upper = FALSE)
+
+# prepare the correlation data for plotting
+# # https://www.cedricscherer.com/2019/08/05/a-ggplot2-tutorial-for-beautiful-plotting-in-r/#charts
+jena.mf <- 
+  jena.mf %>%
+  pivot_longer(
+    cols = -term,
+    names_to = "colname",
+    values_to = "corr"
+  ) %>%
+  mutate(rowname = fct_inorder(term),
+         colname = fct_inorder(colname))
+
+library(viridis)
+jena.corr.plot <- 
+  ggplot(jena.mf, aes(rowname, fct_rev(colname),
+                      fill = corr)) +
+  geom_tile() +
+  coord_fixed(expand = FALSE) +
+  scale_color_manual(values = c("black", "white"),
+                     guide = "none") +
+  geom_text(aes(
+    label = format(round(corr, 1), nsmall = 0),
+    color = abs(corr) == 1
+  ), size = 2) +
+  scale_fill_viridis(
+    option = "C",
+    na.value = "white",
+    direction = -1, alpha = 0.8, begin = 0.2, end = 0.8,
+    name = "rho") +
+  labs(x = NULL, y = NULL) +
+  theme(panel.border = element_rect(color = NA, fill = NA),
+        legend.position = c(.85, .8),
+        axis.text.y = element_text(colour = "black"),
+        axis.text.x = element_text(angle = 90, colour = "black"),
+        axis.title = element_blank()) +
+  guides( fill = guide_colourbar(barwidth = 0.5, barheight = 6,
+                                 frame.colour = "black", ticks = FALSE,
+                                 title = guide_legend(title = "rho")) )
+
+p1 <- mds.plot + jena.corr.plot + plot_annotation(tag_levels = "a")
+
+ggsave(filename = here("Figures/nmds_out.png"), p1,
+       units = "cm", width = 18, height = 12)
 
 
 ### simulate data to test the performance of the metrics
@@ -162,7 +200,7 @@ for(i in 1:length(func.names)) {
 best.dist.sub <- best.dist[c(1, 3, 5, 7, 8)]
 
 # set up the number of points to simulate
-n.sim <- 1001
+n.sim <- 1000
 n.sim <- as.integer(n.sim)
 
 if ( (class(n.sim) != "integer") | (n.sim %% 2 == 0) ) {
@@ -325,6 +363,8 @@ p.1 <-
              fill = "#99CCFF", colour = "black", shape = 21, alpha = 1, size = 6, stroke = 1.25) +
   geom_text(data = df.label, 
             mapping = aes(label = label), size = 4, nudge_y = 0.0025) +
+  scale_y_continuous(limits = c(-0.05, max(df.all$sd_MF))) +
+  scale_x_continuous(limits = c(-0.05, 1.05)) +
   ylab("SD among functions") +
   xlab("Mean among functions") +
   scale_colour_viridis_c() + 
@@ -408,30 +448,33 @@ for(i in 1:length(metric_even)) {
     ggplot() +
     geom_point(data = df.metric,
                mapping = aes(x = ave_MF, y = sd_MF, shape = metric_negative, colour = !!sym(metric) ),
-               size = 2, alpha = 0.25, position = position_jitter(width = 0.005)) +
-    scale_colour_viridis_c(option = "D", name = metric) +
+               size = 2, alpha = 0.15, position = position_jitter(width = 0.005)) +
+    scale_colour_viridis_c(option = "C", name = metric) +
     scale_shape_manual(values=c(16, 15), guide = FALSE)+
     geom_hline(yintercept = df.min[["sd_MF"]], linetype = "dashed", colour = "black") +
     geom_vline(xintercept = df.max[["ave_MF"]], linetype = "dashed", colour = "black") +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "black") +
     geom_point(data = df.min, 
                mapping = aes(x = ave_MF, y = sd_MF), 
-               fill = "white", colour = "black", shape = 24, alpha = 1, size = 2.5, 
-               position = position_nudge(x = -0.025), stroke = 1 ) +
+               fill = "black", colour = "black", shape = 24, alpha = 1, size = 0.8, 
+               stroke = 1 ) +
     geom_point(data = df.max,
                mapping = aes(x = ave_MF, y = sd_MF),
-               fill = "white", colour = "black", shape = 21, alpha = 1, size = 2.5,
-               position = position_nudge(x = -0.025), stroke = 1 ) +
+               fill = "black", colour = "black", shape = 21, alpha = 1, size = 0.8, 
+               stroke = 1 ) +
     geom_point(data = df.metric.max,
                mapping = aes(x = ave_MF, y = sd_MF),
-               colour = "black", fill = "black", shape = 21, alpha = 1, size = 2.5, stroke = 1) +
+               colour = "black", fill = "white", shape = 21, alpha = 1, size = 2.5, stroke = 1) +
     geom_point(data = df.metric.min,
                mapping = aes(x = ave_MF, y = sd_MF),
-               colour = "black", fill =  "black", shape = 24, alpha = 1, size = 2.5, stroke = 1) +
+               colour = "black", fill =  "white", shape = 24, alpha = 1, size = 2.5, stroke = 1) +
     geom_point(data = df.metric.undefined,
                mapping = aes(x = ave_MF, y = sd_MF), 
                shape = 4, size = 3, position = position_nudge(x = 0.025) ) +
     ylab("SD among functions") +
     xlab("Mean among functions") +
+    scale_y_continuous(limits = c(-0.05, max(df.metric$sd_MF))) +
+    scale_x_continuous(limits = c(-0.05, 1.05)) +
     theme_meta() +
     guides( colour = guide_colourbar(barwidth = 0.5, barheight = 10,
                                      frame.colour = "black", ticks = FALSE,
