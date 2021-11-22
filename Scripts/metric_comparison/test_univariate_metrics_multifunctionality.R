@@ -68,101 +68,6 @@ func.names <- c("biomass",  "plantCN", "soilC",
                 "soilorgC", "herbi", "micBMC", "phoact",            
                 "poll", "rootBM")
 
-jena.mf <- 
-  calculate_MF(data = jena.dat, func.names = func.names)
-names(jena.mf)
-
-# perform the cluster analysis based on this subset of points
-jena.clust <- 
-  jena.mf %>% 
-  dplyr::select(ends_with(" MF"), -starts_with("sd"))
-
-mds_out <- 
-  jena.clust %>% 
-  mutate(across(.cols = everything(), ~(.-mean(., na.rm = TRUE))/sd(., na.rm = TRUE) ) ) %>% 
-  as.matrix(.) %>% 
-  t() %>% 
-  dist(x = ., method = "euclidean") %>% 
-  metaMDS(comm = .) 
-
-mds.plot <- 
-  mds_out$points %>% 
-  as.data.frame(.) %>% 
-  tibble::rownames_to_column(var = "MF_metrics") %>% 
-  mutate(group = c(rep("sum/ave.", 4), rep("eveness", 4), rep("thresh.", 8), "other")) %>%
-  ggplot(data = .,
-         mapping = aes(x = MDS1, y = MDS2, colour = group)) +
-  geom_point(size = 2) +
-  ggrepel::geom_text_repel(mapping = aes(label = MF_metrics),
-                            show.legend = FALSE,
-                            size = 2,
-                            segment.alpha = 0.5, min.segment.length = 0.01) +
-  scale_colour_viridis_d(option = "C", end = 0.9) +
-  guides(label = FALSE,
-         colour = guide_legend(override.aes = list(size = 1.5))) +
-  theme_meta() +
-  theme(legend.position = "top",
-        legend.key = element_blank(),
-        legend.text = element_text(colour = "black", size = 6, face = "plain"),
-        legend.title = element_blank())
-
-mds.plot
-
-# generate a correlation plot between these functions
-jena.mf.raw <- 
-  jena.clust %>% 
-  mutate(across(.cols = everything(), ~(.-mean(., na.rm = TRUE))/sd(., na.rm = TRUE) ) )
-
-jena.mf <-
-  jena.mf.raw %>%
-  corrr::correlate(diagonal = 1) %>%
-  corrr::shave(upper = FALSE)
-
-# prepare the correlation data for plotting
-# # https://www.cedricscherer.com/2019/08/05/a-ggplot2-tutorial-for-beautiful-plotting-in-r/#charts
-jena.mf <- 
-  jena.mf %>%
-  pivot_longer(
-    cols = -term,
-    names_to = "colname",
-    values_to = "corr"
-  ) %>%
-  mutate(rowname = fct_inorder(term),
-         colname = fct_inorder(colname))
-
-library(viridis)
-jena.corr.plot <- 
-  ggplot(jena.mf, aes(rowname, fct_rev(colname),
-                      fill = corr)) +
-  geom_tile() +
-  coord_fixed(expand = FALSE) +
-  scale_color_manual(values = c("black", "white"),
-                     guide = "none") +
-  geom_text(aes(
-    label = format(round(corr, 1), nsmall = 0),
-    color = abs(corr) == 1
-  ), size = 2) +
-  scale_fill_viridis(
-    option = "C",
-    na.value = "white",
-    direction = -1, alpha = 0.8, begin = 0.2, end = 0.8,
-    name = "rho") +
-  labs(x = NULL, y = NULL) +
-  theme(panel.border = element_rect(color = NA, fill = NA),
-        legend.position = c(.85, .8),
-        axis.text.y = element_text(colour = "black"),
-        axis.text.x = element_text(angle = 90, colour = "black"),
-        axis.title = element_blank()) +
-  guides( fill = guide_colourbar(barwidth = 0.5, barheight = 6,
-                                 frame.colour = "black", ticks = FALSE,
-                                 title = guide_legend(title = "rho")) )
-
-p1 <- mds.plot + jena.corr.plot + plot_annotation(tag_levels = "a")
-
-ggsave(filename = here("Figures/nmds_out.png"), p1,
-       units = "cm", width = 18, height = 12)
-
-
 ### simulate data to test the performance of the metrics
 
 # fit distributions to the functions from the Jena data
@@ -326,9 +231,62 @@ mds.plot <-
         legend.text = element_text(colour = "black", size = 6, face = "plain"),
         legend.title = element_blank())
 
-mds.plot
+# generate a correlation plot between these functions
+sim.cor.raw <- 
+  sim.clust %>%
+  filter( !is.na(`SAM MF`) ) %>%
+  filter(`SAM MF` != Inf) %>%
+  filter(`SAM MF` != -Inf) %>%
+  mutate(across(.cols = everything(), ~(.-mean(., na.rm = TRUE))/sd(., na.rm = TRUE) ) ) 
 
+sim.cor <-
+  sim.cor.raw %>%
+  corrr::correlate(diagonal = 1) %>%
+  corrr::shave(upper = FALSE)
 
+# prepare the correlation data for plotting
+# # https://www.cedricscherer.com/2019/08/05/a-ggplot2-tutorial-for-beautiful-plotting-in-r/#charts
+sim.cor <- 
+  sim.cor %>%
+  pivot_longer(
+    cols = -term,
+    names_to = "colname",
+    values_to = "corr"
+  ) %>%
+  mutate(rowname = fct_inorder(term),
+         colname = fct_inorder(colname))
+
+library(viridis)
+sim.corr.plot <- 
+  ggplot(sim.cor, aes(rowname, fct_rev(colname),
+                      fill = corr)) +
+  geom_tile() +
+  coord_fixed(expand = FALSE) +
+  scale_color_manual(values = c("black", "white"),
+                     guide = "none") +
+  geom_text(aes(
+    label = format(round(corr, 1), nsmall = 0),
+    color = abs(corr) == 1
+  ), size = 2) +
+  scale_fill_viridis(
+    option = "C",
+    na.value = "white",
+    direction = -1, alpha = 0.8, begin = 0.2, end = 0.8,
+    name = "rho") +
+  labs(x = NULL, y = NULL) +
+  theme(panel.border = element_rect(color = NA, fill = NA),
+        legend.position = c(.85, .8),
+        axis.text.y = element_text(colour = "black"),
+        axis.text.x = element_text(angle = 90, colour = "black"),
+        axis.title = element_blank()) +
+  guides( fill = guide_colourbar(barwidth = 0.5, barheight = 6,
+                                 frame.colour = "black", ticks = FALSE,
+                                 title = guide_legend(title = "rho")) )
+
+p1 <- mds.plot + sim.corr.plot + plot_annotation(tag_levels = "a")
+
+ggsave(filename = here("Figures/nmds_out.png"), p1,
+       units = "cm", width = 18, height = 12)
 
 
 ### how should we standardise raw function data for plotting?
