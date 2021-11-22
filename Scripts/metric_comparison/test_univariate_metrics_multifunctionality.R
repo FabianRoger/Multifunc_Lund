@@ -203,10 +203,6 @@ best.dist.sub <- best.dist[c(1, 3, 5, 7, 8)]
 n.sim <- 1000
 n.sim <- as.integer(n.sim)
 
-if ( (class(n.sim) != "integer") | (n.sim %% 2 == 0) ) {
-  warning("code is only robust if odd simulations are used because it is based on quantile distributions")
-}
-
 # weibull distribution
 best.dist.sub[[1]]
 x1 <- rweibull(n = n.sim, shape = best.dist.sub[[1]]$estimate[1], scale = best.dist.sub[[1]]$estimate[2])
@@ -287,6 +283,55 @@ sim.metric <- calculate_MF(data = sim.metric, func.names = func.names)
 
 # add a row.id column
 sim.metric$row_id <- 1:nrow(sim.metric)
+
+
+### run an nMDS on the simulated data so we need to z-score transform all MF metrics
+
+# perform the cluster analysis based on this subset of points
+sim.clust <- 
+  sim.metric %>% 
+  dplyr::select(ends_with(" MF"), -starts_with("sd"))
+
+sum(!complete.cases(sim.clust))
+
+mds_out <- 
+  sim.clust %>% 
+  filter( !is.na(`SAM MF`) ) %>%
+  filter(`SAM MF` != Inf) %>%
+  filter(`SAM MF` != -Inf) %>%
+  mutate(across(.cols = everything(), ~(.-mean(., na.rm = TRUE))/sd(., na.rm = TRUE) ) ) %>% 
+  as.matrix(.) %>% 
+  t() %>% 
+  dist(x = ., method = "euclidean") %>% 
+  metaMDS(comm = .) 
+
+mds.plot <- 
+  mds_out$points %>% 
+  as.data.frame(.) %>% 
+  tibble::rownames_to_column(var = "MF_metrics") %>% 
+  mutate(group = c(rep("sum/ave.", 4), rep("eveness", 4), rep("thresh.", 8), "other")) %>%
+  ggplot(data = .,
+         mapping = aes(x = MDS1, y = MDS2, colour = group)) +
+  geom_point(size = 2) +
+  ggrepel::geom_text_repel(mapping = aes(label = MF_metrics),
+                           show.legend = FALSE,
+                           size = 2,
+                           segment.alpha = 0.5, min.segment.length = 0.01) +
+  scale_colour_viridis_d(option = "C", end = 0.9) +
+  guides(label = FALSE,
+         colour = guide_legend(override.aes = list(size = 1.5))) +
+  theme_meta() +
+  theme(legend.position = "top",
+        legend.key = element_blank(),
+        legend.text = element_text(colour = "black", size = 6, face = "plain"),
+        legend.title = element_blank())
+
+mds.plot
+
+
+
+
+### how should we standardise raw function data for plotting?
 
 # how to standardise the raw function data for plotting?
 stand <- "max"

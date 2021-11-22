@@ -485,7 +485,7 @@ MF_slade <- function(adf, vars,
     
   } else if (A == "min") {
     
-    a <- apply(X = adf_mat, MARGIN = 2, function(x) { mean(x[x < quantile(x, probs = A_quant)], na.rm = TRUE)   })
+    a <- apply(X = adf_mat, MARGIN = 2, function(x) { mean(x[x <= quantile(x, probs = A_quant)], na.rm = TRUE)   })
     
   } else {
     
@@ -500,7 +500,7 @@ MF_slade <- function(adf, vars,
     
   } else if (B == "max") {
     
-    b <- apply(X = adf_mat, MARGIN = 2, function(x) { mean(x[x > quantile(x, probs = B_quant)], na.rm = TRUE) })
+    b <- apply(X = adf_mat, MARGIN = 2, function(x) { mean(x[x >= quantile(x, probs = B_quant)], na.rm = TRUE) })
     
   } else {
     
