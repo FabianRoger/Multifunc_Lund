@@ -76,85 +76,59 @@ AIC_sp <- function(data, function_names, species_names) {
 # species_names: vector of species names
 # n_ran: number of randomisations
 
-SES_score <- function(data, function_names, species_names, n_ran) {
+SES_score <- function(data, function_names, species_names, n_ran = 100) {
   
-  if(! "dplyr" %in% installed.packages()[,1]) stop(
-    "this function requires the dplyr package to be installed"
-  )
-  if(! "tidyr" %in% installed.packages()[,1]) stop(
-    "this function requires the tidyr package to be installed"
-  )
+  sp.dat <- data[, species_names]
+  func.dat <- data[, function_names]
   
-  # load dplyr and tidyr packages
-  library(dplyr)
-  library(tidyr)
-  
-  # randomise the data and calculate d-values for each randomisation
-  ran.d.vals <- vector("list", length = n_ran)
-  for (i in 1:n_ran) {
+  func.list <- vector("list", length = length(function_names))
+  for (i in 1:length(function_names)) {
     
-    # randomise function values across plots
-    data.random <- row.randomiser(func.names = function_names,
-                                  species.names = species_names, 
-                                  adf.data = data)
+    x <- func.dat[[function_names[i]]]
     
-    # calculate difference values for each species for each function
-    ran.d.vals[[i]] <-  
-      data.random %>%
-      pivot_longer(cols = all_of(species_names),
-                   names_to = "species",
-                   values_to = "pa") %>%
-      group_by(species, pa) %>%
-      summarise(across(.cols = all_of(function_names), mean ), .groups = "drop") %>%
-      group_by(species) %>%
-      summarise(across(.cols = all_of(function_names), diff ), .groups = "drop")
+    sp.out <- 
+      lapply(sp.dat, function(y) {
+        
+        obs_D <- mean(x[y == 1]) - mean(x[y == 0])
+        
+        ran_D <- vector("double", length = n_ran)
+        for (i in 1:n_ran) {
+          
+          z <- sample(x, size = length(x), replace = TRUE)
+          ran_D[i] <- mean(z[y == 1]) - mean(z[y == 0])
+          
+        }
+        
+        SES_i <- (obs_D - mean(ran_D) )/sd(ran_D)
+        
+        # assign positive or negative effects depending on the effect size (>2 or <-2)
+        if (SES_i > 2) {
+          
+          SES_i <- 1
+          
+        } else if (SES_i < -2) {
+          
+          SES_i <- -1 
+          
+        } 
+        
+        else { SES_i <- 0 }
+        
+      }
+      
+      )
+    
+    func.list[[i]] <- unlist(sp.out)
     
   }
   
-  # bind the list into a data.frame  
-  ran.d.vals <- bind_rows(ran.d.vals, .id = "run")
+  # sort out the output
+  df <- do.call("cbind", func.list)
+  df <- as.data.frame(df)
+  names(df) <- function_names
+  df <- as_tibble(df, rownames = "species")
   
-  # calculate mean and sd of d-values of randomised data
-  ran.d.vals <- 
-    ran.d.vals %>%
-    pivot_longer(cols = all_of(function_names),
-                 names_to = "function_name",
-                 values_to = "d_value") %>%
-    arrange(species, function_name) %>%
-    group_by(species, function_name) %>%
-    summarise(mean_d_value = mean(d_value, na.rm = TRUE),
-              sd_d_value = sd(d_value, na.rm = TRUE), .groups = "drop")
-  
-  # calculate observed d values
-  obs.d.vals <- 
-    data %>%
-    pivot_longer(cols = all_of(species_names),
-                 names_to = "species",
-                 values_to = "pa") %>%
-    group_by(species, pa) %>%
-    summarise(across(.cols = all_of(function_names), mean ), .groups = "drop") %>%
-    group_by(species) %>%
-    summarise(across(.cols = all_of(function_names), diff ), .groups = "drop") %>%
-    pivot_longer(cols = all_of(function_names),
-                 names_to = "function_name",
-                 values_to = "d_value_obs") %>%
-    arrange(species, function_name)
-  
-  # join the observed d.vals to the randomised d.vals
-  d.val.dat <- full_join(ran.d.vals, obs.d.vals, by = c("species", "function_name"))
-  
-  # calculate species importance scores
-  sp.SES <- 
-    d.val.dat %>%
-    mutate(SES = (d_value_obs - mean_d_value)/(sd_d_value)) %>%
-    mutate(SES_effect = if_else(SES > 2, 1, 
-                                if_else(SES < -2, -1, 0))) %>%
-    select(species, function_name, SES_effect) %>%
-    pivot_wider(id_cols = "species",
-                names_from = "function_name",
-                values_from = "SES_effect")
-  
-  return(sp.SES)
+  return(df)
   
 }
 
