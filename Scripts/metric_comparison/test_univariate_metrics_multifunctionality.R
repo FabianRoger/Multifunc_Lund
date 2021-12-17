@@ -223,13 +223,15 @@ mds.plot <-
                            size = 2,
                            segment.alpha = 0.5, min.segment.length = 0.01) +
   scale_colour_viridis_d(option = "C", end = 0.9) +
-  guides(label = FALSE,
+  guides(label = "none",
          colour = guide_legend(override.aes = list(size = 1.5))) +
   theme_meta() +
   theme(legend.position = "top",
         legend.key = element_blank(),
         legend.text = element_text(colour = "black", size = 6, face = "plain"),
         legend.title = element_blank())
+
+mds.plot
 
 # generate a correlation plot between these functions
 sim.cor.raw <- 
@@ -263,7 +265,8 @@ sim.corr.plot <-
   geom_tile() +
   coord_fixed(expand = FALSE) +
   scale_color_manual(values = c("black", "white"),
-                     guide = "none") +
+                     guide = "none",
+                     na.value = "white") +
   geom_text(aes(
     label = format(round(corr, 1), nsmall = 0),
     color = abs(corr) == 1
@@ -276,14 +279,16 @@ sim.corr.plot <-
   labs(x = NULL, y = NULL) +
   theme(panel.border = element_rect(color = NA, fill = NA),
         legend.position = c(.85, .8),
-        axis.text.y = element_text(colour = "black"),
-        axis.text.x = element_text(angle = 90, colour = "black"),
+        axis.text.y = element_text(colour = "black", size = 7),
+        axis.text.x = element_text(angle = 90, colour = "black", size = 7),
         axis.title = element_blank()) +
   guides( fill = guide_colourbar(barwidth = 0.5, barheight = 6,
                                  frame.colour = "black", ticks = FALSE,
                                  title = guide_legend(title = "rho")) )
 
-p1 <- mds.plot + sim.corr.plot + plot_annotation(tag_levels = "a")
+p1 <- mds.plot + sim.corr.plot + 
+  plot_annotation(tag_levels = "a") +
+  plot_layout(widths = c(1.3, 1))
 
 ggsave(filename = here("Figures/nmds_out.png"), p1,
        units = "cm", width = 18, height = 12)
@@ -416,15 +421,12 @@ ggsave(filename = here("Figures/metric_comparison.png"), p.full,
 # for each metric, what do we want to plot separately?
 # set the metric
 names(df.all)
-metric_even <- c("Pasari MF", "SAM MF", "Simp. MF", "ENF MF")
-metric_thresh <- c("Manning.30 MF", "Manning.70 MF", 
-                   "thresh.30 MF", "thresh.70 MF",
-                   "Slade.10.90 MF", "Slade.40.60 MF")
+metric_in <- c("Pasari MF", "SAM MF", "Simp. MF", "ENF MF", "PCA MF")
 
-list.even <- vector("list", length = length(metric_even))
-for(i in 1:length(metric_even)) {
+list.even <- vector("list", length = length(metric_in))
+for(i in 1:length(metric_in)) {
   
-  metric <- metric_even[i]
+  metric <- metric_in[i]
   
   df.metric <- 
     df.all %>%
@@ -486,7 +488,8 @@ for(i in 1:length(metric_even)) {
           legend.text = element_text(size = 9))
   
 }
-  
+
+# plot the evenness graph  
 even.full <- 
   list.even[[1]] + list.even[[2]] + list.even[[3]] + list.even[[4]] +
   plot_layout(nrow = 2, ncol = 2) +
@@ -494,5 +497,9 @@ even.full <-
 
 ggsave(filename = here("Figures/metric_comparison_even.png"), even.full,
        units = "cm", width = 18, height = 14)
+
+# plot the PCA graph
+ggsave(filename = here("Figures/PCA_comparison.png"), list.even[[5]],
+       units = "cm", width = 9, height = 7)
 
 ### END
