@@ -13,8 +13,8 @@ library(here)
 rm(list = ls())
 
 # load functions from important scripts
-source(here("Scripts/MF_functions_collated.R"))
-source(here("Scripts/process_model_data.R"))
+source(here("Scripts/01_general_functions/MF_functions_collated.R"))
+source(here("Scripts/01_general_functions/process_model_data.R"))
 
 
 # using functions defined to get combinations of functions:
@@ -51,19 +51,17 @@ get_BEF_mf_est <- function(adf.data,
     # get the vector of function names
     sample.func.names <- list.func.names[[i]]
     
-    # standardise functions if TRUE
-    if (standardise_funcs == TRUE) {
-      dat.in <- 
-        dat.in %>%
-        mutate(across(.cols = all_of(sample.func.names) , ~standardise(.) ) )
-      }
-    
     # calculate the multifunctionality metrics
-    data.mf <- multifunc_calculator(adf = dat.in, vars = sample.func.names,
-                                    mf.functions = c("MF_sum", "MF_av", "MF_pasari", "single_threshold_mf", "single_threshold_mf"),
-                                    mf.names = c("sum_MF", "ave._MF", "Pasari_MF", "thresh.30_MF", "thresh.70_MF"),
-                                    add.args = list(NA, NA, NA, c(thresh = 0.3), c(thresh = 0.7))
-               )
+    data.mf <- 
+      dat.in %>%
+      mutate(sum_MF = MF_sum(adf = dat.in, vars = sample.func.names),
+             ave_MF = MF_av(adf = dat.in, vars = sample.func.names, stand_method = "z_score_abs"),
+             sd_MF = MF_sd(adf = dat.in, vars = sample.func.names, stand_method = "z_score_abs"),
+             Pasari_MF = MF_pasari(adf = dat.in, vars = sample.func.names),
+             ENF_MF = hill_multifunc(adf = dat.in, vars = sample.func.names, scale = 1, HILL = TRUE),
+             thresh_30_MF = single_threshold_mf(adf = dat.in, vars = sample.func.names, thresh = 0.3),
+             thresh_70_MF  = single_threshold_mf(adf = dat.in, vars = sample.func.names, thresh = 0.7) 
+             )
     
     # calculate summary statistics for the data.mf data.frame
     data.mf.summary <- 
@@ -139,10 +137,10 @@ get_BEF_mf_est <- function(adf.data,
   
 }
 
-
 # load the processed model data
 mod.out <- read_csv(here("data/drift_model_n_functions_processed.csv"))
-View(head(mod.out))
+head(mod.out)
+unique(mod.out$function_matrix)
 
 # do this for a subset of the data i.e. n = 50
 mod.out <- 

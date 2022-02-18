@@ -16,8 +16,8 @@ library(patchwork)
 rm(list = ls())
 
 # tell R where to call scripts from
-source(here("Scripts/function_plotting_theme.R"))
-source(here("Scripts/MF_functions_collated.R"))
+source(here("Scripts/01_general_functions/function_plotting_theme.R"))
+source(here("Scripts/01_general_functions/MF_functions_collated.R"))
 
 # load the jena data
 jena.dat <- read_csv(file = here("data/jena_data_Jochum_2020_clean.csv"))
