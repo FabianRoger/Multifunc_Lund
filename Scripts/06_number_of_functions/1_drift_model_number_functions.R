@@ -5,13 +5,14 @@
 
 # load relevant libraries
 library(here)
+library(readr)
 
 # clear the current memory
 rm(list = ls())
 
 # link to scripts with the relevant functions
-source(here("Scripts//ecological_drift_model.R"))
-source(here("Scripts/MF_functions_collated.R"))
+source(here("Scripts/01_general_functions/ecological_drift_model.R"))
+source(here("Scripts/01_general_functions/MF_functions_collated.R"))
 
 # how many model reps for each parameter combination?
 # with 1000 replicates, it can take up to 30 minutes to complete
@@ -52,26 +53,24 @@ drift.mod.list <-
          species, abundance)
 
 # write this model data.frame into a .csv file so the model does not have to be re-run
-library(readr)
 
 # make a folder to export the cleaned data
 if(! dir.exists(here("data"))){
   dir.create(here("data"))
 }
 
-write_csv(x = drift.mod.list, file = here("data/drift_model_n_functions.csv"))
-
-### END
-
-### TEST THE DRIFT MODEL:
+# write_csv(x = drift.mod.list, file = here("data/drift_model_n_functions.csv"))
 
 
-drift.mod.list
+# Test the drift model i.e. is there a relationship between abundance and species richness
+drift.mod.list <- read_csv(here("data/drift_model_n_functions.csv"))
 
 # calculate the slope between number of functions and multifuncitonal BEF slope 
 # and other summary statistics for each multifunctionality metric
 library(purrr)
 library(broom)
+library(tidyr)
+library(ggplot2)
 
 # define function to efficiently output the slope
 lm.cleaner <- function(data, response, explanatory, output_prefix = "x") {
@@ -91,15 +90,16 @@ df_test <-
   group_by(model_run, local_species_pool, patch) %>%
   summarise(abundance = sum(abundance)) %>%
   group_by(model_run) %>% 
-  mutate(across(.cols = c("abundance"), standardise)) %>%
+  mutate(across(.cols = c("abundance"), ~standardise_functions(x = ., method = "z_score") )) %>%
   nest() %>% 
   summarise(total_abun_slope = map(data, ~lm.cleaner(data = .x, explanatory = "local_species_pool", response = "abundance")) ) %>%
   unnest(ends_with("slope"))
+head(df_test)
 
-df_test
-
+# check the range of slopes
 range(df_test$xabundance)
 
+# plot a histogram of slopes
 ggplot(data = df_test,
        mapping = aes(x = xabundance)) +
   geom_histogram(colour = "transparent", alpha = 0.5) +
@@ -107,9 +107,4 @@ ggplot(data = df_test,
   geom_vline(xintercept = 0, colour = "black", linetype = "dashed") +
   theme_classic()
 
-
-
-
-
-
-
+### END

@@ -69,7 +69,7 @@ get_BEF_mf_est <- function(adf.data,
       pivot_longer(cols = ends_with("MF"),
                    names_to = "multifunctionality_metric",
                    values_to = "MF") %>%
-      select(multifunctionality_metric, MF) %>%
+      dplyr::select(multifunctionality_metric, MF) %>%
       group_by(multifunctionality_metric) %>%
       summarise(mean_MF = mean(MF, na.rm = TRUE),
                 sum_MF = sum(MF, na.rm = TRUE),
@@ -86,7 +86,7 @@ get_BEF_mf_est <- function(adf.data,
     data.f.summary <- 
       dat.in %>%
       mutate(row_id = 1:nrow(dat.in)) %>%
-      select(row_id, local_species_pool, all_of(sample.func.names)) %>%
+      dplyr::select(row_id, local_species_pool, all_of(sample.func.names)) %>%
       pivot_longer(cols = all_of(sample.func.names),
                    names_to = "function_id",
                    values_to = "function_value") %>%
@@ -172,19 +172,12 @@ View(sim.n.df)
 sim.n.out <- 
   left_join(sim.n.df,
             mod.out %>%
-              select(mod_id, drift_parameter, function_matrix, model_run) %>%
+              dplyr::select(mod_id, drift_parameter, function_matrix, model_run) %>%
               distinct(), by = "mod_id")
 head(sim.n.out)
 
 # write this to a csv so we don't have to run the model again
 write_csv(x = sim.n.out, file = here("data/sim_n_functions.csv"))
-
-
-
-
-
-
-
 
 
 

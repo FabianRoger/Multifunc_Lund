@@ -14,9 +14,9 @@ library(ggplot2)
 rm(list = ls())
 
 # get scripts to call functions from
-source(here("Scripts/function_plotting_theme.R"))
-source(here("Scripts/MF_functions_collated.R"))
-source(here("Scripts/linear_model_slope_function.R"))
+source(here("Scripts/01_general_functions/function_plotting_theme.R"))
+source(here("Scripts/01_general_functions/MF_functions_collated.R"))
+source(here("Scripts/01_general_functions/linear_model_slope_function.R"))
 
 
 # plot n-functions and multifunctionality
@@ -25,6 +25,7 @@ source(here("Scripts/linear_model_slope_function.R"))
 sim.n.out <- read_csv(here("data/sim_n_functions.csv"))
 View(head(sim.n.out))
 dim(sim.n.out)
+unique(sim.n.out$function_matrix)
 
 # plot a few illustrative examples for each multifunctionality metric
 mf.metric.list <- unique(sim.n.out$multifunctionality_metric)
@@ -48,7 +49,7 @@ for(i in 1:length(mf.metric.list)) {
                          group = mod_id, colour = function_matrix)) +
     geom_jitter(width = 0.1, alpha = 0.2) +
     geom_smooth(method = "lm", se = FALSE, width = 0.5) +
-    scale_colour_viridis_d() +
+    scale_colour_viridis_d(option = "C", end = 0.9) +
     ggtitle(mf.names[i]) +
     xlab("Number of functions") +
     ylab("MF BEF-slope") +
@@ -77,9 +78,8 @@ nfunc_slopes <-
   nest() %>% 
   mutate(nfunc.bef_slope = map(data, ~lm.cleaner(data = .x, explanatory = "number_of_functions", response = "diversity_mf_est"))  ) %>%
   unnest(starts_with("nfunc"))  %>% 
-  select(-data) %>%
+  dplyr::select(-data) %>%
   ungroup()
-
 View(nfunc_slopes)
 
 plots.fx2 <- vector("list", length = length(mf.metric.list))
@@ -106,7 +106,7 @@ for(i in 1:length(mf.metric.list)) {
     scale_x_continuous(limits = c(-0.11, 0.11)) +
     ggtitle("") +
     xlab("Estimate") +
-    scale_colour_viridis_d() +
+    scale_colour_viridis_d(option = "C", end = 0.9) +
     facet_wrap(~function_matrix, scales = "free") +
     theme_meta() +
     theme(legend.position = "none",
@@ -123,13 +123,14 @@ names(plots.fx2) <- mf.metric.list
 library(patchwork)
 
 f.x1 <- 
-  plots.fx1$ave._MF + plots.fx2$ave._MF + 
+  plots.fx1$ave_MF + plots.fx2$ave_MF + 
   plots.fx1$sum_MF + plots.fx2$sum_MF + 
   plots.fx1$Pasari_MF + plots.fx2$Pasari_MF + 
-  plots.fx1$thresh.30_MF + plots.fx2$thresh.30_MF +
-  plots.fx1$thresh.70_MF + plots.fx2$thresh.70_MF + 
+  plots.fx1$thresh_30_MF + plots.fx2$thresh_30_MF +
+  plots.fx1$thresh_70_MF + plots.fx2$thresh_70_MF + 
   plot_layout(ncol = 2, widths = c(1, 2.5)) +
   plot_annotation(tag_levels = "a")
+f.x1
 
 ggsave(filename = here("Figures/fig_x1.png"), plot = f.x1, width = 20, height = 27,
        units = "cm")

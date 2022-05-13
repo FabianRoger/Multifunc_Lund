@@ -29,7 +29,7 @@ lm.cleaner <- function(data, response, explanatory) {
     lm(reformulate(explanatory, response), data = data) %>% 
     tidy %>% 
     filter(term == explanatory) %>% 
-    select(estimate)
+    dplyr::select(estimate)
   
   names(lm.x) <- paste(explanatory, response, sep = "_")
   

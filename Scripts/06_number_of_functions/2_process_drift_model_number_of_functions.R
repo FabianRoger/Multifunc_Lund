@@ -37,14 +37,14 @@ func_mat_generator <- function(mu = 5, sigma = 1,
     x <- rnorm(n = n_funcs, mean = mu, sd = sigma)
     y <- lapply(sp, function(i) x)
     z <- do.call("rbind" , y)
-    print(mean((cor(t(z)))))
+    print(paste("correlation among functions =", mean((cor(t(z))))) )
     
   } else if (type == "random") {
     
     # function matrix 2: random species values
     y <- lapply(sp, function(i) rnorm(n = n_funcs, mean = mu, sd = sigma))
     z <- do.call("rbind" , y)
-    print(mean((cor(t(z)))))
+    print(paste("correlation among functions =", mean((cor(t(z))))) )
     
   } else {
     
