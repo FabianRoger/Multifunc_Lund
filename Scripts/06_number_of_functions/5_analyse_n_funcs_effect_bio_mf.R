@@ -149,11 +149,15 @@ sim.n.sub <-
 head(sim.n.sub)
 names(sim.n.sub)
 
-# is the range larger with more functions?
-sim.n.sub %>%
-  group_by(mod_id, number_of_functions) %>%
-  summarise(mean_range = mean(range_funcs),
-            mean_sd = mean(sd_funcs))
+# Does the variation decline with species richness more with more functions?
+
+# Yes, with function matrix 2 i.e. different functional contributions of species
+ggplot(data = sim.n.sub,
+       mapping = aes(x = number_of_functions, y = sd_cor) ) +
+  geom_jitter(width = 0.1) +
+  facet_wrap(~function_matrix) +
+  geom_hline(yintercept = 0, colour = "red") +
+  theme_meta()
 
 ggplot(data = sim.n.slopes,
        mapping = aes(x = number_of_functions_sd_cor)) +
