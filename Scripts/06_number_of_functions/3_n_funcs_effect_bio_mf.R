@@ -141,11 +141,12 @@ get_BEF_mf_est <- function(adf.data,
 mod.out <- read_csv(here("data/drift_model_n_functions_processed.csv"))
 head(mod.out)
 unique(mod.out$function_matrix)
+length(unique(mod.out$mod_id))
 
 # do this for a subset of the data i.e. n = 50
 mod.out <- 
   mod.out %>%
-  filter(mod_id %in% sample(unique(mod.out$mod_id), 50))
+  filter(mod_id %in% sample(unique(mod.out$mod_id), 200))
 
 # output the function names
 f.names <- names(mod.out)[grepl(pattern = "F_", names(mod.out))]
