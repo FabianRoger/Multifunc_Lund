@@ -141,6 +141,7 @@ x.sim <-
 x.sims <- do.call(expand.grid, x.sim)
 names(x.sims) <- paste("F_", 1:length(x.sim), sep = "")
 x.sims <- as_tibble(x.sims)
+dim(x.sims)
 
 # standardise the data
 x <- apply(x.sims, 2, standardise_functions, method = "max")
@@ -184,7 +185,7 @@ sim.metric <- x.sims[c(v[1], unlist(sampled_rows), v[length(v)]) , ]
 func.names <- names(sim.metric)
 
 # calculate the multifunctionality metrics on these simulated data using function
-sim.metric <- calculate_MF(data = sim.metric, func.names = func.names)
+sim.metric <- calculate_MF(data = sim.metric, func.names = func.names) # warnings are not important
 
 # add a row.id column
 sim.metric$row_id <- 1:nrow(sim.metric)
@@ -224,11 +225,12 @@ mds.plot <-
                            segment.alpha = 0.5, min.segment.length = 0.01) +
   scale_colour_viridis_d(option = "C", end = 0.9) +
   guides(label = "none",
-         colour = guide_legend(override.aes = list(size = 1.5))) +
+         colour = guide_legend(override.aes = list(size = 3))) +
   theme_meta() +
   theme(legend.position = "top",
+        legend.spacing.x = unit(0.1, 'cm'),
         legend.key = element_blank(),
-        legend.text = element_text(colour = "black", size = 6, face = "plain"),
+        legend.text = element_text(colour = "black", size = 8, face = "plain"),
         legend.title = element_blank())
 
 mds.plot
@@ -405,13 +407,19 @@ for (i in 1:length(p.labels )) {
 }
 
 library(patchwork)
-p.full <- 
+p1 <- 
   (p.1 + (p.list[[1]] + p.list[[2]]) + 
-     plot_layout(ncol = 1, nrow = 2 ) 
-   ) | (p.list[[3]] + p.list[[4]] + p.list[[5]] + p.list[[6]] + 
-     plot_layout(ncol = 2, nrow = 2) )
+     plot_layout(ncol = 1, nrow = 2 )
+   )
 
-p.full <- p.full + plot_annotation(tag_levels = list(c("", letters[1:6])) )
+p2 <- 
+  (p.list[[3]] + p.list[[4]] + p.list[[5]] + p.list[[6]] + 
+         plot_layout(ncol = 2, nrow = 2) 
+   )
+
+p.full <- 
+  (p1 | p2) + 
+  plot_annotation(tag_levels = list( letters[1:7] )) 
 
 ggsave(filename = here("Figures/metric_comparison.png"), p.full,
        units = "cm", width = 18, height = 14)
