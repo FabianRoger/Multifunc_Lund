@@ -119,6 +119,9 @@ for(i in 1:length(mf.metric.list)) {
 }
 names(plots.fx2) <- mf.metric.list
 
+names(plots.fx2)
+plots.fx2$sum_MF
+
 # link these plots using patchwork
 library(patchwork)
 
@@ -144,10 +147,11 @@ names(sim.n.out)
 
 sim.n.sub <- 
   sim.n.out %>%
-  select(model_run, function_matrix, mod_id, func.comb.id, n.func.id, number_of_functions, sd_funcs, cv_funcs, range_funcs, sd_cor, cv_cor, range_cor, mean_cor) %>%
+  dplyr::select(model_run, function_matrix, mod_id, func.comb.id, n.func.id, number_of_functions, sd_funcs, cv_funcs, range_funcs, sd_cor, cv_cor, range_cor, mean_cor) %>%
   distinct()
 head(sim.n.sub)
 names(sim.n.sub)
+View(sim.n.sub)
 
 # Does the variation decline with species richness more with more functions?
 
@@ -172,5 +176,22 @@ ggplot(data = sim.n.slopes,
   geom_vline(xintercept = 0, linetype = "dashed") +
   facet_wrap(~function_matrix, scales = "free_y") +
   theme_meta()
+
+# does the range in multifunctionality change with more functions?
+ggplot(data = sim.n.out %>%
+         mutate(function_matrix = as.character(function_matrix)),
+       mapping = aes(x = number_of_functions, y = range_MF, colour = function_matrix) ) +
+  geom_jitter(width = 0.1, alpha = 0.2) +
+  facet_wrap(~multifunctionality_metric, scales = "free") +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_hline(yintercept = 0, colour = "red") +
+  theme_meta()
+
+
+
+
+
+
+
 
 
