@@ -138,7 +138,7 @@ SES_score <- function(data, function_names, species_names, n_ran = 100) {
 # function_names: vector of function names
 # species_names: vector of species names
 # method: method to calculate species effects ("AIC" or "SES")
-# n_ran: number of randomisations
+# n_ran: number of randomisations when using the SES score
 
 prop_species_pool <- function(data, function_names, species_names, method = "AIC", n_ran = 100) {
   
@@ -231,7 +231,8 @@ prop_species_pool <- function(data, function_names, species_names, method = "AIC
 # function_names: vector of function names
 # species_names: vector of species names
 # method: method to calculate species effects ("AIC" or "SES")
-# n_ran: number of randomisations
+# n_ran: number of randomisations when using the SES method
+# n: number of random datasets
 
 prop_species_pool_random <- function(data, function_names, species_names, method = "AIC", n_ran = 100, n = 10) {
 

@@ -1,31 +1,37 @@
 
-# Project: Review of multifunctionality in ecology, conservation and ecosystem service science
+#' @title drift_model
 
-# Title: Code for an ecological drift model (sensu Hubbell 2001) but without dispersal or speciation
+#' @description Ecological drift model (sensu Hubbell 2001) but without dispersal or speciation
+#' 
+#' @details Takes a set of parameters describing a typical biodiversity-ecosystem functioning
+#' experiment (e.g. initial diversity, monocultures etc.) along with information about
+#' community turnover rates and the number of time-steps and runs a simple birth-death model
+#' for different numbers of species. These models are pure ecological drift models which means
+#' that there is no possibility that, on average, total abundance increases with the number of species
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' @param rsp number of species in the regional species pool
+#' @param lsp vector of local species pools (i.e. initial seeded diversity) but not monocultures (positive integers)
+#' @param mono how to initialise the monocultures. Options include:
+#' - "all": includes all possible monocultures from the regional species pool (i.e. rsp)
+#' - "random" draws monocultures randomly as per the other local species pool treatments
+#' - "none" excludes monocultures
+#' @param reps number of replicates for each local species pool size
+#' @param technical reps number of repeats of each exact treatment
+#' @param t_steps number of time-steps (i.e. generations) to include in the model
+#' @param n0 initial abundance of all species in a patch
+#' @param prop_change expected proportion of individuals that turnover at each time step drawn from a Poisson distribution
+#' @param n_repeats how many times to run the model with the current set of parameters
+#' 
+#' @return returns a dataframe with the model output containing the following variables:
+#' - model_run, patch, time, local_species_pool, composition, species, abundance
 
-# parameter definitions
 
-# lsp: gradient of local species pools (i.e. initial seeded diversity) but not monocultures (must be positive integers)
-# mono: options for including monocultures:
-# - "all" includes all possible monocultures from the regional species pool (i.e. rsp)
-# - "random" draws monocultures randomly as per the other local species pool treatments
-# - "none" excludes monocultures
-# reps: number of replicates for each local species pool size
-# technical_reps: how many repeats of each treatment exactly
-# rsp: number of species in the regional species pool
-# t_steps: number of time steps to model
-# n0: initial abundance of all species (i.e. all species together)
-
-# prop_change: expected proportion (Poisson distribution) of individuals that turnover at each time-step
-
-# n_repeats: how many times to run the model with current parameters
-
-# write an ecological drift model (sensu Hubbell 2001)
-drift_model <- function(lsp = c(2, 4, 6),
+drift_model <- function(rsp = 9,
+                        lsp = c(2, 4, 6),
                         mono = "all",
                         reps = 3,
                         technical_reps = 1,
-                        rsp = 9,
                         t_steps = 1000,
                         n0 = 500,
                         prop_change = 0.05,

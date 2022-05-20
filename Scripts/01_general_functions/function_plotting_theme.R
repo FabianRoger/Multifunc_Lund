@@ -1,4 +1,9 @@
 
+#' @title theme_meta
+#' @description A customised plotting theme to equalise the formatting of all plots plotted with ggplot2
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+
 # customised plotting theme
 theme_meta <- 
   function(base_size = 12, base_family = "") {
@@ -19,3 +24,4 @@ theme_meta <-
           legend.title = element_text(colour = "black", size=10, face = "plain"))
   }
 
+### END

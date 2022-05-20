@@ -12,9 +12,9 @@ library(ggplot2)
 rm(list = ls())
 
 # link to scripts with the relevant functions
-source(here("Scripts/turnover_approach/turnover_approach_functions.R"))
-source(here("Scripts/function_plotting_theme.R"))
-source(here("Scripts/process_model_data.R"))
+source(here("Scripts/05_turnover_approach/turnover_approach_functions.R"))
+source(here("Scripts/01_general_functions/function_plotting_theme.R"))
+source(here("Scripts/01_general_functions/process_model_data.R"))
 
 # read in the Jena data
 jena.dat <- read_csv(file = here("data/jena_data_Jochum_2020_clean.csv"))
@@ -112,7 +112,8 @@ l.in <-
   lapply(l.in, function(x) {
   
   x %>%
-    mutate(par_id = paste(method, gsub(x = effect_direction, pattern = "_", replacement = " "), sep = " " ) )
+    mutate(par_id = paste(paste(method, ":", sep = ""), 
+                          gsub(x = effect_direction, pattern = "_", replacement = " "), sep = " " ) )
   
 })
 
@@ -136,11 +137,15 @@ g1 <-
   ylab("Proportion species pool") +
   xlab("Number of functions") +
   facet_wrap(~par_id) +
-  theme_meta()
+  theme_meta() + 
+  theme(axis.text = element_text(size = 9),
+    strip.text = element_text(
+      size = 11
+    ))
 
 g1
 
 ggsave(filename = here("Figures/turnover_null.png"), plot = g1,
-       width = 16, height = 14, units = "cm", dpi = 450)
+       width = 12, height = 11, units = "cm", dpi = 450)
 
 ### END
