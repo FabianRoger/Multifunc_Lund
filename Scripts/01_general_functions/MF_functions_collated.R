@@ -1,10 +1,23 @@
 
-# functions to calculate multifunctionality
+#' @title standardise_functions
+#' @description Function to standardise ecosystem functions using several typical standardisation methods
+#' 
+#' @details Takes a numeric vector and standardises the values using one of five methods:
+#' 1. "z_score": (vector - mean(vector))/sd(vector)
+#' 2. "z_score_abs": (vector - mean(vector))/sd(vector) + min((vector - mean(vector))/sd(vector))
+#' 3. "max_0_1": ( vector - min(vector) )/( max(vector) - min(vector) )
+#' 4. "max": vector/max(vector)
+#' 5. "max_5_%": vector/max(quantile(vector, 0.95))
+#' This function is implemented in all univariate multifunctionality calculations for standardisation
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' 
+#' @param x numeric vector of ecosystem function values
+#' @param method method of standardisation ("z_score", "z_score_abs", "max_0_1", "max", "max_5_%", see details above)
+#' 
+#' @return standardised numeric vector
+#' 
 
-# function to standardise functions to match the original paper
-# this function is built into all functions
-# therefore, the user can choose the standardisation method
-# the default is always the one that is most commonly used in the literature
 standardise_functions <- function(x, method) {
   
   if (method == "z_score") {
@@ -40,24 +53,31 @@ standardise_functions <- function(x, method) {
     
   }
   
-  y
+  return(y)
   
 }
 
-
-# key arguments for all functions:
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to be a named vector
-
-
-# Hill approach (Roger et al. unpublished)
-
-# function to calculate the effective number of functions as proposed by Roger, Bagchi and Byrnes (unpublished!) 
-
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector of functions to include which has to correspond to column names
-# scales is the order of diversity that should be calculated. default = 1
-# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
+#' @title hill_multifunc 
+#' @description Calculate the Hill number multifunctionality (effective number of functions) for rows in a data.frame
+#' 
+#' @details Takes a data frame, variable names, a standardisation method and, an order of Hill number. It then 
+#' calculates and returns Hill number multifunctionality.
+#' 
+#' @author Fabian Roger
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' @param scale Hill number exponent (default = 2)
+#' @param HILL use Hill-number conversion of diversity-indices
+#' @param stand_method method of standardisation from the standardise_functions() function (above), default = "z_score_abs"
+#' 
+#' @references 
+#' 
+#' Byrnes, J.E.K., Roger, F., Bagchi, R. 2022. Understandable multifunctionality measures using Hill numbers
+#' bioRxiv. doi: https://doi.org/10.1101/2022.03.17.484802
+#' 
+#' @return returns a vector Hill number multifunctionality values for each row
+#' 
 
 hill_multifunc <- function(adf, vars, scale = 2, HILL = TRUE, stand_method = "z_score_abs"){
   
@@ -82,19 +102,32 @@ hill_multifunc <- function(adf, vars, scale = 2, HILL = TRUE, stand_method = "z_
   
 }
 
-
-# Manning et al. (2018) approach
-
-# function to calculate multifunctionality as proposed by Manning et al. (2018, Nature Ecology and Evolution)
-
-# adf is a dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector of functions to include which has to correspond to column names
-# ind is the index used to determine the optimal number of clusters using NbClust function (if multiple are included, the median of all of them is used)
-# met is the method used for clustering. This functions supports all methods in hclust() besides "kmeans"
-# thresh is the threshold for function assigngin a zero or one
-# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
-
-# this doesn't work with few functions
+#' @title manning_multifunc
+#' @description Calculate ecosystem function multifunctionality (Manning et al. 2018) for rows in a data.frame
+#' 
+#' @details Takes a data frame and ecosystem function names and calculates Manning et al.'s (2018) ecosystem function
+#' multifunctionality metric. In this implementation (unlike the original implementation), functions are clustered using
+#' an automated clustering procedure. Specifically, we cluster the functions using four algorithms that are implemented
+#' in the hclust() function: "mcclain", "cindex", "silhouette", "dunn". The optimal number of clusters is chosen using the
+#' "ward.D2" method from the NbClust package. After automated clustering, the method proceeds as described by Manning et al. (2018)
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' @param ind clustering methods from the NbClust package, default =  c("mcclain", "cindex", "silhouette", "dunn")
+#' @param met method for determining the optimal number of clusters from the NbClust package, only supports "ward.D2" at present
+#' @param dis distance metric, default = "euclidean"
+#' @param thresh threshold beyond which a function is counted as 1, default = 0.5
+#' @param stand_method method of standardisation from the standardise_functions() function (above), default = "max_5_%"
+#' 
+#' @references 
+#' 
+#' Manning et al. 2018. Redefining ecosystem multifunctionality. Nature Ecology and Evolution, 2(3): 427-436.
+#' 
+#' @return returns a vector of ecosystem function multifunctionality (Manning et al. 2018) values for each row
+#'
+#'
 
 manning_multifunc <- function(adf, vars, 
                               ind = c("mcclain", "cindex", "silhouette", "dunn"), 
@@ -171,15 +204,26 @@ manning_multifunc <- function(adf, vars,
   
 }
 
-
-# Meyer et al. (2017) approach
-
-# function to calculate the pca based multifunctionality index as suggested by 
-# Meyer et al. (2017) Biodiversity-multifunctionality relationships depend on identity and number of measured functions #
-# Nature Ecology & Evolution   
-
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector
+#' @title pca_multifunc
+#' @description Calculate PCA-based multifunctionality (Meyer et al. 2018) for rows in a data.frame
+#' 
+#' @details Takes a data frame and ecosystem function names and calculates Meyer et al.'s (2018) PCA-based multifunctionality metric. 
+#' The method of standardisation cannot be changed with this method because it needs z-score standardised function data. Otherwise,
+#' the method is implemented exactly as per Meyer et al. (2018)
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com) and Fabian Roger
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' 
+#' @references 
+#' 
+#' Meyer et al. 2018. Biodiversity–multifunctionality relationships depend on identity and number of measured functions. 
+#' Nature Ecology and Evolution, 2(1): 44-49.
+#' 
+#' @return returns a vector of PCA-based multifunctionality (Meyer et al. 2018) values for each row
+#'
+#'
 
 pca_multifunc <- function(adf, vars){
   
@@ -217,14 +261,26 @@ pca_multifunc <- function(adf, vars){
   
 }
 
-
-# Pasari et al. (2013) approach
-
-# function to calculate Pasari et al.'s (2013) multifunctionality metric
-
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector of functions to include which has to correspond to column names
-# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
+#' @title MF_pasari 
+#' @description Calculate Pasari et al.'s (2013) unique multifunctionality metric for rows in a data.frame
+#' 
+#' @details Takes a data frame, variable names and a standardisation method and calculate the "unique multifunctionality
+#' metric" proposed by Pasari et al. (2013). The metric is the average across standardised functions minus the standard deviation
+#' among functions. Therefore, the metric decreases when there is a lot of variation among functions.
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' @param stand_method method of standardisation from the standardise_functions() function (above), default = "max"
+#' 
+#' @references 
+#' 
+#' Pasari, J.R., Levi, T., Zavaleta, E.S. and Tilman, D., 2013. Several scales of biodiversity affect ecosystem 
+#' multifunctionality. Proceedings of the National Academy of Sciences, 110(25): 10219-10222.
+#' 
+#' @return returns a vector of Pasari et al.'s (2013) multifunctionality values for each row
+#' 
 
 MF_pasari <- function(adf, vars, stand_method = "max") {
   
@@ -239,14 +295,28 @@ MF_pasari <- function(adf, vars, stand_method = "max") {
   
 }
 
-
-# Dooley et al. (2018) approach
-
-# function to calculate Dooley's (2018) Scaled Average Multifunctionality (SAM)
-
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector of functions to include which has to correspond to column names
-# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
+#' @title MF_dooley
+#' @description Calculate Dooley et al.'s (2018) scaled average multifunctionality metric for rows in a data.frame
+#' 
+#' @details Takes a data frame, variable names and a standardisation method and calculates the "scaled average multifunctionality
+#' metric (SAM metric)" proposed by Dooley et al. (2018). The metric is the mean across standardised functions minus after which
+#' the mean across functions is divided by the standard deviation among functions. Therefore, the metric decreases 
+#' when there is a lot of variation among functions.
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' @param stand_method method of standardisation from the standardise_functions() function (above), default = "max_5_%"
+#' 
+#' @references 
+#' 
+#' Dooley, Á., 2018. Modelling Techniques for Biodiversity and Ecosystem Multifunctionality: 
+#' Theoretical Development and Application (Doctoral dissertation, National University of 
+#' Ireland, Maynooth (Ireland)).
+#' 
+#' @return returns a vector of Dooley et al.'s (2018) scaled average multifunctionality values for each row
+#' 
 
 MF_dooley <- function(adf, vars, stand_method = "max_5_%") {
   
@@ -261,14 +331,27 @@ MF_dooley <- function(adf, vars, stand_method = "max_5_%") {
   
 }
 
-
-# Jing et al. (2020) approach
-
-# function to calculate Jing et al.'s (2020) Scaling Mulifunctionality Metric
-
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector of functions to include which has to correspond to column names
-# stand is the method of standardisation. three methods are supported: (1) no standardisation ("none") (2) z-score standardisation ("z_score") and (3) by the maximum ("max")
+#' @title MF_jing
+#' @description Calculate Jing et al.'s (2020) scaling multifunctionalityu metric for rows in a data.frame
+#' 
+#' @details Takes a data frame, variable names and a standardisation method and calculates the "scaling multifunctionality
+#' metric" proposed by Jing et al. (2020). The metric is calculated by taking the mean among z-score-standardised functions and then
+#' standardising the mean multifunctionality values using the z-score standardisation method. This method can only be implemented
+#' using the z-score standardisation because the method only makes sense using this standardisation.
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' 
+#' @references 
+#' 
+#' Jing, X., Prager, C.M., Classen, A.T., Maestre, F.T., He, J.S. and Sanders, N.J., 2020. Variation in the methods 
+#' leads to variation in the interpretation of biodiversity–ecosystem multifunctionality relationships. 
+#' Journal of Plant Ecology, 13(4): 431-441.
+#' 
+#' @return returns a vector of Jing et al.'s (2018) scaling multifunctionality metric values for each row
+#' 
 
 MF_jing <- function(adf, vars) {
   

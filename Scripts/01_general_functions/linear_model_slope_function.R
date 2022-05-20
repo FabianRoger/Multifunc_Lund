@@ -1,15 +1,16 @@
 
-# Project: Review of multifunctionality in ecology, conservation and ecosystem service science
+#' @title theme_meta
+#' @description Function to efficiently output the slope of a linear model
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' @param data data.frame with data to be used in the linear model
+#' @param response string containing the name of the response variable (y-variable)
+#' @param explanatory string containing the name of the explanatory variable (x-variable)
+#' 
+#' @return returns a data.frame with a single named column ("explanatory_response") and the slope estimate
+#' 
 
-# Title: Function to efficiently output the slope of a linear model
 
-# arguments
-
-# data - data.frame with data to be used in the linear model
-# response - name of the response variable
-# explanatory - name of the explanatory variable
-
-# define function to efficiently output the slope
 lm.cleaner <- function(data, response, explanatory) {
   
   # check that the correct packages are installed
@@ -22,6 +23,7 @@ lm.cleaner <- function(data, response, explanatory) {
     "this function requires broom to be installed"
   )
   
+  # load the dplyr and broom libraries
   library(dplyr)
   library(broom)
   
