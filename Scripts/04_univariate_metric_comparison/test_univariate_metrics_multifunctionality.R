@@ -431,9 +431,8 @@ ggsave(filename = here("Figures/metric_comparison.png"), p.full,
 # for each metric, what do we want to plot separately?
 # set the metric
 names(df.all)
-metric_in <- c("Pasari MF", "SAM MF", "Simp. MF", 
-               "Shannon MF", "ENF.Q0 MF", "ENF.Q1 MF", 
-               "PCA MF")
+metric_in <- c("ave. MF", "SAM MF", "Simp. MF", 
+               "ENF.Q1 MF", "thresh.70 MF", "PCA MF")
 
 list.even <- vector("list", length = length(metric_in))
 for(i in 1:length(metric_in)) {
@@ -473,21 +472,21 @@ for(i in 1:length(metric_in)) {
     geom_vline(xintercept = 0, linetype = "dashed", colour = "black") +
     geom_point(data = df.min, 
                mapping = aes(x = ave_MF, y = sd_MF), 
-               fill = "black", colour = "black", shape = 24, alpha = 1, size = 0.8, 
+               fill = "black", colour = "black", shape = 24, alpha = 1, size = 1.5, 
                stroke = 1 ) +
     geom_point(data = df.max,
                mapping = aes(x = ave_MF, y = sd_MF),
-               fill = "black", colour = "black", shape = 21, alpha = 1, size = 0.8, 
+               fill = "black", colour = "black", shape = 21, alpha = 1, size = 2, 
                stroke = 1 ) +
     geom_point(data = df.metric.max,
                mapping = aes(x = ave_MF, y = sd_MF),
-               colour = "black", fill = "white", shape = 21, alpha = 1, size = 2.5, stroke = 1) +
+               colour = "black", fill = "white", shape = 21, alpha = 1, size = 2, stroke = 1) +
     geom_point(data = df.metric.min,
                mapping = aes(x = ave_MF, y = sd_MF),
-               colour = "black", fill =  "white", shape = 24, alpha = 1, size = 2.5, stroke = 1) +
+               colour = "black", fill =  "white", shape = 24, alpha = 1, size = 1.5, stroke = 1) +
     geom_point(data = df.metric.undefined,
                mapping = aes(x = ave_MF, y = sd_MF), 
-               shape = 4, size = 3, position = position_nudge(x = 0.025) ) +
+               shape = 4, size = 4, position = position_nudge(x = 0.025) ) +
     ylab("SD among functions") +
     xlab("Mean among functions") +
     scale_y_continuous(limits = c(-0.05, max(df.metric$sd_MF))) +
@@ -504,11 +503,12 @@ for(i in 1:length(metric_in)) {
 # plot the evenness graph  
 even.full <- 
   list.even[[1]] + list.even[[2]] + list.even[[3]] + list.even[[4]] +
-  plot_layout(nrow = 2, ncol = 2) +
+  list.even[[5]] + list.even[[6]] +
+  plot_layout(nrow = 3, ncol = 2) +
   plot_annotation(tag_levels = "a")
 
 ggsave(filename = here("Figures/metric_comparison_even.png"), even.full,
-       units = "cm", width = 18, height = 14)
+       units = "cm", width = 18, height = 19)
 
 # plot the PCA graph
 ggsave(filename = here("Figures/PCA_comparison.png"), list.even[[5]],
