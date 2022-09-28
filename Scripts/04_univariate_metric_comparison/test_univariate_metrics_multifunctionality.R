@@ -45,8 +45,10 @@ calculate_MF <- function(data, func.names) {
            `MESLI MF` = MF_mesli(adf = data, vars = func.names),
            `Pasari MF` = MF_pasari(adf = data, vars = func.names),
            `SAM MF` = MF_dooley(adf = data, vars = func.names),
-           `ENF MF` = hill_multifunc(adf = data, vars = func.names, scale = 1, HILL = TRUE),
            `Simp. MF` = MF_simpsons_div(adf = data, vars = func.names),
+           `Shannon MF` = MF_shannon_div(adf = data, vars = func.names),
+           `ENF.Q0 MF` = hill_multifunc(adf = data, vars = func.names, scale = 1, HILL = TRUE),
+           `ENF.Q1 MF` = hill_multifunc(adf = data, vars = func.names, scale = 2, HILL = TRUE),
            `Manning.30 MF` = manning_multifunc(adf = data, vars = func.names, thresh = 0.3),
            `Manning.50 MF` = manning_multifunc(adf = data, vars = func.names, thresh = 0.5),
            `Manning.70 MF` = manning_multifunc(adf = data, vars = func.names, thresh = 0.7),
@@ -215,7 +217,7 @@ mds.plot <-
   mds_out$points %>% 
   as.data.frame(.) %>% 
   tibble::rownames_to_column(var = "MF_metrics") %>% 
-  mutate(group = c(rep("sum/ave.", 4), rep("eveness", 4), rep("thresh.", 8), "other")) %>%
+  mutate(group = c(rep("sum/ave.", 6), rep("entropy", 4), rep("thresh.", 8), "other")) %>%
   ggplot(data = .,
          mapping = aes(x = MDS1, y = MDS2, colour = group)) +
   geom_point(size = 2) +
@@ -352,7 +354,7 @@ df.label <-
   df.all %>%
   filter(row_id %in% row_id_in) %>%
   dplyr::select(row_id, starts_with("F_"), ave_MF, sd_MF) %>%
-  mutate(label = letters[1:length(row_id_in)])
+  mutate(label = letters[2:(length(row_id_in)+1) ])
 
 
 # make a test plot
@@ -429,7 +431,9 @@ ggsave(filename = here("Figures/metric_comparison.png"), p.full,
 # for each metric, what do we want to plot separately?
 # set the metric
 names(df.all)
-metric_in <- c("Pasari MF", "SAM MF", "Simp. MF", "ENF MF", "PCA MF")
+metric_in <- c("Pasari MF", "SAM MF", "Simp. MF", 
+               "Shannon MF", "ENF.Q0 MF", "ENF.Q1 MF", 
+               "PCA MF")
 
 list.even <- vector("list", length = length(metric_in))
 for(i in 1:length(metric_in)) {
@@ -461,7 +465,7 @@ for(i in 1:length(metric_in)) {
     ggplot() +
     geom_point(data = df.metric,
                mapping = aes(x = ave_MF, y = sd_MF, shape = metric_negative, colour = !!sym(metric) ),
-               size = 2, alpha = 0.15, position = position_jitter(width = 0.005)) +
+               size = 4, alpha = 0.15, position = position_jitter(width = 0.005)) +
     scale_colour_viridis_c(option = "C", name = metric) +
     scale_shape_manual(values=c(16, 15), guide = FALSE)+
     geom_hline(yintercept = df.min[["sd_MF"]], linetype = "dashed", colour = "black") +

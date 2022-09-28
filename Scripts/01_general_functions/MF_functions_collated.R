@@ -500,13 +500,35 @@ MF_simpsons_div <- function(adf, vars, stand_method = "max") {
     
     warning(x = "all functions are zero which leads to maximum Simpson diversity")
     
-    mf_simp
+    return(mf_simp)
     
   } else {
     
-    mf_simp
+    return(mf_simp)
     
   }
+  
+}
+
+# Simpson's diversity index: Raudsepp-Hearne et al. (2009)
+
+# adf, is dataframe with plots in rows, and functions in columns
+# vars has to bee a named vector of functions to include which has to correspond to column names
+# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
+
+MF_shannon_div <- function(adf, vars, stand_method = "max") {
+  
+  if(! "vegan" %in% installed.packages()[,1]) stop(
+    "this function requires vegan to be installed"
+  )
+  
+  adf_mat <- adf[, vars]
+  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- as.data.frame(adf_mat)
+  
+  mf_shan <- vegan::diversity(x = adf_mat, index = "shannon", MARGIN = 1)
+  
+  return(mf_shan)
   
 }
 
