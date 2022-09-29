@@ -466,7 +466,7 @@ single_threshold_mf <- function(adf, vars = NA, thresh = 0.7, prepend = "Diversi
   
   funcMaxed <- rowSums(apply(adf[,which(names(adf)%in%vars)], 2, function(x) x >= thresh*getMaxValue(x)))
   
-  funcMaxed
+  return(funcMaxed)
   
 }
 
@@ -666,6 +666,7 @@ MF_slade <- function(adf, vars,
   # apply the weights by adding it as an exponent
   d_out <- sweep(d_out, MARGIN = 2, ws, `^`)
   
+  # apply the geometric mean
   d_mf <- 
     apply(d_out, MARGIN = 1, function(x) {
       
