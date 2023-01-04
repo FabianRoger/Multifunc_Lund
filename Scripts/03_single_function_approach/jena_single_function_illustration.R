@@ -19,7 +19,7 @@ library(patchwork)
 rm(list = ls())
 
 # link to scripts with the relevant functions
-source(here("Scripts/function_plotting_theme.R"))
+source(here("Scripts/01_general_functions/function_plotting_theme.R"))
 
 # read in the Jena data
 jena.dat <- read_csv(file = here("data/jena_data_Jochum_2020_clean.csv"))
@@ -317,5 +317,15 @@ p1 <-
 
 ggsave(filename = here("Figures/single_func.png"), p1, units = "cm",
        width = 18, height = 16)
+
+
+# calculate intrinsic correlations i.e. residuals after regressing on sown species richness
+
+# extract residuals from the model of species richness and then calculate correlations
+lm.po2
+lm.bm
+lm.cn
+
+cor(data.frame(residuals(lm.po2), residuals(lm.bm), residuals(lm.cn)))
 
 ### END

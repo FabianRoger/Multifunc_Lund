@@ -34,6 +34,7 @@ names(mf_out) <- paste0("F_", 1:nf)
 # print the data.frame
 print(mf_out)
 
+
 # (1) define a supply-benefit curve for each function
 
 # write functions for different types of supply benefit curve
@@ -121,6 +122,9 @@ ws <- c(1, 0.1, 0.5, 3, 5)
 
 # these are then scaled to the number of functions
 ws <- ( (ws/sum(ws))*nf )
+
+# why do we scale them to the number of functions? So that the maximum functioning is still nf
+sum(ws)
 
 # calculate summed multifunctionality without weights
 mf <- apply(mf_out, 1, sum)
