@@ -120,8 +120,10 @@ if (transform == "Y") {
 # these numbers represent how we might value the functions relative to each other
 ws <- c(1, 0.1, 0.5, 3, 5)
 
+
 # these are then scaled to the number of functions
 ws <- ( (ws/sum(ws))*nf )
+ws <- ws/sum(ws)
 
 # why do we scale them to the number of functions? So that the maximum functioning is still nf
 sum(ws)
