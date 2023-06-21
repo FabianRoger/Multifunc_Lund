@@ -9,6 +9,7 @@ source("Scripts/01_general_functions/function_plotting_theme.R")
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(multifunc)
 
 # make a test data.frame
 df <- tibble(Com = c(rep(1, 5),
@@ -41,6 +42,7 @@ p1 <-
   xlab(NULL) +
   theme_meta() +
   theme(legend.position = "none")
+plot(p1)
 
 ggsave(filename = "Figures/test_metric1.png", p1, dpi = 400,
        units = "cm", width = 20, height = 5)  
@@ -59,8 +61,14 @@ calculate_MF <- function(data, func.names) {
            `SAM MF` = MF_dooley(adf = data, vars = func.names,  stand_method = "none"),
            `Simp. MF` = MF_simpsons_div(adf = data, vars = func.names, stand_method = "none"),
            `Shannon MF` = MF_shannon_div(adf = data, vars = func.names, stand_method = "none"),
-           `ENF.Q0 MF` = hill_multifunc(adf = data, vars = func.names, scale = 1, HILL = TRUE, stand_method = "none"),
-           `ENF.Q1 MF` = hill_multifunc(adf = data, vars = func.names, scale = 2, HILL = TRUE, stand_method = "none"),
+           `ENF.Q0 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 0,
+                                              standardized = FALSE,
+                                              standardize_function = standardizeUnitScale,
+                                              D = NULL, tau = NULL),
+           `ENF.Q1 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 1,
+                                              standardized = FALSE,
+                                              standardize_function = standardizeUnitScale,
+                                              D = NULL, tau = NULL),
            `Cluster.30 MF` = manning_multifunc(adf = data, vars = func.names, thresh = 0.3),
            `Cluster.70 MF` = manning_multifunc(adf = data, vars = func.names, thresh = 0.7),
            `thresh.30 MF` = single_threshold_mf(adf = data, vars = func.names, thresh = 0.3),
@@ -69,6 +77,7 @@ calculate_MF <- function(data, func.names) {
     )
   
 }
+
 
 # process the data into the correct format
 df_w <- 
@@ -98,7 +107,7 @@ df_undef <-
   df_mf %>%
   filter(is.na(MF))
 df_undef$MF <- "NA"
-df_undef$y <- c(1, 0.5, 0.5)
+df_undef$y <- c(1, 0.5)
 
 # plot the results
 p2 <- 
@@ -119,9 +128,9 @@ p2 <-
   ylab("Multifunctionality") +
   scale_x_continuous(breaks = c(1:6), limits = c(0.5, 6.5)) +
   theme(legend.position = "none")
+plot(p2)
 
 ggsave(filename = "Figures/test_metric2.png", p2, dpi = 400,
        units = "cm", width = 20, height = 14)  
 
-
-
+### END
