@@ -213,7 +213,7 @@ for(i in 1:length(metrics)) {
          mapping = aes(x = MF_ave, y = MF_inv_simp, 
                        colour = Value, shape = NA_YN)) +
     geom_jitter(mapping = aes(x = MF_ave, y = MF_inv_simp), 
-                size = 1.5, alpha = 0.5, shape = 16, width = 0.01) +
+                size = 1.2, alpha = 0.2, shape = 16, width = 0.01) +
     scale_shape_manual(values = c(1, 8)) +
     scale_colour_gradientn(colours = pal) +
     labs(colour = metrics[i]) +
@@ -225,9 +225,9 @@ for(i in 1:length(metrics)) {
     ylab(ylab) +
     xlab(xlab) +
     theme_meta() +
-    theme(legend.position = c(0.8, 0.3),
+    theme(legend.position = c(0.75, 0.3),
           legend.text = element_text(size = 8),
-          legend.title = element_text(size = 9),
+          legend.title = element_text(size = 8),
           axis.text.x = element_text(size = 8),
           axis.text.y = element_text(size = 8),
           axis.title.x = element_text(size = 10),
