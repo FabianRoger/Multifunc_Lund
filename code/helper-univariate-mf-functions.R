@@ -57,52 +57,7 @@ standardise_functions <- function(x, method) {
   
 }
 
-#' @title hill_multifunc 
-#' @description Calculate the Hill number multifunctionality (effective number of functions) for rows in a data.frame
-#' 
-#' @details Takes a data frame, variable names, a standardisation method and, an order of Hill number. It then 
-#' calculates and returns Hill number multifunctionality.
-#' 
-#' @author Fabian Roger
-#' 
-#' @param adf dataframe with plots in rows, and functions in columns
-#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
-#' @param scale Hill number exponent (default = 2)
-#' @param HILL use Hill-number conversion of diversity-indices
-#' @param stand_method method of standardisation from the standardise_functions() function (above), default = "z_score_abs"
-#' 
-#' @references 
-#' 
-#' Byrnes, J.E.K., Roger, F., Bagchi, R. 2022. Understandable multifunctionality measures using Hill numbers
-#' bioRxiv. doi: https://doi.org/10.1101/2022.03.17.484802
-#' 
-#' @return returns a vector Hill number multifunctionality values for each row
-#' 
-
-hill_multifunc <- function(adf, vars, scale = 2, HILL = TRUE, stand_method = "z_score_abs"){
-  
-  if(! "vegan" %in% installed.packages()[,1]) stop(
-    "this function requires vegan to be installed"
-  )
-  
-  if(length(scale) > 1) stop(
-    "this function requires to choose a single order of diversity"
-  )
-  
-  adf_mat <- adf[,vars]
-  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
-  adf_mat <- as.data.frame(adf_mat)
-  
-  effN <- vegan::renyi(adf_mat, scales = scale, hill = TRUE)
-  if(!HILL) effN <- effN/length(vars)
-  meanFunc <- rowMeans(adf_mat) 
-  
-  multifunc_effN <-  effN*meanFunc
-  return( as.numeric(multifunc_effN) )
-  
-}
-
-#' @title manning_multifunc
+#' @title cluster_multifunc
 #' @description Calculate ecosystem function multifunctionality (Manning et al. 2018) for rows in a data.frame
 #' 
 #' @details Takes a data frame and ecosystem function names and calculates Manning et al.'s (2018) ecosystem function
@@ -129,12 +84,13 @@ hill_multifunc <- function(adf, vars, scale = 2, HILL = TRUE, stand_method = "z_
 #'
 #'
 
-manning_multifunc <- function(adf, vars, 
+cluster_multifunc <- function(adf, vars, 
                               ind = c("mcclain", "cindex", "silhouette", "dunn"), 
                               met = "ward.D2",
                               dis = "euclidean",
                               thresh = 0.5,
-                              stand_method = "max_5_%") {
+                              stand_method = "max_5_%"
+                              ) {
   
   if(! "NbClust" %in% installed.packages()[,1]) stop(
     "this function requires NbClust to be installed and loaded"
@@ -510,7 +466,7 @@ MF_simpsons_div <- function(adf, vars, stand_method = "max") {
   
 }
 
-# Simpson's diversity index: Raudsepp-Hearne et al. (2009)
+# Shannon diversity index
 
 # adf, is dataframe with plots in rows, and functions in columns
 # vars has to bee a named vector of functions to include which has to correspond to column names
@@ -679,70 +635,5 @@ MF_slade <- function(adf, vars,
   return(d_mf)
   
 }
-
-
-# define a function to calculate different multifunctionality metrics
-# mf.functions is a vector of the names of the function to call
-# mf.names are the names to assign to the output of each function call
-# add.args is a list of additional arguments to pass to each function called
-# if no additional arguments are required then an NA must be specified
-multifunc_calculator <- 
-  function(adf,
-           vars,
-           mf.functions = c("MF_sum", "MF_av", "MF_pasari", "single_threshold_mf", "single_threshold_mf"),
-           mf.names = c("sum_MF", "ave._MF", "Pasari_MF", "thresh.30_MF", "thresh.70_MF"),
-           add.args = list(NA, NA, NA, c(thresh = 0.3), c(thresh = 0.7))) {
-    
-    # perform error checks
-    if( !any(is.na(add.args)) ) {
-      print("warning: no NAs in add.args list, is this correct?")
-    }
-    
-    if( length(mf.functions) != length(mf.names) ) {
-      stop("error, there must be a name for each multifunctionality metric")
-    }
-    
-    if(length(vars) < 2) {
-      stop("error, there must be two or more functions")
-    }
-    
-    # add function names to the additional argument vector
-    names(add.args) <- mf.names
-    
-    # for each function, create an input list with or without additional arguments
-    input.list <- vector("list")
-    for(j in 1:length(add.args)) {
-      
-      if (!is.na(add.args[[j]])){
-        
-        input.list[[j]] <- list(adf, vars)
-        
-        for (i in 1:length(add.args[[j]])){
-          
-          input.list[[j]] <- c(input.list[[j]], add.args[[j]][i])
-          
-        }
-        
-      } else(
-        
-        input.list[[j]] <- list(adf, vars)
-        
-      )
-      
-    }
-    
-    # assign each function name the multifunctionality value
-    for (k in 1:length(mf.names)) {
-      assign(mf.names[k], do.call(mf.functions[k], input.list[[k]]))
-    }
-    
-    # pull the metrics into a data.frame
-    mf.df <- sapply(mf.names, function(x){get(x)})
-    mf.df <- data.frame(mf.df)
-    
-    # bind the metrics into a data.frame
-    return( data.frame(cbind(adf, mf.df)) )
-    
-  }
 
 ### END
