@@ -26,7 +26,7 @@ jena.func <-
   rename(plotcode = plot)
 
 # read in the Jena community composition data
-jena.com <- read_csv(here("data/Jena_community_02-08.csv"))
+jena.com <- read_csv(here("data/Jena_Community_02-08.csv"))
 head(jena.com)
 names(jena.com)
 
