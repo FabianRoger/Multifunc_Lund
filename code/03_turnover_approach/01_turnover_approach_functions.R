@@ -28,6 +28,60 @@ row.randomiser <- function(func.names, species.names, adf.data) {
   
 }
 
+# get combinations of functions in vectors
+
+# BEF slope and n-functions
+
+# get the list of matrices of function combinations
+function.combinations <- function(vector.func.names) {
+  nested.list.matrices <- vector("list", length = (length(vector.func.names)-1) )
+  for (i in 2:length(vector.func.names)){
+    nested.list.matrices[[i-1]] <- combn(x = vector.func.names, m = i)
+  }
+  return(nested.list.matrices)
+}
+
+# write a function to flatten an individual part of a nested list
+flatten.list.matrices <- function(nested.list.matrices){
+  unnested.list <- split(nested.list.matrices, col(nested.list.matrices)) 
+  names(unnested.list) <- NULL 
+  return(unnested.list)
+}
+
+# combine function.combinations and flatten.list.matrices and loop over each n-func
+get.function.combinations <- function(function.names){
+  
+  # test if the data has two separate functions
+  if (length(function.names) < 2) {
+    
+    stop("error, function requires at least two different ecosystem functions")
+    
+  }
+  
+  # get raw list of matrices
+  list.func.matrix <- function.combinations(vector.func.names = function.names)
+  
+  if (length(function.names) < 3) {
+    
+    # flatten the first matrix in the list
+    list.combination <- flatten.list.matrices(nested.list.matrices = list.func.matrix[[1]])
+    
+  } else {
+    
+    # flatten the first matrix in the list
+    list.combination <- flatten.list.matrices(nested.list.matrices = list.func.matrix[[1]])
+    
+    # loop over this and bind into a list
+    for (i in 2:length(list.func.matrix)){
+      x <- flatten.list.matrices(nested.list.matrices = list.func.matrix[[i]])
+      list.combination <- c(list.combination, x)
+    }
+    
+  }
+  
+  list.combination
+  
+}
 
 # functions to implement aic-based species effects and Gotelli et al. (2011) species effects
 
