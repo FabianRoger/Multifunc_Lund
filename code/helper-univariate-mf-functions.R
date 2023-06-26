@@ -15,24 +15,24 @@
 #' @return TRUE or FALSE whether the data passed the tests
 #' 
 
-test_inputs <- function(data, fnames) {
+test_inputs <- function(adf, vars) {
   
   # check that the data input is a data.frame or a tibble
   assertthat::assert_that(
-    is.data.frame(data) | dplyr::is.tbl(data),
-    msg = paste0(substitute(data), " data is not a data.frame or tibble object")
+    is.data.frame(adf) | dplyr::is.tbl(adf),
+    msg = paste0(substitute(adf), " adf is not a data.frame or tibble object")
   )
   
   # check that the data input is a data.frame or a tibble
   assertthat::assert_that(
-    is.vector(fnames) && is.character(fnames),
-    msg = paste0("fnames is not a character vector")
+    is.vector(vars) && is.character(vars),
+    msg = paste0("vars is not a character vector")
   )
   
   # check the names in vars are all in the adf data.frame
   assertthat::assert_that(
-    all(fnames %in% names(data)),
-    msg = "names in data are not all present in fnames"
+    all(vars %in% names(adf)),
+    msg = "names in adf are not all present in vars"
   )
   
 }
@@ -143,7 +143,7 @@ MF_cluster <- function(adf, vars,
                        stand_method = "max_abs") {
   
   # test the data inputs
-  test_inputs(data = adf, fnames = vars)
+  test_inputs(adf = adf, vars = vars)
   
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars] 
@@ -227,7 +227,7 @@ MF_cluster <- function(adf, vars,
 MF_pca <- function(adf, vars){
   
   # test the data inputs
-  test_inputs(data = adf, fnames = vars)
+  test_inputs(adf = adf, vars = vars)
   
   # check that the vegan package is installed
   assertthat::assert_that(
@@ -286,7 +286,7 @@ MF_pca <- function(adf, vars){
 MF_pasari <- function(adf, vars, stand_method = "max") {
   
   # test the data inputs
-  test_inputs(data = adf, fnames = vars)
+  test_inputs(adf = adf, vars = vars)
   
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars]
@@ -325,7 +325,7 @@ MF_pasari <- function(adf, vars, stand_method = "max") {
 MF_dooley <- function(adf, vars, stand_method = "max_abs") {
   
   # test the data inputs
-  test_inputs(data = adf, fnames = vars)
+  test_inputs(adf = adf, vars = vars)
   
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars] 
@@ -364,7 +364,7 @@ MF_dooley <- function(adf, vars, stand_method = "max_abs") {
 MF_jing <- function(adf, vars) {
   
   # test the data inputs
-  test_inputs(data = adf, fnames = vars)
+  test_inputs(adf = adf, vars = vars)
   
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars] 
@@ -399,7 +399,7 @@ MF_jing <- function(adf, vars) {
 MF_sum <- function(adf, vars, stand_method = "z_score_abs") {
   
   # test the data inputs
-  test_inputs(data = adf, fnames = vars)
+  test_inputs(adf = adf, vars = vars)
   
   adf_mat <- adf[, vars]
   adf_mat <- apply(adf_mat, 2, standardise_function, method = stand_method)
@@ -433,7 +433,7 @@ MF_sum <- function(adf, vars, stand_method = "z_score_abs") {
 MF_av <- function(adf, vars, stand_method = "max_abs") {
   
   # test the data inputs
-  test_inputs(data = adf, fnames = vars)
+  test_inputs(adf = adf, vars = vars)
   
   adf_mat <- adf[, vars]
   adf_mat <- apply(adf_mat, 2, standardise_function, method = stand_method)
@@ -443,7 +443,7 @@ MF_av <- function(adf, vars, stand_method = "max_abs") {
   
   mf_av
   
-}(
+}
 
 #' @title MF_geom()
 #'  
@@ -466,7 +466,7 @@ MF_av <- function(adf, vars, stand_method = "max_abs") {
 MF_geom <- function(adf, vars, stand_method = "max_abs") {
   
   # test the data inputs
-  test_inputs(data = adf, fnames = vars)
+  test_inputs(adf = adf, vars = vars)
   
   adf_mat <- adf[, vars]
   adf_mat <- apply(adf_mat, 2, standardise_function, method = stand_method)
@@ -498,10 +498,10 @@ MF_geom <- function(adf, vars, stand_method = "max_abs") {
 #' @return returns a vector of average multifunctionality for each row in adf
 #' 
 
-MF_thresh <- function(adf, vars = NA, thresh = 0.7, maxN = 1){
+MF_thresh <- function(adf, vars, thresh = 0.7, maxN = 1){
   
   # test the data inputs
-  test_inputs(data = adf, fnames = vars)
+  test_inputs(adf = adf, vars = vars)
   
   assertthat::assert_that(
     is.numeric(thresh) && (thresh > 0 && thresh < 1),
@@ -542,7 +542,7 @@ MF_thresh <- function(adf, vars = NA, thresh = 0.7, maxN = 1){
 MF_inv_simpson <- function(adf, vars, stand_method = "max_abs") {
   
   # test the data inputs
-  test_inputs(data = adf, fnames = vars)
+  test_inputs(adf = adf, vars = vars)
   
   # check that the vegan package is installed
   assertthat::assert_that(
@@ -585,7 +585,7 @@ MF_inv_simpson <- function(adf, vars, stand_method = "max_abs") {
 MF_shannon <- function(adf, vars, stand_method = "max_abs") {
   
   # test the data inputs
-  test_inputs(data = adf, fnames = vars)
+  test_inputs(adf = adf, vars = vars)
   
   # check that the vegan package is installed
   assertthat::assert_that(
@@ -644,7 +644,7 @@ MF_slade <- function(adf, vars,
                      weights = "equal") {
   
   # test the data inputs
-  test_inputs(data = adf, fnames = vars)
+  test_inputs(adf = adf, vars = vars)
   
   adf_mat <- adf[, vars]
   

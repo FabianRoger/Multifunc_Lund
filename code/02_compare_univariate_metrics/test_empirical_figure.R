@@ -35,8 +35,11 @@ col_pal <- wesanderson::wes_palette("Darjeeling1", 6, type = "continuous")
 col_pal <- col_pal[c(5, 2, 3, 4, 1, 6)]
 
 # plot the function distributions
+df_plot <- mutate(df, Com = factor(Com))
+levels(df_plot$Com) <- paste0("Community ", 1:6)
+
 p1 <- 
-  ggplot(data = df, 
+  ggplot(data = df_plot, 
        mapping = aes(x = Func, y = Func_val, fill = Com)) +
   geom_col(width = 0.5) +
   scale_y_continuous(expand = c(0, 0), 
@@ -46,11 +49,13 @@ p1 <-
   ylab("Stand. function value (0-1)") +
   xlab(NULL) +
   theme_meta() +
-  theme(legend.position = "none")
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_text(size = 11))
 plot(p1)
 
-ggsave(filename = "Figures/test_metric1.png", p1, dpi = 400,
-       units = "cm", width = 20, height = 5)  
+ggsave(filename = "figures/test_metric1.svg", p1,
+       units = "cm", width = 20, height = 6)  
 
 # calculate the different metrics
 
@@ -63,24 +68,24 @@ calculate_MF <- function(data, func.names) {
            `geom. MF` = MF_geom(adf = data, vars = func.names, stand_method = "none"),
            `Pasari MF` = MF_pasari(adf = data, vars = func.names, stand_method = "none"),
            `SAM MF` = MF_dooley(adf = data, vars = func.names,  stand_method = "none"),
-           `Simp. MF` = MF_inv_simpson(adf = data, vars = func.names, stand_method = "none"),
-           `Shannon MF` = MF_shannon_div(adf = data, vars = func.names, stand_method = "none"),
-           `ENF.Q0 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 0,
+           `inv. Simp. MF` = MF_inv_simpson(adf = data, vars = func.names, stand_method = "none"),
+           `Shannon MF` = MF_shannon(adf = data, vars = func.names, stand_method = "none"),
+           `ENF Q0 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 0,
                                               standardized = TRUE,
                                               standardize_function = standardizeUnitScale,
                                               D = NULL, tau = NULL),
-           `ENF.Q1 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 1,
+           `ENF Q1 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 1,
                                               standardized = TRUE,
                                               standardize_function = standardizeUnitScale,
                                               D = NULL, tau = NULL),
-           `ENF.Q2 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 2,
+           `ENF Q2 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 2,
                                               standardized = TRUE,
                                               standardize_function = standardizeUnitScale,
                                               D = NULL, tau = NULL),
-           `Cluster.30 MF` = MF_cluster(adf = data, vars = func.names, thresh = 0.3),
-           `Cluster.70 MF` = MF_cluster(adf = data, vars = func.names, thresh = 0.7),
-           `thresh.30 MF` = MF_thresh(adf = data, vars = func.names, thresh = 0.3),
-           `thresh.70 MF` = MF_thresh(adf = data, vars = func.names, thresh = 0.7),
+           `cluster 30 MF` = MF_cluster(adf = data, vars = func.names, thresh = 0.3),
+           `cluster 70 MF` = MF_cluster(adf = data, vars = func.names, thresh = 0.7),
+           `thresh. 30 MF` = MF_thresh(adf = data, vars = func.names, thresh = 0.3),
+           `thresh. 70 MF` = MF_thresh(adf = data, vars = func.names, thresh = 0.7),
            `PCA MF` = MF_pca(adf = data, vars = func.names)
     )
   
@@ -111,11 +116,20 @@ df_mf <-
   arrange(MF_metric, Com) %>%
   mutate(MF = ifelse(is.infinite(MF) | is.na(MF), NA, MF))
 
+df_mf$MF_metric <- factor(df_mf$MF_metric, 
+                          levels = c("ave. MF", "sum MF",
+                                     "Pasari MF", "SAM MF", "geom. MF",
+                                     "PCA MF",
+                                     "thresh. 30 MF", "thresh. 70 MF",
+                                     "cluster 30 MF", "cluster 70 MF",
+                                     "inv. Simp. MF", "Shannon MF",
+                                     "ENF Q0 MF", "ENF Q1 MF", "ENF Q2 MF"))
+
 df_undef <- 
   df_mf %>%
   filter(is.na(MF))
 df_undef$MF <- "NA"
-df_undef$y <- c(1, 0.5)
+df_undef$y <- c(0.15, 0.15, 0.2, 0.05)
 
 # plot the results
 p2 <- 
@@ -127,18 +141,21 @@ p2 <-
   geom_point(data = df_mf,
              mapping = aes(x = as.integer(Com), y = MF, colour = Com),
              size = 2.5) +
+  scale_colour_manual(values = col_pal) +
   geom_text(data = df_undef,
             mapping = aes(x = as.integer(Com), y = y, label = MF),
             size = 2.5) +
   facet_wrap(~MF_metric, scales = "free_y", ncol = 5, nrow = 3) +
   theme_meta() +
-  xlab("Community (1-6)") +
+  xlab("Hypothetical community (1-6)") +
   ylab("Multifunctionality") +
   scale_x_continuous(breaks = c(1:6), limits = c(0.5, 6.5)) +
-  theme(legend.position = "none")
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_text(size = 10))
 plot(p2)
 
-ggsave(filename = "Figures/test_metric2.png", p2, dpi = 400,
+ggsave(filename = "figures/test_metric2.svg", p2,
        units = "cm", width = 20, height = 14)  
 
 ### END
