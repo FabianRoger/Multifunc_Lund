@@ -2,8 +2,8 @@
 # empirical exploration figure test
 
 # load the multifunctionality calculations
-source("Scripts/01_general_functions/MF_functions_collated.R")
-source("Scripts/01_general_functions/function_plotting_theme.R")
+source("code/helper-univariate-mf-functions.R")
+source("code/helper-plotting-theme.R")
 
 # load relevant libraries
 library(dplyr)
@@ -30,6 +30,10 @@ head(df)
 # convert the Com column into a character
 df$Com <- as.character(df$Com)
 
+# get a colour palette
+col_pal <- wesanderson::wes_palette("Darjeeling1", 6, type = "continuous")
+col_pal <- col_pal[c(5, 2, 3, 4, 1, 6)]
+
 # plot the function distributions
 p1 <- 
   ggplot(data = df, 
@@ -38,6 +42,7 @@ p1 <-
   scale_y_continuous(expand = c(0, 0), 
                      limits = c(0, 1.1), breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1)) +
   facet_wrap(~Com, ncol = 6, nrow = 1) +
+  scale_fill_manual(values = col_pal) +
   ylab("Stand. function value (0-1)") +
   xlab(NULL) +
   theme_meta() +
@@ -53,27 +58,30 @@ ggsave(filename = "Figures/test_metric1.png", p1, dpi = 400,
 calculate_MF <- function(data, func.names) {
   
   data %>%
-    mutate(`scal. MF` = MF_jing(adf = data, vars = func.names),
-           `sum MF` = MF_sum(adf = data, vars = func.names, stand_method = "none"),
+    mutate(`sum MF` = MF_sum(adf = data, vars = func.names, stand_method = "none"),
            `ave. MF` = MF_av(adf = data, vars = func.names, stand_method = "none"),
-           `MESLI MF` = MF_mesli(adf = data, vars = func.names, stand_method = "none"),
+           `geom. MF` = MF_geom(adf = data, vars = func.names, stand_method = "none"),
            `Pasari MF` = MF_pasari(adf = data, vars = func.names, stand_method = "none"),
            `SAM MF` = MF_dooley(adf = data, vars = func.names,  stand_method = "none"),
-           `Simp. MF` = MF_simpsons_div(adf = data, vars = func.names, stand_method = "none"),
+           `Simp. MF` = MF_inv_simpson(adf = data, vars = func.names, stand_method = "none"),
            `Shannon MF` = MF_shannon_div(adf = data, vars = func.names, stand_method = "none"),
            `ENF.Q0 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 0,
-                                              standardized = FALSE,
+                                              standardized = TRUE,
                                               standardize_function = standardizeUnitScale,
                                               D = NULL, tau = NULL),
            `ENF.Q1 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 1,
-                                              standardized = FALSE,
+                                              standardized = TRUE,
                                               standardize_function = standardizeUnitScale,
                                               D = NULL, tau = NULL),
-           `Cluster.30 MF` = manning_multifunc(adf = data, vars = func.names, thresh = 0.3),
-           `Cluster.70 MF` = manning_multifunc(adf = data, vars = func.names, thresh = 0.7),
-           `thresh.30 MF` = single_threshold_mf(adf = data, vars = func.names, thresh = 0.3),
-           `thresh.70 MF` = single_threshold_mf(adf = data, vars = func.names, thresh = 0.7),
-           `PCA MF` = pca_multifunc(adf = data, vars = func.names)
+           `ENF.Q2 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 2,
+                                              standardized = TRUE,
+                                              standardize_function = standardizeUnitScale,
+                                              D = NULL, tau = NULL),
+           `Cluster.30 MF` = MF_cluster(adf = data, vars = func.names, thresh = 0.3),
+           `Cluster.70 MF` = MF_cluster(adf = data, vars = func.names, thresh = 0.7),
+           `thresh.30 MF` = MF_thresh(adf = data, vars = func.names, thresh = 0.3),
+           `thresh.70 MF` = MF_thresh(adf = data, vars = func.names, thresh = 0.7),
+           `PCA MF` = MF_pca(adf = data, vars = func.names)
     )
   
 }

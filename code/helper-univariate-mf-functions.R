@@ -15,24 +15,24 @@
 #' @return TRUE or FALSE whether the data passed the tests
 #' 
 
-test_inputs <- function(adf, vars) {
+test_inputs <- function(data, fnames) {
   
   # check that the data input is a data.frame or a tibble
   assertthat::assert_that(
-    is.data.frame(adf) | dplyr::is.tbl(adf),
-    msg = paste0(substitute(adf), " adf is not a data.frame or tibble object")
+    is.data.frame(data) | dplyr::is.tbl(data),
+    msg = paste0(substitute(data), " data is not a data.frame or tibble object")
   )
   
   # check that the data input is a data.frame or a tibble
   assertthat::assert_that(
-    is.vector(vars) && is.character(vars),
-    msg = paste0("vars is not a character vector")
+    is.vector(fnames) && is.character(fnames),
+    msg = paste0("fnames is not a character vector")
   )
   
   # check the names in vars are all in the adf data.frame
   assertthat::assert_that(
-    all(names(adf) %in% vars),
-    msg = "names in adf are not all present in vars"
+    all(fnames %in% names(data)),
+    msg = "names in data are not all present in fnames"
   )
   
 }
@@ -109,7 +109,8 @@ standardise_function <- function(x, method) {
   
 }
 
-#' @title cluster_multifunc
+#' @title MF_cluster()
+#' 
 #' @description Calculate ecosystem function multifunctionality (Manning et al. 2018) for rows in a data.frame
 #' 
 #' @details Takes a data frame and ecosystem function names and calculates Manning et al.'s (2018) ecosystem function
@@ -134,16 +135,15 @@ standardise_function <- function(x, method) {
 #' @return returns a vector of ecosystem function multifunctionality (Manning et al. 2018) values for each row
 #'
 
-cluster_multifunc <- function(adf, vars, 
-                              ind = c("mcclain", "cindex", "silhouette", "dunn"), 
-                              met = "ward.D2",
-                              dis = "euclidean",
-                              thresh = 0.5,
-                              stand_method = "max_abs"
-                              ) {
+MF_cluster <- function(adf, vars, 
+                       ind = c("mcclain", "cindex", "silhouette", "dunn"), 
+                       met = "ward.D2",
+                       dis = "euclidean",
+                       thresh = 0.5,
+                       stand_method = "max_abs") {
   
   # test the data inputs
-  test_inputs(adf = adf, vars = vars)
+  test_inputs(data = adf, fnames = vars)
   
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars] 
@@ -205,7 +205,8 @@ cluster_multifunc <- function(adf, vars,
   
 }
 
-#' @title pca_multifunc
+#' @title MF_pca()
+#' 
 #' @description Calculate PCA-based multifunctionality (Meyer et al. 2018) for rows in a data.frame
 #' 
 #' @details Takes a data frame and ecosystem function names and calculates Meyer et al.'s (2018) PCA-based multifunctionality metric. 
@@ -223,10 +224,10 @@ cluster_multifunc <- function(adf, vars,
 #' @return returns a vector of PCA-based multifunctionality (Meyer et al. 2018) values for each row
 #'
 
-pca_multifunc <- function(adf, vars){
+MF_pca <- function(adf, vars){
   
   # test the data inputs
-  test_inputs(adf = adf, vars = vars)
+  test_inputs(data = adf, fnames = vars)
   
   # check that the vegan package is installed
   assertthat::assert_that(
@@ -285,7 +286,7 @@ pca_multifunc <- function(adf, vars){
 MF_pasari <- function(adf, vars, stand_method = "max") {
   
   # test the data inputs
-  test_inputs(adf = adf, vars = vars)
+  test_inputs(data = adf, fnames = vars)
   
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars]
@@ -324,7 +325,7 @@ MF_pasari <- function(adf, vars, stand_method = "max") {
 MF_dooley <- function(adf, vars, stand_method = "max_abs") {
   
   # test the data inputs
-  test_inputs(adf = adf, vars = vars)
+  test_inputs(data = adf, fnames = vars)
   
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars] 
@@ -363,7 +364,7 @@ MF_dooley <- function(adf, vars, stand_method = "max_abs") {
 MF_jing <- function(adf, vars) {
   
   # test the data inputs
-  test_inputs(adf = adf, vars = vars)
+  test_inputs(data = adf, fnames = vars)
   
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars] 
@@ -376,7 +377,7 @@ MF_jing <- function(adf, vars) {
   
 }
 
-#' @title MF_sum
+#' @title MF_sum()
 #'  
 #' @description Calculate summed multifunctionality
 #' 
@@ -398,7 +399,7 @@ MF_jing <- function(adf, vars) {
 MF_sum <- function(adf, vars, stand_method = "z_score_abs") {
   
   # test the data inputs
-  test_inputs(adf = adf, vars = vars)
+  test_inputs(data = adf, fnames = vars)
   
   adf_mat <- adf[, vars]
   adf_mat <- apply(adf_mat, 2, standardise_function, method = stand_method)
@@ -410,7 +411,7 @@ MF_sum <- function(adf, vars, stand_method = "z_score_abs") {
   
 }
 
-#' @title MF_av
+#' @title MF_av()
 #'  
 #' @description Calculate average multifunctionality
 #' 
@@ -432,7 +433,7 @@ MF_sum <- function(adf, vars, stand_method = "z_score_abs") {
 MF_av <- function(adf, vars, stand_method = "max_abs") {
   
   # test the data inputs
-  test_inputs(adf = adf, vars = vars)
+  test_inputs(data = adf, fnames = vars)
   
   adf_mat <- adf[, vars]
   adf_mat <- apply(adf_mat, 2, standardise_function, method = stand_method)
@@ -442,9 +443,9 @@ MF_av <- function(adf, vars, stand_method = "max_abs") {
   
   mf_av
   
-}
+}(
 
-#' @title MF_geom
+#' @title MF_geom()
 #'  
 #' @description Calculate geometric mean multifunctionality
 #' 
@@ -465,7 +466,7 @@ MF_av <- function(adf, vars, stand_method = "max_abs") {
 MF_geom <- function(adf, vars, stand_method = "max_abs") {
   
   # test the data inputs
-  test_inputs(adf = adf, vars = vars)
+  test_inputs(data = adf, fnames = vars)
   
   adf_mat <- adf[, vars]
   adf_mat <- apply(adf_mat, 2, standardise_function, method = stand_method)
@@ -477,7 +478,7 @@ MF_geom <- function(adf, vars, stand_method = "max_abs") {
   
 }
 
-#' @title MF_thresh
+#' @title MF_thresh()
 #'  
 #' @description Calculates single threshold multifunctionality
 #' 
@@ -500,7 +501,7 @@ MF_geom <- function(adf, vars, stand_method = "max_abs") {
 MF_thresh <- function(adf, vars = NA, thresh = 0.7, maxN = 1){
   
   # test the data inputs
-  test_inputs(adf = adf, vars = vars)
+  test_inputs(data = adf, fnames = vars)
   
   assertthat::assert_that(
     is.numeric(thresh) && (thresh > 0 && thresh < 1),
@@ -541,7 +542,7 @@ MF_thresh <- function(adf, vars = NA, thresh = 0.7, maxN = 1){
 MF_inv_simpson <- function(adf, vars, stand_method = "max_abs") {
   
   # test the data inputs
-  test_inputs(adf = adf, vars = vars)
+  test_inputs(data = adf, fnames = vars)
   
   # check that the vegan package is installed
   assertthat::assert_that(
@@ -584,7 +585,7 @@ MF_inv_simpson <- function(adf, vars, stand_method = "max_abs") {
 MF_shannon <- function(adf, vars, stand_method = "max_abs") {
   
   # test the data inputs
-  test_inputs(adf = adf, vars = vars)
+  test_inputs(data = adf, fnames = vars)
   
   # check that the vegan package is installed
   assertthat::assert_that(
@@ -643,7 +644,7 @@ MF_slade <- function(adf, vars,
                      weights = "equal") {
   
   # test the data inputs
-  test_inputs(adf = adf, vars = vars)
+  test_inputs(data = adf, fnames = vars)
   
   adf_mat <- adf[, vars]
   
