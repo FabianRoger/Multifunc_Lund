@@ -1,13 +1,52 @@
 
-#' @title standardise_functions
-#' @description Function to standardise ecosystem functions using several typical standardisation methods
+#' @title test_inputs()
+#'
+#' @description Function to test the data characteristics
+#'
+#' @details All univariate multifunctionality metric functions take a 
+#' data.frame with functions as columns and replicates as rows. This function
+#' is used to test whether the input data follow these characteristics
+#'
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' 
+#' @return TRUE or FALSE whether the data passed the tests
+#' 
+
+test_inputs <- function(adf, vars) {
+  
+  # check that the data input is a data.frame or a tibble
+  assertthat::assert_that(
+    is.data.frame(adf) | dplyr::is.tbl(adf),
+    msg = paste0(substitute(adf), " adf is not a data.frame or tibble object")
+  )
+  
+  # check that the data input is a data.frame or a tibble
+  assertthat::assert_that(
+    is.vector(vars) && is.character(vars),
+    msg = paste0("vars is not a character vector")
+  )
+  
+  # check the names in vars are all in the adf data.frame
+  assertthat::assert_that(
+    all(names(adf) %in% vars),
+    msg = "names in adf are not all present in vars"
+  )
+  
+}
+
+#' @title standardise_function()
+#' 
+#' @description Function to standardise an ecosystem function using several typical standardisation methods
 #' 
 #' @details Takes a numeric vector and standardises the values using one of five methods:
-#' 1. "z_score": (vector - mean(vector))/sd(vector)
-#' 2. "z_score_abs": (vector - mean(vector))/sd(vector) + min((vector - mean(vector))/sd(vector))
-#' 3. "max_0_1": ( vector - min(vector) )/( max(vector) - min(vector) )
-#' 4. "max": vector/max(vector)
-#' 5. "max_5_%": vector/max(quantile(vector, 0.95))
+#' "z_score": (vector - mean(vector))/sd(vector)
+#' "z_score_abs": (vector - mean(vector))/sd(vector) + min((vector - mean(vector))/sd(vector))
+#' "max_0_1": ( vector - min(vector) )/( max(vector) - min(vector) )
+#' "max": vector/max(vector)
+#' "max_5_%": vector/max(quantile(vector, 0.95))
 #' This function is implemented in all univariate multifunctionality calculations for standardisation
 #' 
 #' @author James G. Hagan (james_hagan(at)outlook.com)
@@ -18,34 +57,47 @@
 #' @return standardised numeric vector
 #' 
 
-standardise_functions <- function(x, method) {
+standardise_function <- function(x, method) {
   
-  if (method == "z_score") {
+  # check that the data input is a numeric vector
+  assertthat::assert_that(
+    is.vector(x) && is.numeric(x),
+    msg = paste(x, "is not a numeric vector")
+  )
+  
+  # standardise the function
+  fstand <- 
     
-    y <- scale(x)[,1]
+    if (method == "z_score") {
+    
+    scale(x)[,1]
     
   } else if (method == "z_score_abs") {
     
     y <- scale(x)[,1]
-    y <- y + abs(min(y))
+    y + abs(min(y))
     
   } else if (method == "max_0_1") {
     
-    y <- ( x - min(x) )/( max(x) - min(x) )
+    ( x - min(x) )/( max(x) - min(x) )
     
   } else if (method == "max") {
     
-    y <- x/max(x, na.rm = TRUE)
+    x/max(x, na.rm = TRUE)
     
-  } else if (method == "max_5_%") {
+  } else if (method == "max_abs") {
     
-    z <- x[ (x != Inf & x != -Inf & !is.na(x)) ]
-    max_x <- z[z >= quantile(z, 0.95, na.rm = TRUE)]
-    y <- x/mean(max_x)
+    # get the maximum value
+    max_x <- max(x, na.rm = TRUE)
+    
+    # add back minimum of negative values in function so you can rescale properly
+    if (min(x, na.rm = TRUE) < 0) x <- x + abs(min(x, na.rm = TRUE))
+    
+    x / max_x
     
   } else if (method == "none") {
     
-    y <- x
+    x
     
   } else {
     
@@ -53,7 +105,7 @@ standardise_functions <- function(x, method) {
     
   }
   
-  return(y)
+  fstand
   
 }
 
@@ -74,14 +126,12 @@ standardise_functions <- function(x, method) {
 #' @param met method for determining the optimal number of clusters from the NbClust package, only supports "ward.D2" at present
 #' @param dis distance metric, default = "euclidean"
 #' @param thresh threshold beyond which a function is counted as 1, default = 0.5
-#' @param stand_method method of standardisation from the standardise_functions() function (above), default = "max_5_%"
+#' @param stand_method method of standardisation from the standardise_function() function (above), default = "max_5_%"
 #' 
-#' @references 
-#' 
-#' Manning et al. 2018. Redefining ecosystem multifunctionality. Nature Ecology and Evolution, 2(3): 427-436.
+#' @references Manning et al. 2018. Redefining ecosystem multifunctionality. 
+#' Nature Ecology and Evolution, 2(3): 427-436.
 #' 
 #' @return returns a vector of ecosystem function multifunctionality (Manning et al. 2018) values for each row
-#'
 #'
 
 cluster_multifunc <- function(adf, vars, 
@@ -89,16 +139,11 @@ cluster_multifunc <- function(adf, vars,
                               met = "ward.D2",
                               dis = "euclidean",
                               thresh = 0.5,
-                              stand_method = "max_5_%"
+                              stand_method = "max_abs"
                               ) {
   
-  if(! "NbClust" %in% installed.packages()[,1]) stop(
-    "this function requires NbClust to be installed and loaded"
-  )
-  
-  if(length(vars) <= 1) stop(
-    "this function requires at least two ecosystem functions"
-  )
+  # test the data inputs
+  test_inputs(adf = adf, vars = vars)
   
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars] 
@@ -107,7 +152,7 @@ cluster_multifunc <- function(adf, vars,
   adf_mat_t <- as.data.frame(t((adf_mat[ , ]))) 
   
   # scale the transposed matrix
-  adf_mat_t <- apply(adf_mat_t, 2, standardise_functions, method = "z_score")
+  adf_mat_t <- apply(adf_mat_t, 2, standardise_function, method = "z_score")
   adf_mat_t <- as.data.frame(adf_mat_t)
 
   # generate a distance matrix based on the transposed adf matrix
@@ -144,7 +189,7 @@ cluster_multifunc <- function(adf, vars,
     apply(X = adf_mat, MARGIN = 2,
           FUN = function(z) { 
             
-            y <- standardise_functions(x = z, method = stand_method)
+            y <- standardise_function(x = z, method = stand_method)
             
             ifelse(y > thresh, 1, 0)
             
@@ -154,9 +199,9 @@ cluster_multifunc <- function(adf, vars,
   adf_thres <- sweep(adf_thres, MARGIN = 2, func_loads, `*`)
   
   # add the multifunctionality score to the input data
-  manning_mf <-  rowSums(adf_thres)/clus_n
+  cluster_mf <-  rowSums(adf_thres)/clus_n
   
-  return(manning_mf)
+  cluster_mf
   
 }
 
@@ -172,28 +217,28 @@ cluster_multifunc <- function(adf, vars,
 #' @param adf dataframe with plots in rows, and functions in columns
 #' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
 #' 
-#' @references 
-#' 
-#' Meyer et al. 2018. Biodiversity–multifunctionality relationships depend on identity and number of measured functions. 
+#' @references Meyer et al. 2018. Biodiversity–multifunctionality relationships depend on identity and number of measured functions. 
 #' Nature Ecology and Evolution, 2(1): 44-49.
 #' 
 #' @return returns a vector of PCA-based multifunctionality (Meyer et al. 2018) values for each row
 #'
-#'
 
 pca_multifunc <- function(adf, vars){
   
-  if(! "vegan" %in% installed.packages()[,1]) stop(
-    "this function requires vegan to be installed"
+  # test the data inputs
+  test_inputs(adf = adf, vars = vars)
+  
+  # check that the vegan package is installed
+  assertthat::assert_that(
+    "vegan" %in% installed.packages()[,1],
+    msg = "this function requires the vegan package"
   )
   
-  warning("stand_method cannot be altered with this function as the PCA approach requires z_score standardised function data")
-  
   adf_mat <- adf[,vars]
-  adf_mat <- apply(adf_mat, 2, standardise_functions, method = "z_score")
+  adf_mat <- apply(adf_mat, 2, standardise_function, method = "z_score")
   adf_mat <- as.data.frame(adf_mat)
   
-  pca2<-vegan::rda(adf_mat, scale = FALSE)
+  pca2 <- vegan::rda(adf_mat, scale = FALSE)
   
   pc_load <- prcomp(x = adf_mat)
   pc_load <- pc_load$rotation %*% diag(pc_load$sdev) 
@@ -213,7 +258,8 @@ pca_multifunc <- function(adf, vars){
   
   Index.wt <- rowSums(temp2)
   multifunc_pca_ind <-  Index.wt
-  return(multifunc_pca_ind)
+  
+  multifunc_pca_ind
   
 }
 
@@ -228,11 +274,9 @@ pca_multifunc <- function(adf, vars){
 #' 
 #' @param adf dataframe with plots in rows, and functions in columns
 #' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
-#' @param stand_method method of standardisation from the standardise_functions() function (above), default = "max"
+#' @param stand_method method of standardisation from the standardise_function() function (above), default = "max"
 #' 
-#' @references 
-#' 
-#' Pasari, J.R., Levi, T., Zavaleta, E.S. and Tilman, D., 2013. Several scales of biodiversity affect ecosystem 
+#' @references Pasari, J.R., Levi, T., Zavaleta, E.S. and Tilman, D., 2013. Several scales of biodiversity affect ecosystem 
 #' multifunctionality. Proceedings of the National Academy of Sciences, 110(25): 10219-10222.
 #' 
 #' @return returns a vector of Pasari et al.'s (2013) multifunctionality values for each row
@@ -240,14 +284,17 @@ pca_multifunc <- function(adf, vars){
 
 MF_pasari <- function(adf, vars, stand_method = "max") {
   
+  # test the data inputs
+  test_inputs(adf = adf, vars = vars)
+  
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars]
-  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- apply(adf_mat, 2, standardise_function, method = stand_method)
   adf_mat <- as.data.frame(adf_mat)
   
   mf_pasari <- apply(adf_mat, MARGIN = 1, function(x) mean(x) ) - apply(adf_mat, MARGIN = 1, function(x) sd(x) ) 
   
-  return(mf_pasari)
+  mf_pasari
   
 }
 
@@ -263,7 +310,7 @@ MF_pasari <- function(adf, vars, stand_method = "max") {
 #' 
 #' @param adf dataframe with plots in rows, and functions in columns
 #' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
-#' @param stand_method method of standardisation from the standardise_functions() function (above), default = "max_5_%"
+#' @param stand_method method of standardisation from the standardise_function() function (above), default = "max_5_%"
 #' 
 #' @references 
 #' 
@@ -274,20 +321,24 @@ MF_pasari <- function(adf, vars, stand_method = "max") {
 #' @return returns a vector of Dooley et al.'s (2018) scaled average multifunctionality values for each row
 #' 
 
-MF_dooley <- function(adf, vars, stand_method = "max_5_%") {
+MF_dooley <- function(adf, vars, stand_method = "max_abs") {
+  
+  # test the data inputs
+  test_inputs(adf = adf, vars = vars)
   
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars] 
-  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- apply(adf_mat, 2, standardise_function, method = stand_method)
   adf_mat <- as.data.frame(adf_mat)
   
   mf_dooley <- apply(adf_mat, MARGIN = 1, function(x) mean(x) )/apply(adf_mat, MARGIN = 1, function(x) sd(x) )
   
-  return(mf_dooley)
+  mf_dooley
   
 }
 
 #' @title MF_jing
+#' 
 #' @description Calculate Jing et al.'s (2020) scaling multifunctionalityu metric for rows in a data.frame
 #' 
 #' @details Takes a data frame, variable names and a standardisation method and calculates the "scaling multifunctionality
@@ -311,109 +362,150 @@ MF_dooley <- function(adf, vars, stand_method = "max_5_%") {
 
 MF_jing <- function(adf, vars) {
   
+  # test the data inputs
+  test_inputs(adf = adf, vars = vars)
+  
   # extract functions from input matrix: adf
   adf_mat <- adf[, vars] 
-  adf_mat <- apply(adf_mat, 2, standardise_functions, method = "z_score")
+  adf_mat <- apply(adf_mat, 2, standardise_function, method = "z_score")
   adf_mat <- as.data.frame(adf_mat)
   
-  warning("stand_method cannot be altered with this function as Jing et al.'s approach requires z_score standardised function data")
+  mf_jing <- standardise_function(x = rowSums(adf_mat), method = "z_score")
   
-  mf_jing <- standardise_functions(x = rowSums(adf_mat), method = "z_score")
-  
-  return(mf_jing) 
+  mf_jing 
   
 }
 
+#' @title MF_sum
+#'  
+#' @description Calculate summed multifunctionality
+#' 
+#' @details Takes a data frame, variable names and a standardisation method and calculates
+#' summed multifunctionality which is simply the sum of standardised functions
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' @param stand_method method of standardisation from the standardise_function() function (above), default = "max"
+#' 
+#' @references Jing, X., Prager, C.M., Classen, A.T., Maestre, F.T., He, J.S. and Sanders, N.J., 2020. Variation in the methods 
+#' leads to variation in the interpretation of biodiversity–ecosystem multifunctionality relationships. 
+#' Journal of Plant Ecology, 13(4): 431-441.
+#' 
+#' @return returns a vector of summed multifunctionality for each row in adf
 
-# summing approach
-
-# function to calculate summed multifunctionality
-
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector of functions to include which has to correspond to column names
 MF_sum <- function(adf, vars, stand_method = "z_score_abs") {
   
+  # test the data inputs
+  test_inputs(adf = adf, vars = vars)
+  
   adf_mat <- adf[, vars]
-  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- apply(adf_mat, 2, standardise_function, method = stand_method)
   adf_mat <- as.data.frame(adf_mat)
   
   mf_sum <- rowSums(adf_mat)
   
-  return(mf_sum)
+  mf_sum
   
 }
 
-# average approach
+#' @title MF_av
+#'  
+#' @description Calculate average multifunctionality
+#' 
+#' @details Takes a data frame, variable names and a standardisation method and calculates
+#' average multifunctionality which is simply the average of standardised functions
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' @param stand_method method of standardisation from the standardise_function() function (above), default = "max_abs"
+#' 
+#' @references Jing, X., Prager, C.M., Classen, A.T., Maestre, F.T., He, J.S. and Sanders, N.J., 2020. Variation in the methods 
+#' leads to variation in the interpretation of biodiversity–ecosystem multifunctionality relationships. 
+#' Journal of Plant Ecology, 13(4): 431-441.
+#' 
+#' @return returns a vector of average multifunctionality for each row in adf
 
-# function to calculate average multifunctionality
-
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector of functions to include which has to correspond to column names
-# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
-
-MF_av <- function(adf, vars, stand_method = "z_score") {
+MF_av <- function(adf, vars, stand_method = "max_abs") {
+  
+  # test the data inputs
+  test_inputs(adf = adf, vars = vars)
   
   adf_mat <- adf[, vars]
-  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- apply(adf_mat, 2, standardise_function, method = stand_method)
   adf_mat <- as.data.frame(adf_mat)
   
   mf_av <- rowSums(adf_mat)/length(vars)
   
-  return(mf_av)
+  mf_av
   
 }
 
-# function to calculate standard deviation among functions
+#' @title MF_geom
+#'  
+#' @description Calculate geometric mean multifunctionality
+#' 
+#' @details Takes a data frame, variable names and a standardisation method and calculates
+#' the geometric mean among functions
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' @param stand_method method of standardisation from the standardise_function() function (above), default = "max_abs"
+#' 
+#' @references Hensel et al. (2013). Consumer diversity across kingdoms supports 
+#' multiple functions in a coastal ecosystem. PNAS. 
+#' 
+#' @return returns a vector of geometric mean multifunctionality for each row in adf
 
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector of functions to include which has to correspond to column names
-# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
-
-MF_sd <- function(adf, vars, stand_method = "z_score_abs") {
+MF_geom <- function(adf, vars, stand_method = "max_abs") {
+  
+  # test the data inputs
+  test_inputs(adf = adf, vars = vars)
   
   adf_mat <- adf[, vars]
-  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- apply(adf_mat, 2, standardise_function, method = stand_method)
   adf_mat <- as.data.frame(adf_mat)
   
-  mf_sd <- apply(adf_mat, 1, sd, na.rm = TRUE)
+  mf_geom <- apply(adf_mat, 1, function(x) ( prod(x)^(1/length(x)) ) )
   
-  return(mf_sd)
+  mf_geom
   
 }
 
-# function to calculate coefficient of variation among functions
+#' @title MF_thresh
+#'  
+#' @description Calculates single threshold multifunctionality
+#' 
+#' @details Takes a data frame, variable names and calculates the single threshold
+#' multifunctionality (Gamfeldt et al. 2008; Byrnes et al. 2014). This function
+#' was taken from the multifunc package but rewritten to not rely on the
+#' plyr package which is outdated.
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' @param thresh - threshold of functioning (between 0 and 1)
+#' 
+#' @references Byrnes et al. (2014)
+#' 
+#' @return returns a vector of average multifunctionality for each row in adf
+#' 
 
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector of functions to include which has to correspond to column names
-# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
-
-MF_cv <- function(adf, vars, stand_method = "z_score_abs") {
+MF_thresh <- function(adf, vars = NA, thresh = 0.7, maxN = 1){
   
-  adf_mat <- adf[, vars]
-  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
-  adf_mat <- as.data.frame(adf_mat)
+  # test the data inputs
+  test_inputs(adf = adf, vars = vars)
   
-  mf_cv <- apply(adf_mat, 1, function(x) { (sd(x)/mean(x)) })
-  
-  return(mf_cv)
-  
-}
-
-
-
-# single threshold approach
-
-# The function below taken from the multifunc package and written by Jarret Byrnes (https://github.com/jebyrnes/multifunc)
-
-# They are included here in a modified form as 
-# 1) the package is not available on CRAN for the moment
-# 2) the package loads plyr which conflicts with dplyr if loaded afterwards
-
-# note that I re-wrote the functions below in order to not rely on plyr
-
-single_threshold_mf <- function(adf, vars = NA, thresh = 0.7, prepend = "Diversity", maxN = 1){
-  
-  if(is.na(vars)[1]) stop("You need to specify some response variable names")
+  assertthat::assert_that(
+    is.numeric(thresh) && (thresh > 0 && thresh < 1),
+    msg = "thresh must be numeric and between 0 and 1"
+  )
   
   getMaxValue <- function(x){
     l <- length(x)    
@@ -422,111 +514,125 @@ single_threshold_mf <- function(adf, vars = NA, thresh = 0.7, prepend = "Diversi
   
   funcMaxed <- rowSums(apply(adf[,which(names(adf)%in%vars)], 2, function(x) x >= thresh*getMaxValue(x)))
   
-  return(funcMaxed)
+  funcMaxed
   
 }
 
+#' @title MF_inv_simpson()
+#'  
+#' @description Calculate inverse simpson's index multifunctionality
+#' 
+#' @details Takes a data frame, variable names and calculates inverse
+#' Simpson's diversity index as an index of multifunctionality. Note that,
+#' when all functions are zero, this function returns an NA for multifunctionality
+#' as per Simpson's index.
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' @param stand_method method of standardisation from the standardise_function() function (above), default = "max_abs"
+#' 
+#' @references Raudsepp-Hearne et al. (2009)
+#' 
+#' @return returns a vector of inverse Simpson's diversty multifunctionality for each row in adf
+#' 
 
-# Simpson's diversity index: Raudsepp-Hearne et al. (2009)
-
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector of functions to include which has to correspond to column names
-# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
-
-MF_simpsons_div <- function(adf, vars, stand_method = "max") {
+MF_inv_simpson <- function(adf, vars, stand_method = "max_abs") {
   
-  if(! "vegan" %in% installed.packages()[,1]) stop(
-    "this function requires vegan to be installed"
+  # test the data inputs
+  test_inputs(adf = adf, vars = vars)
+  
+  # check that the vegan package is installed
+  assertthat::assert_that(
+    "vegan" %in% installed.packages()[,1],
+    msg = "this function requires the vegan package"
   )
   
   adf_mat <- adf[, vars]
-  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- apply(adf_mat, 2, standardise_function, method = stand_method)
   adf_mat <- as.data.frame(adf_mat)
   
-  mf_simp <- vegan::diversity(x = adf_mat, index = "simpson", MARGIN = 1)
+  # calculate the inverse simpson's index
+  mf_simp <- vegan::diversity(x = adf_mat, index = "invsimpson", MARGIN = 1)
   
-  z <- 
-    sapply(adf_mat, function(x) {
-    
-    ifelse(sum(x) == 0, 1, 0)
-    
-  })
+  # if all function values are zero, return NA
+  mf_simp[apply(adf_mat, 1, sum) == 0] <- NA
   
-  if (sum(z) == length(vars)) {
-    
-    warning(x = "all functions are zero which leads to maximum Simpson diversity")
-    
-    return(mf_simp)
-    
-  } else {
-    
-    return(mf_simp)
-    
-  }
+  mf_simp
   
 }
 
-# Shannon diversity index
+#' @title MF_shannon()
+#'  
+#' @description Calculate Shannon diversity index multifunctionality
+#' 
+#' @details Takes a data frame, variable names and calculates Shannon diversity 
+#' as an index of multifunctionality
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' @param stand_method method of standardisation from the standardise_function() function (above), default = "max_abs"
+#' 
+#' @references
+#' 
+#' @return returns a vector of Shannon diversty multifunctionality for each row in adf
+#' 
 
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector of functions to include which has to correspond to column names
-# stand_method = method used to standardise the data ("none", "z_score", "z_score_abs", "max", "max_0_1", "max_5_%")
-
-MF_shannon_div <- function(adf, vars, stand_method = "max") {
+MF_shannon <- function(adf, vars, stand_method = "max_abs") {
   
-  if(! "vegan" %in% installed.packages()[,1]) stop(
-    "this function requires vegan to be installed"
+  # test the data inputs
+  test_inputs(adf = adf, vars = vars)
+  
+  # check that the vegan package is installed
+  assertthat::assert_that(
+    "vegan" %in% installed.packages()[,1],
+    msg = "this function requires the vegan package"
   )
   
   adf_mat <- adf[, vars]
-  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
+  adf_mat <- apply(adf_mat, 2, standardise_function, method = stand_method)
   adf_mat <- as.data.frame(adf_mat)
   
   mf_shan <- vegan::diversity(x = adf_mat, index = "shannon", MARGIN = 1)
   
-  return(mf_shan)
+  mf_shan
   
 }
 
 
-# MESLI approach Rodríguez-Loinaz et al. (2015)
-
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector of functions to include which has to correspond to column names
-
-MF_mesli <- function(adf, vars, stand_method = "max_0_1") {
-  
-  adf_mat <- adf[, vars]
-  adf_mat <- apply(adf_mat, 2, standardise_functions, method = stand_method)
-  adf_mat <- as.data.frame(adf_mat)
-  
-  mf_mesli <- rowSums(adf_mat)
-  
-  return(mf_mesli)
-
-}
-
-
-# Slade et al. (2017) desirability function approach
-
-# function to calculate multifunctional desirability sensu Slade et al. (2017)
-
-# adf, is dataframe with plots in rows, and functions in columns
-# vars has to bee a named vector of functions to include which has to correspond to column names
-# A is the lower limit of function deemed acceptable
-# B is the upper limit of the function
-# s is a shape parameter describing how multifunctional desirability changes between A and B
-# when s = 1 (default), multifunctional desirability increases linearly from A to B
-# when s < 1,  multifunctional desirability is higher at lower levels of the response
-# when s > 1 it is more important to be as close as possible to higher multifunctional desirability
-# weights are direct weightings applied to each function
-
-# A, B, s and weights must be defined for each function and must be inputted as vectors (one number for each function)
-# if vectors are not inputted for these quantities the defaults are:
-# A: for each function, the mean of all values below a certain quantile is used (argument = A_quant)
-# B: for each function, the mean of all values above a certain quantile is used (argument = B_quant)
-# s: by default, s is 1 which means there is a linear relationship
-# weights: equal weights (i.e. weights = 1 for all functions) are assigned by default
+#' @title MF_slade()
+#'  
+#' @description Calculates Slade et al.'s (2017) desirability index
+#' 
+#' @details Takes a data frame, variable names and Slade et al.'s (2017)
+#' desirability index. A, B, s and weights must be defined for each function 
+#' and must be inputted as vectors (one number for each function). 
+#' If vectors are not inputted for these quantities the defaults are: A: for 
+#' each function, the mean of all values below a certain quantile is used (argument = A_quant)
+#' B: for each function, the mean of all values above a certain quantile 
+#' is used (argument = B_quant). s: by default, s is 1 which means there 
+#' is a linear relationship weights: equal weights 
+#' (i.e. weights = 1 for all functions) are assigned by default
+#' 
+#' @author James G. Hagan (james_hagan(at)outlook.com)
+#' 
+#' @param adf dataframe with plots in rows, and functions in columns
+#' @param vars character vector with the names of the chosen ecosystem functions corresponding to the column names in adf
+#' @param A is the lower limit of function deemed acceptable
+#' @param B is the upper limit of the function
+#' @param s is a shape parameter describing how multifunctional desirability changes between A and B
+#' when s = 1 (default), multifunctional desirability increases linearly from A to B
+#' when s < 1,  multifunctional desirability is higher at lower levels of the response
+#' when s > 1 it is more important to be as close as possible to higher multifunctional desirability
+#' @param weights are direct weightings applied to each function
+#' 
+#' @references Slade et al. (2017)
+#' 
+#' @return returns a vector of desirability index values
+#' 
 
 MF_slade <- function(adf, vars, 
                      A = "min", 
@@ -536,6 +642,8 @@ MF_slade <- function(adf, vars,
                      s = "linear",
                      weights = "equal") {
   
+  # test the data inputs
+  test_inputs(adf = adf, vars = vars)
   
   adf_mat <- adf[, vars]
   
@@ -632,7 +740,7 @@ MF_slade <- function(adf, vars,
   
   d_mf <- (d_mf)^(1/sum(ws))
   
-  return(d_mf)
+  d_mf
   
 }
 

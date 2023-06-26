@@ -215,6 +215,23 @@
       ],
       "Hash": "f20c47fd52fae58b4e377c37bb8c335b"
     },
+    "cowplot": {
+      "Package": "cowplot",
+      "Version": "1.1.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "ggplot2",
+        "grDevices",
+        "grid",
+        "gtable",
+        "methods",
+        "rlang",
+        "scales"
+      ],
+      "Hash": "b418e8423699d11c7f2087c2bfd07da2"
+    },
     "cpp11": {
       "Package": "cpp11",
       "Version": "0.4.3",
@@ -1004,6 +1021,16 @@
         "withr"
       ],
       "Hash": "7015a74373b83ffaef64023f4a0f5033"
+    },
+    "wesanderson": {
+      "Package": "wesanderson",
+      "Version": "0.3.6",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R"
+      ],
+      "Hash": "42f92f1e9ef722355959ec1f7c459636"
     },
     "withr": {
       "Package": "withr",
