@@ -297,127 +297,134 @@ SES_sp <- function(data, func_names, sp_names, n_ran = 100) {
 #' @param method - AIC or SES to implement the different types of turnover approaches
 #' @param n_ran - number of randomisations if SES is chosen
 #'
-#' @description calculates the proportion of
+#' @description calculates the proportion of the species pool that contributes
+#' positively or negative to at least one of the functions present in the
+#' dataset
 #'
 
 prop_species_pool <- function(data, func_names, sp_names, method = "AIC", n_ran = 100) {
   
-  # start by getting the effect of each species on the different functions using either:
-  # 1. AIC-approach based on the multifunc package
-  # 2. SES-approach of Gotelli et al. (2011)
-  
   if (method == "AIC") {
     
-    df.in <- AIC_sp(data = data, function_names = function_names, sp_names = sp_names)
+    df_in <- AIC_sp(data = data, func_names = func_names, sp_names = sp_names)
     
   } else if (method == "SES") {
     
-    df.in <- SES_score(data = data, function_names = function_names, sp_names = sp_names, n_ran = n_ran)
+    df_in <- SES_sp(data = data, func_names = func_names, sp_names = sp_names, n_ran = n_ran)
     
-  } else { stop("choose appropriate method for calculating the species pool") }
+  } else { 
+    
+    stop("choose appropriate method for calculating the species pool") 
+    
+    }
   
   # get the function combinations
-  f.combs <- c(function_names, get.function.combinations(function.names = function_names))
+  func_combs <- c(func_names, 
+                  get_function_combinations(func_names = func_names))
   
   # set up the list
-  prop_sp_out <- vector("list", length = length(f.combs))
+  prop_sp_out <- vector("list", length = length(func_combs))
   
   # for each function combination, calculate the proportion of the species pool 
   # that has at least one positive effect
   
-  for(i in 1:length(f.combs)) {
+  for(i in 1:length(func_combs)) {
     
     # subset the functions of interest
-    y <- df.in[, f.combs[[i]] ]
+    x <- df_in[, func_combs[[i]] ]
     
-    # tally up positive effects
+    # count positive effects
     
     # test if each species contributes positively to at least one function
-    x <- apply(y, 1, function(z) { ifelse(any(z > 0), TRUE, FALSE) })
+    y <- apply(x, 1, function(x) { ifelse(any(x > 0), TRUE, FALSE) })
     
     # if there are no species contributing to function then set prop_pos FALSE
-    if (all(x == FALSE)) {
+    # else count the number of species positively contributing to each function 
+    # and divide by total number of species 
+    if (all(y == FALSE)) {
       
       prop_pos <- 0
       
-      # count the number of species positively contributing to each function and divide by total number of species    
     } else {
       
-      prop_pos <- length(df.in[x, ]$species)/length(sp_names)
+      prop_pos <- length(df_in[y, ]$species)/length(sp_names)
       
     }
     
-    # tally up negative effects
+    # count negative effects
     
     # test if each contributes negatively to at least one function
-    x2 <- apply(y, 1, function(z) { ifelse(any(z < 0), TRUE, FALSE) })
+    y2 <- apply(x, 1, function(x) { ifelse(any(x < 0), TRUE, FALSE) })
     
     # if there are no species contributing to function then set prop_pos FALSE
-    if (all(x2 == FALSE)) {
+    # else count the number of species positively contributing to each function 
+    # and divide by total number of species
+    if (all(y2 == FALSE)) {
       
       prop_neg <- 0
       
-      # count the number of species positively contributing to each function and divide by total number of species    
     } else {
       
-      prop_neg <- length(df.in[x2, ]$species)/length(sp_names)
+      prop_neg <- length(df_in[y2, ]$species)/length(sp_names)
       
     }
     
-    
-    prop_sp_out[[i]] <- tibble(number_functions = length(f.combs[[i]]),
-                               function_id = paste(f.combs[[i]], collapse = "."),
-                               positive_effect = prop_pos,
-                               negative_effect = prop_neg)
+    # pull the results into a tibble
+    prop_sp_out[[i]] <- 
+      dplyr::tibble(num_funcs = length(func_combs[[i]]),
+                    func_id = paste(func_combs[[i]], collapse = "."),
+                    pos_eff = prop_pos,
+                    neg_eff = prop_neg)
     
   }
   
-  df.out <- dplyr::bind_rows(prop_sp_out)
+  # bind into a data.frame
+  df_out <- dplyr::bind_rows(prop_sp_out)
   
-  df.out <- tidyr::pivot_longer(data = df.out,
-                                cols = c("positive_effect", "negative_effect"),
-                                names_to = "effect_direction",
-                                values_to = "proportion_species_pool")
+  # pull into the long-format
+  df_out <- tidyr::pivot_longer(data = df_out,
+                                cols = c("pos_eff", "neg_eff"),
+                                names_to = "eff_dir",
+                                values_to = "prop_sp_pool")
   
-  df.out <- dplyr::arrange(df.out, 
-                           effect_direction, number_functions, function_id)
+  # arrange by effect direction, number of functions and function_id
+  df_out <- dplyr::arrange(df_out, eff_dir, num_funcs, func_id)
   
 }
 
-# create a function to randomise the data and then calculate the proportion
-# of species pool
+#' @title prop_species_pool_random
+#' 
+#' @param data - data.frame containing functions and species abundances or PAs
+#' @param func_names - vector of function names
+#' @param sp_names - vector of species names
+#' @param method - AIC or SES to implement the different types of turnover approaches
+#' @param n_ran - number of randomisations if SES is chosen
+#' @param n - number of random datasets to create
+#'
 
-# data: data.frame with functions and species presence-absences as columns and samples as rows
-# function_names: vector of function names
-# sp_names: vector of species names
-# method: method to calculate species effects ("AIC" or "SES")
-# n_ran: number of randomisations when using the SES method
-# n: number of random datasets
-
-prop_species_pool_random <- function(data, function_names, sp_names, method = "AIC", n_ran = 100, n = 10) {
+prop_species_pool_random <- function(data, func_names, sp_names, method = "AIC", n_ran = 100, n = 10) {
   
   # create n random datasets in a list
   random_rows <- vector("list", length = n)
-  
   for (i in 1:n) {
-    
-    random_rows[[i]] <- row.randomiser(func.names = function_names,
-                                       species.names = sp_names,
-                                       adf.data = data)
-    
+    random_rows[[i]] <- row_randomiser(func_names = func_names,
+                                       sp_names = sp_names,
+                                       adf_data = data)
   }
   
   # apply over this list
-  prop_list<- 
+  prop_list <- 
     lapply(random_rows, function(x) {
       
-      prop_species_pool(data = x, function_names = function_names,
+      prop_species_pool(data = x, func_names = func_names,
                         sp_names = sp_names, method = method, n_ran = n_ran)
       
     })
   
   # bind this into a data.frame
-  bind_rows(prop_list, .id = "run")
+  prop_df <- dplyr::bind_rows(prop_list, .id = "run")
+  
+  return(prop_df)
   
 }
 

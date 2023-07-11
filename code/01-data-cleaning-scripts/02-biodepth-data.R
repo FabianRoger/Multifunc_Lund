@@ -68,6 +68,6 @@ sp_id <- which(names(prt_dat) %in% prt_sp)
 prt_dat <- prt_dat[,c(1:14, sp_id, prt_vars)]
 
 # write this into a .rds file
-saveRDS(object = swe_dat, file = "data/biodepth_prt_data.rds")
+saveRDS(object = prt_dat, file = "data/biodepth_prt_data.rds")
 
 ### END
