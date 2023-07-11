@@ -1,5 +1,11 @@
-
-# simulate a biodiversity gradient
+#'
+#' @title Finite number of functions analaysis
+#' 
+#' @description Simulates an ecosystem under the assumption that it
+#' has some finite number of functions present. It then tests how measuring
+#' different numbers of functions leads to better estimates of the effect
+#' of biodiversity (or any other variable) on multifunctionality.
+#'
 
 # load relevant libraries
 library(dplyr)
@@ -40,17 +46,19 @@ fsim_list <-
 # pull the functions into a data.frame
 fsim <- do.call("cbind", fsim_list)
 
-# fsim plot
-fsim_plot <- bind_cols(tibble(plot = 1:n, div = div), 
-                       bind_cols(fsim_list))
+# bind the simulation data for efficient plotting
+fsim_plot <- dplyr::bind_cols( dplyr::tibble(plot = 1:n, div = div), 
+                               dplyr::bind_cols(fsim_list))
+
+# rename the columns
 names(fsim_plot) <- c("plot", "div", paste0("F", 1:n_func))
 
 # pull into the long format
 fsim_plot <- 
-  fsim_plot %>%
-  pivot_longer(cols = contains("F"),
-               names_to = "Function", 
-               values_to = "Value")
+  fsim_plot |>
+  tidyr::pivot_longer(cols = contains("F"),
+                      names_to = "Function", 
+                      values_to = "Value")
 
 p1 <- 
   ggplot(data = fsim_plot,
@@ -60,9 +68,10 @@ p1 <-
   xlab("Species richness") +
   theme_test() +
   theme(axis.text = element_text(colour = "black"))
+plot(p1)
 
 # plot the relationship between average EMF and diversity
-fsim_mu <- tibble(div = div, ave_EMF = apply(fsim, 1, mean))
+fsim_mu <- dplyr::tibble(div = div, ave_EMF = apply(fsim, 1, mean))
 
 p2 <- 
   ggplot(data = fsim_mu,
@@ -73,6 +82,7 @@ p2 <-
   xlab("Species richness") +
   theme_test()+
   theme(axis.text = element_text(colour = "black"))
+plot(p2)
 
 p12 <- 
   cowplot::plot_grid(p1, p2, labels = c("a", "b"),
@@ -80,7 +90,7 @@ p12 <-
                      )
 plot(p12)
 
-ggsave(filename = "github/multifunc_sims/figures/fig_x.png", p12,
+ggsave(filename = "figures-paper-2/fig_x.svg", p12,
        units = "cm", width = 15, height = 7.5)
 
 # calculate the true average multifunctionality slope
@@ -88,6 +98,8 @@ ggsave(filename = "github/multifunc_sims/figures/fig_x.png", p12,
 # get the population slope
 mu <- lm(apply(fsim, 1, mean) ~ div)
 mu <- summary(mu)
+
+# extrac the true coefficients
 true_B <- mu$coefficients[2,][["Estimate"]]
 print(true_B)
 true_SE <- mu$coefficients[2,][["Std. Error"]]
@@ -111,18 +123,19 @@ for(i in 1:length(sample_funcs)) {
 }
 
 # pull into a data.frame
-samp_df <- tibble(id = 1:length(samp_B),
-                  n_funcs = sample_funcs,
-                  slope = samp_B,
-                  slope_SE = samp_SE)
+samp_df <- dplyr::tibble(id = 1:length(samp_B),
+                         n_funcs = sample_funcs,
+                         slope = samp_B,
+                         slope_SE = samp_SE
+                         )
 
 # add some random noise to the n_funcs variable
 samp_df$n_funcs_dodge <- samp_df$n_funcs + rnorm(n = nrow(samp_df), 0, 0.2)
 
 # pull the true effect into a data.frame
-true_df <- tibble(n_funcs = 20,
-                  slope = true_B,
-                  slope_SE = true_SE)
+true_df <- dplyr::tibble(n_funcs = n_func,
+                         slope = true_B,
+                         slope_SE = true_SE)
 
 p3 <- 
   ggplot() +
@@ -148,13 +161,7 @@ p3 <-
   theme(axis.text = element_text(colour = "black"))
 plot(p3)
 
-ggsave(filename = "github/multifunc_sims/figures/fig_y.png", p3,
+ggsave(filename = "figures-paper-2/fig_y.svg", p3,
        units = "cm", width = 7.5, height = 7.5)
 
-
-
-
-
-
-
-
+### END
