@@ -38,14 +38,16 @@ swe_cols <- names(swe_dat)
 swe_sp <- swe_cols[grepl(pattern = "[A-Z]{6}[1]", swe_cols)]
 
 # get the function names
-swe_funcs <- c("biomassY3", "root3", "cotton3", "wood3", "N.g.m2", "light3")
+swe_funcs <- c("biomassY3", "root3", "cotton3", "wood3", "N.g.m2")
+all(swe_funcs %in% swe_cols) 
 
 # BIODEPTH: Portugal
 prt_cols <- names(prt_dat)
 prt_sp <- prt_cols[grepl(pattern = "[A-Z]{6}[1]", prt_cols)]
 
 # get the function names
-prt_funcs <- c("biomassY3", "root3", "cotton3", "wood3", "N.Soil", "N.g.m2")
+prt_funcs <- c("root3", "cotton3", "wood3", "N.Soil")
+all(prt_funcs %in% prt_cols) 
 
 # pull these datasets into a list
 dat_list <- list(jena_dat, swe_dat, prt_dat)
@@ -54,14 +56,10 @@ dat_sp <- list(jena_sp, swe_sp, prt_sp)
 
 # convert abundance data into presence absence
 dat_list <- 
-  
   mapply(function(D, S){
-  
   D[,S] <- vegan::decostand(D[,S], method = "pa")
   return(D)
-  
 }, dat_list, dat_sp)
-
 
 # run the AIC turnover approach on these datasets
 aic_dat <- 
@@ -78,9 +76,9 @@ aic_dat <-
   aic_ran <- 
     prop_species_pool_random(data = D,
                              func_names = Func,
-                             sp_names = S, method = "AIC", n = 5)
+                             sp_names = S, method = "AIC", n = 10)
   
-  return( list(aic_obs, aic_ran) )
+  return( list(obs = aic_obs, null = aic_ran) )
   
 }, dat_list, dat_funcs, dat_sp, SIMPLIFY = FALSE)
 
@@ -103,23 +101,97 @@ ses_dat <-
       prop_species_pool_random(data = D,
                                func_names = Func,
                                sp_names = S, method = "SES", n_ran = 999, 
-                               n = 5)
+                               n = 10)
     
-    return( list(ses_obs, ses_ran) )
+    return( list(obs = ses_obs, null = ses_ran) )
     
   }, dat_list, dat_funcs, dat_sp, SIMPLIFY = FALSE)
 
 # set set the names of the datasets
 names(ses_dat) <- c("jena", "swe", "prt")
 
+# plot the results
 
+# combine the AIC and SES lists
+df_list <- c(aic_dat, ses_dat)
 
-x <- SES_sp(data = jena_dat, func_names = jena_funcs, sp_names = jena_sp, n_ran = 100)
+# set-up a list of titles
+title <- c("AIC", " ", " ", "SES", " ", " ")
+ylabs <- c("Prop. species pool", NA, NA, "Prop. species pool", NA, NA)
+xlabs <- c(NA, NA, NA, "", "Number of functions", "")
 
+# loop over the different datasets
+plot_list <- vector("list", length = length(df_list))
+for(i in 1:length(df_list)) {
+  
+  # get the observed data
+  df_obs <- df_list[[i]][["obs"]]
+  
+  # get the number of functions
+  n_funcs <- max(df_obs$num_funcs)
+  
+  # alter the factors of direction variable
+  df_obs$eff_dir <- factor(df_obs$eff_dir)
+  levels(df_obs$eff_dir) <- c("-ve effect", "+ve effect")
+  
+  # summarise the observed data into the mean line
+  df_obs_sum <- 
+    df_obs |>
+    dplyr::group_by(num_funcs, eff_dir) |>
+    dplyr::summarise(prop_sp_pool_m = mean(prop_sp_pool), .groups = "drop")
+  
+  # get the null distribution
+  df_null <- df_list[[i]][["null"]]
+  
+  # alter the factors of direction variable
+  df_null$eff_dir <- factor(df_null$eff_dir)
+  levels(df_null$eff_dir) <- c("-ve effect", "+ve effect")
+  
+  # summarise the null into a 95% percentile
+  df_null <- 
+    df_null |>
+    dplyr::group_by(num_funcs, eff_dir) |>
+    summarise(PI_low = quantile(prop_sp_pool, 0.025),
+              PI_high = quantile(prop_sp_pool, 0.975), .groups = "drop")
+  
+  p1 <- 
+    ggplot() +
+    geom_ribbon(data = df_null,
+                mapping = aes(x = num_funcs, ymin = PI_low, ymax = PI_high, fill = eff_dir),
+                alpha = 0.1, show.legend = FALSE, fill = "red") +
+    geom_quasirandom(data = df_obs, 
+                     mapping = aes(x = num_funcs, y = prop_sp_pool, colour = eff_dir),
+                     width = 0.1, shape = 1, show.legend = FALSE,
+                     alpha = 0.3, stroke = 0.25, colour = "red") +
+    geom_line(data = df_obs_sum,
+              mapping = aes(x = num_funcs, y = prop_sp_pool_m, colour = eff_dir),
+              linewidth = 0.75, colour = "red") +
+    scale_x_continuous(limits = c(0.9, n_funcs + 0.1), 
+                       breaks = seq(1, n_funcs, length.out = if(ceiling(n_funcs/2) < 3){4} else{ceiling(n_funcs/2)} )) +
+    scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.25)) +
+    ylab(if(is.na(ylabs[i])){NULL}else{ylabs[i]}) +
+    xlab(if(is.na(xlabs[i])){NULL}else{xlabs[i]}) +
+    facet_wrap(~eff_dir) +
+    ggtitle(title[i]) + 
+    theme_meta() +
+    theme(legend.position = "bottom",
+          strip.background = element_blank(),
+          strip.text = element_text(size = 11),
+          plot.title = element_text(vjust = -1))
+  
+  plot_list[[i]] <- p1
+  
+}
 
+# combine into a single plot
+f1 <- 
+  cowplot::plot_grid(plotlist = plot_list, 
+                     nrow = 2, ncol = 3,
+                     rel_widths = c(1.4, 1.1, 1),
+                     rel_heights = c(1, 1.075)
+                     )
 
+ggplot2::ggsave(filename = "figures-paper-2/fig_1.svg", f1,
+                units = "cm", width = 20, height = 14)
 
-
-
-
-
+### END

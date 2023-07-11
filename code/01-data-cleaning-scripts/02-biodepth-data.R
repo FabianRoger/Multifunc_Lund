@@ -26,14 +26,13 @@ var_id <- which(names(all_biodepth) %in% all_vars)
 # check the possible locations
 unique(all_biodepth$location)
 
-
 # subset out Sweden
 swe_dat <- 
   all_biodepth |>
   dplyr::filter(location == "Sweden")
 
 # which variables have > 2/3 of the values not NA?
-swe_vars <- which(names(swe_dat) %in% multifunc::whichVars(swe_dat, all_vars))
+swe_vars <- which(names(swe_dat) %in% multifunc::whichVars(swe_dat, all_vars, thresh = 0))
 
 # What are the names of species in this dataset
 # that have at least some values > 0?
@@ -55,7 +54,7 @@ prt_dat <-
   dplyr::filter(location == "Portugal")
 
 # which variables have > 2/3 of the values not NA?
-prt_vars <- which(names(prt_dat) %in% multifunc::whichVars(prt_dat, all_vars))
+prt_vars <- which(names(prt_dat) %in% multifunc::whichVars(prt_dat, all_vars, thresh = 0))
 
 # What are the names of species in this dataset
 # that have at least some values > 0?
