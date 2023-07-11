@@ -1,147 +1,250 @@
+#'
+#' @title Functions to implement turnover approaches
+#' 
+#' @description This script contains a series of functions that are used
+#' to implement the turnover (aka overlap) approach to multifunctionality using
+#' two separate methods: Hector and Bagchi's (2007) information theoretic
+#' approach (implemented as per Byrnes et al. 2014) and a novel implementation
+#' that uses Gotelli et al.'s (2011) species importance scores instead of the
+#' information theoretic approach.
+#'
 
-# Project: Review of multifunctionality in ecology, conservation and ecosystem service science
-
-# Title: Implement the turnover approach using the multifunc package and an analogue to Meyer et al. (2017)'s null model
-
-# set-up general functions
+#' @title row_randomiser
+#' 
+#' @param func_names - vector of function names
+#' @param sp_names - vector of species names
+#' @param adf_data - dataset containing functions and species columns
+#' 
 
 # function to mix-up relationship between function and species
-row.randomiser <- function(func.names, species.names, adf.data) {
+row_randomiser <- function(func_names, sp_names, adf_data) {
+  
+  assertthat::assert_that(
+    is.vector(func_names) && is.vector(sp_names),
+    msg = paste("either func_names or sp_names are not vectors")
+  )
+  
+  assertthat::assert_that(
+    is.data.frame(adf_data) | dplyr::is.tbl(adf_data),
+    msg = paste("adf_data is not a data.frame or tibble")
+  )
+  
+  assertthat::assert_that(
+    all(func_names %in% names(adf_data)) && all(sp_names %in% names(adf_data)),
+    msg = "not all function names nor all species names are present in the input data"
+  )
+  
+  assertthat::assert_that(
+    length(func_names) > 1,
+    msg = paste("func_names must have more than one function")
+  )
+  
+  assertthat::assert_that(
+    length(sp_names) > 1,
+    msg = paste("sp_names must have more than one species")
+  )
   
   # subset a matrix of functions
-  func.mat <- adf.data[, func.names]
-  func.mat.nrow <- nrow(func.mat) # calculate the number of rows in that matrix
+  func_mat <- adf_data[, func_names]
+  
+  # calculate the number of rows in that matrix
+  func_mat_nrow <- nrow(func_mat)
   
   # use sample to get random row ids from the function matrix
-  random.row.ids <- sample(x = 1:func.mat.nrow, size = func.mat.nrow , replace = FALSE)
+  random_row_ids <- sample(x = 1:func_mat_nrow, size = func_mat_nrow , replace = FALSE)
   
   # randomise the function matrix
-  func.mat.random <- func.mat[random.row.ids, ]
+  func_mat_random <- func_mat[random_row_ids, ]
   
   # get a matrix of species data
-  spec.mat <- adf.data[, species.names]
+  spec_mat <- adf_data[, sp_names]
   
   # bind this randomised data together
-  adf.data.random <- cbind(spec.mat, func.mat.random)
+  adf_data_random <- cbind(spec_mat, func_mat_random)
   
-  return(as.data.frame(adf.data.random))
+  return( as.data.frame(adf_data_random) )
   
 }
 
-# get combinations of functions in vectors
-
-# BEF slope and n-functions
+#' @title function_combinations
+#' 
+#' @param func_names - vector of function names
+#'
 
 # get the list of matrices of function combinations
-function.combinations <- function(vector.func.names) {
-  nested.list.matrices <- vector("list", length = (length(vector.func.names)-1) )
-  for (i in 2:length(vector.func.names)){
-    nested.list.matrices[[i-1]] <- combn(x = vector.func.names, m = i)
-  }
-  return(nested.list.matrices)
-}
-
-# write a function to flatten an individual part of a nested list
-flatten.list.matrices <- function(nested.list.matrices){
-  unnested.list <- split(nested.list.matrices, col(nested.list.matrices)) 
-  names(unnested.list) <- NULL 
-  return(unnested.list)
-}
-
-# combine function.combinations and flatten.list.matrices and loop over each n-func
-get.function.combinations <- function(function.names){
+function_combinations <- function(func_names) {
   
-  # test if the data has two separate functions
-  if (length(function.names) < 2) {
-    
-    stop("error, function requires at least two different ecosystem functions")
-    
+  assertthat::assert_that(
+    is.vector(func_names),
+    msg = paste("func_names is not a vector")
+  )
+  
+  assertthat::assert_that(
+    length(func_names) > 1,
+    msg = paste("func_names must have more than one function")
+  )
+  
+  nested_list_matrices <- vector("list", length = (length(func_names)-1) )
+  for (i in 2:length(func_names)){
+    nested_list_matrices[[i-1]] <- combn(x = func_names, m = i)
   }
+  return(nested_list_matrices)
+  
+}
+
+#' @title flatten_list_matrices
+#' 
+#' @param nested_list_matrices - output from the function_combinations() function
+#'
+#' @description the function_combinations() function outputs a nested list of
+#' function combinations i.e. combinations of two functions is one nested layer
+#' and combinations of three functions is another nested layer. This function
+#' converts those nested layers into a single list where each list element
+#' is a different function combination
+#'
+
+flatten_list_matrices <- function(nested_list_matrices){
+  
+  unnested_list <- split(nested_list_matrices, col(nested_list_matrices)) 
+  names(unnested_list) <- NULL 
+  return(unnested_list)
+  
+}
+
+#' @title get_function_combinations
+#' 
+#' @param func_names - vector of function names
+#'
+#' @description function combines several functions to output a list where
+#' each element is a combination of functions.
+#'
+
+get_function_combinations <- function(func_names){
   
   # get raw list of matrices
-  list.func.matrix <- function.combinations(vector.func.names = function.names)
+  list_func_matrix <- function_combinations(func_names = func_names)
   
-  if (length(function.names) < 3) {
+  if (length(func_names) < 3) {
     
     # flatten the first matrix in the list
-    list.combination <- flatten.list.matrices(nested.list.matrices = list.func.matrix[[1]])
+    list_combination <- flatten_list_matrices(nested_list_matrices = list_func_matrix[[1]])
     
   } else {
     
     # flatten the first matrix in the list
-    list.combination <- flatten.list.matrices(nested.list.matrices = list.func.matrix[[1]])
+    list_combination <- flatten_list_matrices(nested_list_matrices = list_func_matrix[[1]])
     
     # loop over this and bind into a list
-    for (i in 2:length(list.func.matrix)){
-      x <- flatten.list.matrices(nested.list.matrices = list.func.matrix[[i]])
-      list.combination <- c(list.combination, x)
+    for (i in 2:length(list_func_matrix)){
+      x <- flatten_list_matrices(nested_list_matrices = list_func_matrix[[i]])
+      list_combination <- c(list_combination, x)
     }
     
   }
   
-  list.combination
+  return(list_combination)
   
 }
 
-# functions to implement aic-based species effects and Gotelli et al. (2011) species effects
+#' @title AIC_sp
+#' 
+#' @param data - data.frame containing functions and species abundances or PAs
+#' @param func_names - vector of function names
+#' @param sp_names - vector of species names
+#'
+#' @description use the AIC-approach as implemented by Byrnes et al. (2014)
+#' in the multifunc package to estimate the number of species required to 
+#' support a set of functions
+#'
 
-# 1. calculate species effects using the AIC-based turnover approach
-
-# data: data.frame with functions and either species abundances or presence-absences as columns and samples as rows
-# function_names: vector of function names
-# species_names: vector of species names
-
-AIC_sp <- function(data, function_names, species_names) {
+AIC_sp <- function(data, func_names, sp_names) {
   
+  assertthat::assert_that(
+    is.vector(func_names) && is.vector(sp_names),
+    msg = paste("either func_names or sp_names are not vectors")
+  )
+  
+  assertthat::assert_that(
+    is.data.frame(data) | dplyr::is.tbl(data),
+    msg = paste("data is not a data.frame or tibble")
+  )
+  
+  assertthat::assert_that(
+    all(func_names %in% names(data)) && all(sp_names %in% names(data)),
+    msg = "not all function names nor all species names are present in the input data"
+  )
+  
+  # make sure the multifunc package is installed
   if(! "multifunc" %in% installed.packages()[,1]) stop(
     "this function requires the multifunc package to be installed"
   )
   
-  # load the multifunc package
-  library(multifunc)
+  # make sure the dplyr package is installed
+  if(! "dplyr" %in% installed.packages()[,1]) stop(
+    "this function requires the dplyr package to be installed"
+  )
   
-  sp.effect.aic <- vector("list", length = length(function_names))
-  for (i in 1:length(function_names)){
+  sp_effect_aic <- vector("list", length = length(func_names))
+  for (i in 1:length(func_names)){
     
     # get species effect on each function using abundances
     # this outputs a vector of species effects (-1, 0 or 1) on the function i
-    redun.out <- getRedundancy(vars = function_names[i], species = species_names, data = data)
-    sp.effect.aic[[i]] <- sapply(redun.out, function(x)(x))
+    redun_out <- multifunc::getRedundancy(vars = func_names[i], species = sp_names, data = data)
+    sp_effect_aic[[i]] <- sapply(redun_out, function(x)(x))
     
   }
   
   # prepare the output
-  sp.effect.aic <- as.data.frame(do.call(cbind, sp.effect.aic))
-  names(sp.effect.aic) <- function_names
-  sp.effect.aic <- cbind(species = rownames(sp.effect.aic), data.frame(sp.effect.aic, row.names = NULL))
+  sp_effect_aic <- as.data.frame(do.call(cbind, sp_effect_aic))
+  names(sp_effect_aic) <- func_names
+  sp_effect_aic <- cbind(species = rownames(sp_effect_aic), data.frame(sp_effect_aic, row.names = NULL))
   
   # return the data.frame with species effects
-  return(as_tibble(sp.effect.aic))
+  return( dplyr::as_tibble(sp_effect_aic) )
   
 }
 
-# AIC_sp(data = mf.pa, function_names = f.names, species_names = spp.present)
+#' @title SES_sp
+#' 
+#' @param data - data.frame containing functions and species abundances or PAs
+#' @param func_names - vector of function names
+#' @param sp_names - vector of species names
+#' @param n_ran - number of randomisations
+#'
+#' @description use the SES-approach as implemented by Gotelli et al. (2011)
+#' to estimate the number of species required to support a set of functions
+#'
 
-
-# 2. calculate species effects using Gotelli et al. (2011)'s method
-
-# data: data.frame with functions and species presence-absences as columns and samples as rows
-# function_names: vector of function names
-# species_names: vector of species names
-# n_ran: number of randomisations
-
-SES_score <- function(data, function_names, species_names, n_ran = 100) {
+SES_sp <- function(data, func_names, sp_names, n_ran = 100) {
   
-  sp.dat <- data[, species_names]
-  func.dat <- data[, function_names]
+  assertthat::assert_that(
+    is.vector(func_names) && is.vector(sp_names),
+    msg = paste("either func_names or sp_names are not vectors")
+  )
   
-  func.list <- vector("list", length = length(function_names))
-  for (i in 1:length(function_names)) {
+  assertthat::assert_that(
+    is.data.frame(data) | dplyr::is.tbl(data),
+    msg = paste("data is not a data.frame or tibble")
+  )
+  
+  assertthat::assert_that(
+    all(func_names %in% names(data)) && all(sp_names %in% names(data)),
+    msg = "not all function names nor all species names are present in the input data"
+  )
+  
+  assertthat::is.count(n_ran)
+  
+  sp_dat <- data[, sp_names]
+  func_dat <- data[, func_names]
+  
+  func_list <- vector("list", length = length(func_names))
+  for (i in 1:length(func_names)) {
     
-    x <- func.dat[[function_names[i]]]
+    # get the focal function
+    x <- func_dat[[func_names[i]]]
     
-    sp.out <- 
-      lapply(sp.dat, function(y) {
+    sp_out <- 
+      lapply(sp_dat, function(y) {
         
         obs_D <- mean(x[y == 1]) - mean(x[y == 0])
         
@@ -172,29 +275,32 @@ SES_score <- function(data, function_names, species_names, n_ran = 100) {
       
       )
     
-    func.list[[i]] <- unlist(sp.out)
+    func_list[[i]] <- unlist(sp_out)
     
   }
   
   # sort out the output
-  df <- do.call("cbind", func.list)
-  df <- as.data.frame(df)
-  names(df) <- function_names
-  df <- as_tibble(df, rownames = "species")
+  sp_effect_ses <- do.call("cbind", func_list)
+  sp_effect_ses <- as.data.frame(sp_effect_ses)
+  names(sp_effect_ses) <- func_names
+  sp_effect_ses <- dplyr::as_tibble(sp_effect_ses, rownames = "species")
   
-  return(df)
+  return(sp_effect_ses)
   
 }
 
-# function to calculate proportion of the species pool required to drive function
+#' @title prop_species_pool
+#' 
+#' @param data - data.frame containing functions and species abundances or PAs
+#' @param func_names - vector of function names
+#' @param sp_names - vector of species names
+#' @param method - AIC or SES to implement the different types of turnover approaches
+#' @param n_ran - number of randomisations if SES is chosen
+#'
+#' @description calculates the proportion of
+#'
 
-# data: data.frame with functions and species presence-absences as columns and samples as rows
-# function_names: vector of function names
-# species_names: vector of species names
-# method: method to calculate species effects ("AIC" or "SES")
-# n_ran: number of randomisations when using the SES score
-
-prop_species_pool <- function(data, function_names, species_names, method = "AIC", n_ran = 100) {
+prop_species_pool <- function(data, func_names, sp_names, method = "AIC", n_ran = 100) {
   
   # start by getting the effect of each species on the different functions using either:
   # 1. AIC-approach based on the multifunc package
@@ -202,11 +308,11 @@ prop_species_pool <- function(data, function_names, species_names, method = "AIC
   
   if (method == "AIC") {
     
-    df.in <- AIC_sp(data = data, function_names = function_names, species_names = species_names)
+    df.in <- AIC_sp(data = data, function_names = function_names, sp_names = sp_names)
     
   } else if (method == "SES") {
     
-    df.in <- SES_score(data = data, function_names = function_names, species_names = species_names, n_ran = n_ran)
+    df.in <- SES_score(data = data, function_names = function_names, sp_names = sp_names, n_ran = n_ran)
     
   } else { stop("choose appropriate method for calculating the species pool") }
   
@@ -237,7 +343,7 @@ prop_species_pool <- function(data, function_names, species_names, method = "AIC
       # count the number of species positively contributing to each function and divide by total number of species    
     } else {
       
-      prop_pos <- length(df.in[x, ]$species)/length(species_names)
+      prop_pos <- length(df.in[x, ]$species)/length(sp_names)
       
     }
     
@@ -254,7 +360,7 @@ prop_species_pool <- function(data, function_names, species_names, method = "AIC
       # count the number of species positively contributing to each function and divide by total number of species    
     } else {
       
-      prop_neg <- length(df.in[x2, ]$species)/length(species_names)
+      prop_neg <- length(df.in[x2, ]$species)/length(sp_names)
       
     }
     
@@ -283,12 +389,12 @@ prop_species_pool <- function(data, function_names, species_names, method = "AIC
 
 # data: data.frame with functions and species presence-absences as columns and samples as rows
 # function_names: vector of function names
-# species_names: vector of species names
+# sp_names: vector of species names
 # method: method to calculate species effects ("AIC" or "SES")
 # n_ran: number of randomisations when using the SES method
 # n: number of random datasets
 
-prop_species_pool_random <- function(data, function_names, species_names, method = "AIC", n_ran = 100, n = 10) {
+prop_species_pool_random <- function(data, function_names, sp_names, method = "AIC", n_ran = 100, n = 10) {
   
   # create n random datasets in a list
   random_rows <- vector("list", length = n)
@@ -296,7 +402,7 @@ prop_species_pool_random <- function(data, function_names, species_names, method
   for (i in 1:n) {
     
     random_rows[[i]] <- row.randomiser(func.names = function_names,
-                                       species.names = species_names,
+                                       species.names = sp_names,
                                        adf.data = data)
     
   }
@@ -306,7 +412,7 @@ prop_species_pool_random <- function(data, function_names, species_names, method
     lapply(random_rows, function(x) {
       
       prop_species_pool(data = x, function_names = function_names,
-                        species_names = species_names, method = method, n_ran = n_ran)
+                        sp_names = sp_names, method = method, n_ran = n_ran)
       
     })
   
