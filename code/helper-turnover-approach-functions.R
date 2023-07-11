@@ -233,8 +233,8 @@ prop_species_pool <- function(data, function_names, species_names, method = "AIC
     if (all(x == FALSE)) {
       
       prop_pos <- 0
-    
-    # count the number of species positively contributing to each function and divide by total number of species    
+      
+      # count the number of species positively contributing to each function and divide by total number of species    
     } else {
       
       prop_pos <- length(df.in[x, ]$species)/length(species_names)
@@ -289,7 +289,7 @@ prop_species_pool <- function(data, function_names, species_names, method = "AIC
 # n: number of random datasets
 
 prop_species_pool_random <- function(data, function_names, species_names, method = "AIC", n_ran = 100, n = 10) {
-
+  
   # create n random datasets in a list
   random_rows <- vector("list", length = n)
   
