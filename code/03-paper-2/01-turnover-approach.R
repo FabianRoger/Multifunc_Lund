@@ -61,6 +61,9 @@ dat_list <-
   return(D)
 }, dat_list, dat_sp)
 
+# set the number of randomisations to do for the null expectation
+n_null <- 999
+
 # run the AIC turnover approach on these datasets
 aic_dat <- 
   
@@ -76,7 +79,7 @@ aic_dat <-
   aic_ran <- 
     prop_species_pool_random(data = D,
                              func_names = Func,
-                             sp_names = S, method = "AIC", n = 10)
+                             sp_names = S, method = "AIC", n = n_null)
   
   return( list(obs = aic_obs, null = aic_ran) )
   
@@ -101,7 +104,7 @@ ses_dat <-
       prop_species_pool_random(data = D,
                                func_names = Func,
                                sp_names = S, method = "SES", n_ran = 999, 
-                               n = 10)
+                               n = n_null)
     
     return( list(obs = ses_obs, null = ses_ran) )
     
@@ -188,8 +191,9 @@ f1 <-
   cowplot::plot_grid(plotlist = plot_list, 
                      nrow = 2, ncol = 3,
                      rel_widths = c(1.4, 1.1, 1),
-                     rel_heights = c(1, 1.075)
-                     )
+                     rel_heights = c(1, 1.075),
+                     labels = letters[1:6],
+                     label_size = 11, label_fontface = "plain")
 
 ggplot2::ggsave(filename = "figures-paper-2/fig_1.svg", f1,
                 units = "cm", width = 20, height = 14)

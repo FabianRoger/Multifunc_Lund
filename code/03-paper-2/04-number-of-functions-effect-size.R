@@ -18,44 +18,134 @@ source("code/03-paper-2/03-helper-slope-estimate-slope-n-functions.R")
 source("code/helper-plotting-theme.R")
 source("code/helper-univariate-mf-functions.R")
 
-# simulate a set of functions
-fsim <- sim_funcs(n_func = 3, n = 100, 
-                  lambda = 10, 
-                  mu_est = 0.25, sd_est = 0.5, 
-                  error_sd = 0.5)
+# set the number of simulations to do
+metrics <- c("ave", "sd", "thresh_30", "thresh_70", "inv-Simpson", "ENFQ1")
+title <- c("Average EMF", "SD EMF", "Thresh 30% EMF",  "Thresh 70% EMF",
+           "Inv-Simpson EMF", "ENF-Q1 EMF")
+xlabs <- c(NA, NA, NA, NA, "Number of functions", "Number of functions")
+ylabs <- c("Slope est. (+-SE)", NA, "Slope est. (+-SE)", NA, "Slope est. (+-SE)")
 
-# bind the simulation data for efficient plotting
-fsim_plot <- dplyr::bind_cols( fsim[[1]], fsim[[2]])
+# set the number of simulations
+n_sim <- 100
 
-# rename the columns
-names(fsim_plot) <- c("plot", "div", paste0("F", 1:ncol(fsim[[2]])) )
+# simulate the datasets
+fsim_list <- 
+  lapply(1:n_sim, function(x) {
+    
+    fsim <- sim_funcs(n_func = 9, n = 100, 
+                      lambda = 10, 
+                      mu_est = 0.25, sd_est = 0.5, 
+                      error_sd = 0.5)
+    
+    # convert to adf_dat
+    fsim[[2]] <- dplyr::as_tibble(fsim[[2]])
+    names(fsim[[2]]) <- paste0("F", 1:ncol(fsim[[2]]))
+    
+    return(fsim)
+    
+  })
 
-# pull into the long format
-fsim_plot <- 
-  fsim_plot |>
-  tidyr::pivot_longer(cols = contains("F"),
-                      names_to = "Function", 
-                      values_to = "Value")
+plot_list <- vector("list", length = length(metrics))
+for(i in 1:length(metrics)){
+  
+  # plot an example figure
+  
+  # get a random dataset
+  df_ex <- fsim_list[[sample(x = 1:n_sim, size = 1)]]
+  
+  # convert to adf_dat
+  ex_nfunc <- 
+    n_func_est(adf = df_ex[[2]], vars = names(df_ex[[2]]), 
+               div = df_ex[[1]]$div, 
+               metric = metrics[i])
+  
+  # add a est id variable
+  ex_nfunc$est_id <- with(ex_nfunc, paste(n_func, id, sep = "_"))
+  
+  ex_nfunc_sum <- 
+    ex_nfunc |>
+    dplyr::group_by(n_func) |>
+    dplyr::summarise(slope_est_m = mean(slope_est), .groups = "drop")
+  
+  p1 <- 
+    ggplot(data = ex_nfunc) +
+    geom_hline(yintercept = 0, linetype = "dashed", colour = "black") +
+    geom_point(mapping = aes(x = n_func, y = slope_est, group = est_id), 
+               shape = 1, alpha = 0.2, position = position_dodge(width = 0.2)) +
+    geom_errorbar(mapping = aes(x = n_func, 
+                                ymin = slope_est - slope_SE, ymax = slope_est + slope_SE,
+                                group = est_id),
+                  width = 0, alpha = 0.2, position = position_dodge(width = 0.2)) +
+    geom_line(data = ex_nfunc_sum, 
+              mapping = aes(x = n_func, y = slope_est_m), colour = "red") +
+    ylab(if(is.na(ylabs[i])){NULL}else{ylabs[i]}) +
+    xlab(if(is.na(xlabs[i])){NULL}else{xlabs[i]}) +
+    scale_x_continuous(breaks = c(2:9)) +
+    ggtitle(title[i]) +
+    theme_meta() +
+    theme(plot.title = element_text(size = 11),
+          axis.text.x = element_text(size=10))
+  
+  # perform the analysis for all simulated datasets
+  nfunc_plot <- 
+    
+    lapply(fsim_list, function(x) {
+      
+      # get the function data
+      adf_dat <- x[[2]]  
+      
+      # estimate the slope between div and EMF with different numbers of functions
+      df_nfunc <- 
+        n_func_est(adf = adf_dat, vars = names(adf_dat), 
+                   div = x[[1]]$div, 
+                   metric = metrics[i])
+      
+      df_nfunc <- 
+        df_nfunc |>
+        dplyr::group_by(n_func) |>
+        dplyr::summarise(slope_est_m = mean(slope_est))
+      
+      return(df_nfunc)
+      
+    } )
+  
+  # bind into a data.frame
+  nfunc_plot <- dplyr::bind_rows(nfunc_plot, .id = "id")
+  
+  # plot the different slopes
+  p2 <- 
+    ggplot(data = nfunc_plot) +
+    geom_hline(yintercept = 0, linetype = "dashed", colour = "black") +
+    geom_line(mapping = aes(x = n_func, y = slope_est_m, group = id), 
+              colour = "red", linewidth = 0.25, alpha = 0.5) +
+    ylab(NULL) +
+    xlab(if(is.na(xlabs[i])){NULL}else{xlabs[i]}) +
+    scale_x_continuous(breaks = c(2:9)) +
+    ggtitle(" ") +
+    theme_meta() +
+    theme(plot.title = element_text(size = 11),
+          axis.text.x = element_text(size=10))
+  
+  # join the two plots
+  p12 <- cowplot::plot_grid(p1, p2, rel_widths = c(1, 1.15),
+                            align = "h")
+  
+  # add the plot to a list
+  plot_list[[i]] <- p12
+  
+}
 
-p1 <- 
-  ggplot(data = fsim_plot,
-         mapping = aes(x = div, y = Value, group = Function)) +
-  geom_smooth(method = "lm", size = 0.5, colour = "grey", se = FALSE) +
-  ylab("Function value (0-1)") +
-  xlab("Species richness") +
-  theme_test() +
-  theme(axis.text = element_text(colour = "black"))
-plot(p1)
+# combine into a single plot
+p <- 
+  cowplot::plot_grid(plotlist = plot_list,
+                     nrow = 3, ncol = 2, labels = letters[1:6],
+                     label_size = 11, label_fontface = "plain",
+                     rel_heights = c(1, 1, 1.075),
+                     rel_widths = c(1.085, 1, 1),
+                     align = "h")
 
-adf_dat <- dplyr::as_tibble(fsim[[2]])
-names(adf_dat) <- paste0("F", 1:ncol(fsim[[2]]))
-
-# estimate the slope between biodiveristy and functioning
-# different numbers of functions
-n_func_est(adf = adf_dat, vars = names(adf_dat), 
-           div = fsim[[1]]$div, 
-           metric = "thresh_30")
-
+ggsave("figures-paper-2/fig_2.svg", p,
+       units = "cm", height = 18, width = 23)
 
 # add a few non-linear functions
 

@@ -10,7 +10,7 @@
 #' @param vars - character vector with the names of the chosen ecosystem functions 
 #' corresponding to the column names in adf
 #' @param div - vector of biodiversity values
-#' @param metric - EMF metric: "ave", "thresh_30", "thresh_70", "ENFQ1", "Shannon"
+#' @param metric - EMF metric: "ave", "thresh_30", "thresh_70", "ENFQ1", "inv-Simpson", "sd"
 
 n_func_est <- function(adf, vars, div, metric = "ave") {
   
@@ -52,11 +52,16 @@ n_func_est <- function(adf, vars, div, metric = "ave") {
           
         } else if(metric == "ENFQ1") {
           
-          multifunc::eff_num_func(dat = adf, vars = func_vec)
+          multifunc::getMF_eff(data = adf, vars = func_vec, q = 1,
+                               standardized = TRUE)
           
-        } else if(metric == "Shannon") {
+        } else if(metric == "inv-Simpson") {
           
-          MF_shannon(adf = adf, vars = func_vec, stand_method = "none")
+          MF_inv_simpson(adf = adf, vars = func_vec, stand_method = "none")
+          
+        } else if(metric == "sd") {
+          
+          apply(adf[, names(adf) %in% func_vec], 1, sd)
           
         } else {
           
@@ -64,7 +69,7 @@ n_func_est <- function(adf, vars, div, metric = "ave") {
           
         }
       
-      # fit a linear model
+      # fit a linear model on unstandardised data
       x <- lm(EMF ~ div)
       y <- summary(x)
       comb_B[k] <- y$coefficients[2,][["Estimate"]]
