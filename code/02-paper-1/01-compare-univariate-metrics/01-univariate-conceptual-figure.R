@@ -1,5 +1,9 @@
-
-# empirical exploration figure test
+#'
+#' @title Compare univariate metrics with six representative examples
+#' 
+#' @description Generates conceptual figure which compares six communities
+#' representing a range of functional distributions.
+#'
 
 # load the multifunctionality calculations
 source("code/helper-univariate-mf-functions.R")
@@ -54,7 +58,7 @@ p1 <-
         strip.text = element_text(size = 11))
 plot(p1)
 
-ggsave(filename = "figures/test_metric1.svg", p1,
+ggsave(filename = "figures-paper-1/fig_1a.svg", p1,
        units = "cm", width = 20, height = 6)  
 
 # calculate the different metrics
@@ -62,32 +66,32 @@ ggsave(filename = "figures/test_metric1.svg", p1,
 # write a function with the relevant metrics
 calculate_MF <- function(data, func.names) {
   
-  data %>%
-    mutate(`sum MF` = MF_sum(adf = data, vars = func.names, stand_method = "none"),
-           `ave. MF` = MF_av(adf = data, vars = func.names, stand_method = "none"),
-           `geom. MF` = MF_geom(adf = data, vars = func.names, stand_method = "none"),
-           `Pasari MF` = MF_pasari(adf = data, vars = func.names, stand_method = "none"),
-           `SAM MF` = MF_dooley(adf = data, vars = func.names,  stand_method = "none"),
-           `inv. Simp. MF` = MF_inv_simpson(adf = data, vars = func.names, stand_method = "none"),
-           `Shannon MF` = MF_shannon(adf = data, vars = func.names, stand_method = "none"),
-           `ENF Q0 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 0,
-                                              standardized = TRUE,
-                                              standardize_function = standardizeUnitScale,
-                                              D = NULL, tau = NULL),
-           `ENF Q1 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 1,
-                                              standardized = TRUE,
-                                              standardize_function = standardizeUnitScale,
-                                              D = NULL, tau = NULL),
-           `ENF Q2 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 2,
-                                              standardized = TRUE,
-                                              standardize_function = standardizeUnitScale,
-                                              D = NULL, tau = NULL),
-           `cluster 30 MF` = MF_cluster(adf = data, vars = func.names, thresh = 0.3),
-           `cluster 70 MF` = MF_cluster(adf = data, vars = func.names, thresh = 0.7),
-           `thresh. 30 MF` = MF_thresh(adf = data, vars = func.names, thresh = 0.3),
-           `thresh. 70 MF` = MF_thresh(adf = data, vars = func.names, thresh = 0.7),
-           `PCA MF` = MF_pca(adf = data, vars = func.names)
-    )
+  data |>
+    dplyr::mutate(`sum MF` = MF_sum(adf = data, vars = func.names, stand_method = "none"),
+                  `ave. MF` = MF_av(adf = data, vars = func.names, stand_method = "none"),
+                  `geom. MF` = MF_geom(adf = data, vars = func.names, stand_method = "none"),
+                  `Pasari MF` = MF_pasari(adf = data, vars = func.names, stand_method = "none"),
+                  `SAM MF` = MF_dooley(adf = data, vars = func.names,  stand_method = "none"),
+                  `inv. Simp. MF` = MF_inv_simpson(adf = data, vars = func.names, stand_method = "none"),
+                  `Shannon MF` = MF_shannon(adf = data, vars = func.names, stand_method = "none"),
+                  `ENF Q0 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 0,
+                                                     standardized = TRUE,
+                                                     standardize_function = standardizeUnitScale,
+                                                     D = NULL, tau = NULL),
+                  `ENF Q1 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 1,
+                                                     standardized = TRUE,
+                                                     standardize_function = standardizeUnitScale,
+                                                     D = NULL, tau = NULL),
+                  `ENF Q2 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 2,
+                                                     standardized = TRUE,
+                                                     standardize_function = standardizeUnitScale,
+                                                     D = NULL, tau = NULL),
+                  `cluster 30 MF` = MF_cluster(adf = data, vars = func.names, thresh = 0.3),
+                  `cluster 70 MF` = MF_cluster(adf = data, vars = func.names, thresh = 0.7),
+                  `thresh. 30 MF` = MF_thresh(adf = data, vars = func.names, thresh = 0.3),
+                  `thresh. 70 MF` = MF_thresh(adf = data, vars = func.names, thresh = 0.7),
+                  `PCA MF` = MF_pca(adf = data, vars = func.names)
+                  )
   
 }
 
@@ -155,7 +159,7 @@ p2 <-
         strip.text = element_text(size = 10))
 plot(p2)
 
-ggsave(filename = "figures/test_metric2.svg", p2,
+ggsave(filename = "figures-paper-1/fig_1b.svg", p2,
        units = "cm", width = 20, height = 14)  
 
 ### END

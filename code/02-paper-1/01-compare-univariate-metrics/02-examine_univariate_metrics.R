@@ -1,5 +1,9 @@
-
-# univariate multifunctionality simulations
+#'
+#' @title Compare univariate metrics
+#' 
+#' @description Compares univariate metrics for almost all possible combinations
+#' of function distributions
+#'
 
 # load relevant scripts
 source("code/helper-univariate-mf-functions.R")
@@ -45,31 +49,31 @@ df <- dplyr::distinct(df)
 
 # plot histograms of a few representative points
 rep_points <- 
-  tibble(MF_ave = c(0.5, 0.5, 0.1, 0.75),
-         MF_inv_simp = c(2, 4, 3, 3.2)
-         )
+  dplyr::tibble(MF_ave = c(0.5, 0.5, 0.1, 0.75),
+                MF_inv_simp = c(2, 4, 3, 3.2)
+                )
 
 # get points that match these criteria
 rep_points_list <- vector("list", length = nrow(rep_points))
 for(i in 1:nrow(rep_points)) {
   
   x <- 
-    df %>%
-    filter(near(MF_ave, rep_points$MF_ave[i], 0.025 ),
-           near(MF_inv_simp, rep_points$MF_inv_simp[i], 0.025 )) %>%
-    sample_n(size = 1)
+    df |>
+    dplyr::filter( dplyr::near(MF_ave, rep_points$MF_ave[i], 0.025 ),
+                   dplyr::near(MF_inv_simp, rep_points$MF_inv_simp[i], 0.025 )) |>
+    dplyr::sample_n(size = 1)
   
  rep_points_list[[i]] <- x 
   
 }
 
 # get the two extreme points
-ex_p1 <- list(filter(df, MF_ave == 1, MF_inv_simp == 4))
-ex_p2 <- list(filter(df, MF_ave == 0, MF_inv_simp == 1))
-ex_points_df <- bind_rows(ex_p1, ex_p2, .id = "id")
+ex_p1 <- list( dplyr::filter(df, MF_ave == 1, MF_inv_simp == 4) )
+ex_p2 <- list( dplyr::filter(df, MF_ave == 0, MF_inv_simp == 1) )
+ex_points_df <- dplyr::bind_rows(ex_p1, ex_p2, .id = "id")
 
 # bind this into a data.frame
-rep_points_df <- bind_rows(rep_points_list, .id = "id")
+rep_points_df <- dplyr::bind_rows(rep_points_list, .id = "id")
 
 col_pal <- wesanderson::wes_palette(name = "Darjeeling1", n = 6, type = "continuous")
 
@@ -93,28 +97,27 @@ p1 <-
   theme(legend.position = "none")
 
 # export to check the dimensions
-ggsave(filename = "figures/mf_ave_even.svg", 
+ggsave(filename = "figures-paper-1/fig_S1_main.svg", 
        p1, units = "cm",
        width = 10, height = 10)
 
 # plot the different column plots
-col_plots_df <- bind_rows(ex_points_df, rep_points_df)
+col_plots_df <- dplyr::bind_rows(ex_points_df, rep_points_df)
 col_plots_df$id <- 1:nrow(col_plots_df)
 
 # pull into the long format
 col_plots_df <- 
-  col_plots_df %>%
-  select(-MF_ave, -MF_inv_simp) %>%
-  pivot_longer(cols = contains("F"),
-               names_to = "Function", 
-               values_to = "Value")
-
+  col_plots_df |>
+  dplyr::select(-MF_ave, -MF_inv_simp) |>
+  tidyr::pivot_longer(cols = contains("F"),
+                      names_to = "Function", 
+                      values_to = "Value")
 
 # loop over the six plots
 for(i in 1:length( unique(col_plots_df$id) )) {
   
  p1 <- 
-   ggplot(data = filter(col_plots_df, id == i),
+   ggplot(data = dplyr::filter(col_plots_df, id == i),
            mapping = aes(x = Function, y = Value)) +
     geom_col(width = 0.5, fill = col_pal[i], colour = "white") +
     scale_y_continuous(expand = c(0, 0), limits = c(0, 1.1) ) +
@@ -126,7 +129,7 @@ for(i in 1:length( unique(col_plots_df$id) )) {
           axis.title.y = element_text(size = 9))
   
   # export to check the dimensions
-  ggsave(filename = paste0("figures/", "hist_comp", i, ".svg"), 
+  ggsave(filename = paste0("figures-paper-1/", "fig_S1_sub", i, ".svg"), 
          p1, units = "cm",
          width = 4, height = 4.5)
   
@@ -137,26 +140,25 @@ for(i in 1:length( unique(col_plots_df$id) )) {
 # write a function with the relevant metrics
 calculate_MF <- function(data, func.names) {
   
-  data %>%
-    mutate(`sum MF` = MF_sum(adf = data, vars = func.names, stand_method = "none"),
-           `ave. MF` = MF_av(adf = data, vars = func.names, stand_method = "none"),
-           `MESLI MF` = MF_mesli(adf = data, vars = func.names, stand_method = "none"),
-           `Pasari MF` = MF_pasari(adf = data, vars = func.names, stand_method = "none"),
-           `SAM MF` = MF_dooley(adf = data, vars = func.names,  stand_method = "none"),
-           `Simp. MF` = MF_simpsons_div(adf = data, vars = func.names, stand_method = "none"),
-           `Shannon MF` = MF_shannon_div(adf = data, vars = func.names, stand_method = "none"),
-           `ENF.Q0 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 0,
-                                              standardized = FALSE,
-                                              standardize_function = standardizeUnitScale,
-                                              D = NULL, tau = NULL),
-           `ENF.Q1 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 1,
-                                              standardized = FALSE,
-                                              standardize_function = standardizeUnitScale,
-                                              D = NULL, tau = NULL),
-           `thresh.30 MF` = single_threshold_mf(adf = data, vars = func.names, thresh = 0.3),
-           `thresh.70 MF` = single_threshold_mf(adf = data, vars = func.names, thresh = 0.7),
-           `PCA MF` = pca_multifunc(adf = data, vars = func.names)
-    )
+  data |>
+    dplyr::mutate(`sum MF` = MF_sum(adf = data, vars = func.names, stand_method = "none"),
+                  `ave. MF` = MF_av(adf = data, vars = func.names, stand_method = "none"),
+                  `Pasari MF` = MF_pasari(adf = data, vars = func.names, stand_method = "none"),
+                  `SAM MF` = MF_dooley(adf = data, vars = func.names,  stand_method = "none"),
+                  `Simp. MF` = MF_inv_simpson(adf = data, vars = func.names, stand_method = "none"),
+                  `Shannon MF` = MF_shannon(adf = data, vars = func.names, stand_method = "none"),
+                  `ENF.Q0 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 0,
+                                                     standardized = FALSE,
+                                                     standardize_function = standardizeUnitScale,
+                                                     D = NULL, tau = NULL),
+                  `ENF.Q1 MF` = multifunc::getMF_eff(data = data, vars = func.names, q = 1,
+                                                     standardized = FALSE,
+                                                     standardize_function = standardizeUnitScale,
+                                                     D = NULL, tau = NULL),
+                  `thresh.30 MF` = MF_thresh(adf = data, vars = func.names, thresh = 0.3),
+                  `thresh.70 MF` = MF_thresh(adf = data, vars = func.names, thresh = 0.7),
+                  `PCA MF` = MF_pca(adf = data, vars = func.names) 
+                  )
   
 }
 
@@ -165,19 +167,20 @@ df_mf <- calculate_MF(data = df, func.names = paste0("F", 1:4))
 
 # convert to the long format
 df_mf <-
-  df_mf %>%
-  pivot_longer(cols = contains(" MF"),
-               names_to = "Metric", 
-               values_to = "Value")
+  df_mf |>
+  tidyr::pivot_longer(cols = contains(" MF"),
+                      names_to = "Metric", 
+                      values_to = "Value"
+                      )
 
 # add a column describing whether a metric is NA or not
 df_mf <- 
-  df_mf %>%
-  mutate(NA_YN = ifelse(is.na(Value) | is.infinite(Value), "Y", "N"))
+  df_mf |>
+  dplyr::mutate(NA_YN = ifelse(is.na(Value) | is.infinite(Value), "Y", "N"))
 
 # how many NAs are there?
-df_mf %>%
-  filter(NA_YN == "Y")
+df_mf |>
+  dplyr::filter(NA_YN == "Y")
 
 # get a vector of the different names
 metrics <- unique(df_mf$Metric)
@@ -209,7 +212,7 @@ for(i in 1:length(metrics)) {
   }
   
   metric_plot_list[[i]] <- 
-    ggplot(data = df_mf %>% filter(Metric == metrics[i]), 
+    ggplot(data = dplyr::filter(df_mf, Metric == metrics[i]), 
          mapping = aes(x = MF_ave, y = MF_inv_simp, 
                        colour = Value, shape = NA_YN)) +
     geom_jitter(mapping = aes(x = MF_ave, y = MF_inv_simp), 
@@ -246,7 +249,7 @@ p1 <-
                      )
 
 # export to check the dimensions
-ggsave(filename = "figures/metric_comparison.svg", 
+ggsave(filename = "figures-paper-1/fig_S2.svg", 
        p1, units = "cm",
        width = 20, height = 25)
 
