@@ -12,43 +12,28 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 
+# load relevant scripts
+source("code/helper-plotting-theme.R")
+source("code/03-paper-2/02-helper-simulate-functions.R")
+
 # set a seed for reproducibility
-set.seed(495074209)
+set.seed(54807)
 
-# set the number of functions
-n_func <- 20
-
-# set the number of plots
+# how many plots?
 n <- 100
 
-# get the diversity of these different plots
-div <- rpois(n = n, lambda = 10)
-range(div)
-hist(div)
+# how many functions?
+n_func <- 20
 
-# simulate a set of coefficients for the effect of biodiversity on functioning
-fslope <- rnorm(n = n_func, mean = 0.1, 0.1)
-mean(fslope)
-range(fslope)
-hist(fslope)
-
-# simulate a set of functions
-fsim_list <-
-  
-  lapply(fslope, function(x) {
-  
-  y <- (div*x) + rnorm(n = length(div), mean = 0, sd = 0.5)
-  z <- y + abs( min(y) )
-  return(z/max(z))
-  
-})
-
-# pull the functions into a data.frame
-fsim <- do.call("cbind", fsim_list)
+# simulate a set of 20 functions
+fsim <- sim_funcs(n_func = n_func, n = n, 
+                  lambda = 10, 
+                  mu_est = 0.1, sd_est = 0.1, 
+                  error_sd = 0.5)
 
 # bind the simulation data for efficient plotting
-fsim_plot <- dplyr::bind_cols( dplyr::tibble(plot = 1:n, div = div), 
-                               dplyr::bind_cols(fsim_list))
+fsim_plot <- dplyr::bind_cols( dplyr::tibble(plot = 1:n, div = fsim[[1]]$div), 
+                               dplyr::as_tibble(fsim[[2]]))
 
 # rename the columns
 names(fsim_plot) <- c("plot", "div", paste0("F", 1:n_func))
@@ -66,12 +51,15 @@ p1 <-
   geom_line(stat = "smooth", method = "lm", size = 0.5, alpha = 0.3) +
   ylab("Function value (0-1)") +
   xlab("Species richness") +
-  theme_test() +
-  theme(axis.text = element_text(colour = "black"))
+  theme_meta() +
+  theme(axis.text.x = element_text(colour = "black", size = 9.5),
+        axis.text.y = element_text(colour = "black", size = 9.5),
+        axis.title.x = element_text(size = 10.5),
+        axis.title.y = element_text(size = 10.5))
 plot(p1)
 
 # plot the relationship between average EMF and diversity
-fsim_mu <- dplyr::tibble(div = div, ave_EMF = apply(fsim, 1, mean))
+fsim_mu <- dplyr::tibble(div = fsim[[1]]$div, ave_EMF = apply(fsim[[2]], 1, mean))
 
 p2 <- 
   ggplot(data = fsim_mu,
@@ -80,8 +68,11 @@ p2 <-
   geom_smooth(method = "lm", size = 0.5, colour = "black") +
   ylab("True average EMF") +
   xlab("Species richness") +
-  theme_test()+
-  theme(axis.text = element_text(colour = "black"))
+  theme_meta() +
+  theme(axis.text.x = element_text(colour = "black", size = 9.5),
+        axis.text.y = element_text(colour = "black", size = 9.5),
+        axis.title.x = element_text(size = 10.5),
+        axis.title.y = element_text(size = 10.5))
 plot(p2)
 
 p12 <- 
@@ -90,13 +81,13 @@ p12 <-
                      )
 plot(p12)
 
-ggsave(filename = "figures-paper-2/fig_x.svg", p12,
+ggsave(filename = "figures-paper-2/fig_3.svg", p12,
        units = "cm", width = 15, height = 7.5)
 
 # calculate the true average multifunctionality slope
 
 # get the population slope
-mu <- lm(apply(fsim, 1, mean) ~ div)
+mu <- lm(apply(fsim[[2]], 1, mean) ~ fsim[[1]]$div)
 mu <- summary(mu)
 
 # extrac the true coefficients
@@ -106,16 +97,16 @@ true_SE <- mu$coefficients[2,][["Std. Error"]]
 print(true_SE)
 
 # get a vector of the number of functions to sample
-sample_funcs <- rep(c(2, 6, 10, 14, 18), each = 20)
+sample_funcs <- rep(c(2, 6, 10, 14, 18), each = 10)
 
 # get the individual slope of each function
 samp_B <- vector(length = length(sample_funcs) )
 samp_SE <- vector(length = length(sample_funcs) )
 for(i in 1:length(sample_funcs)) {
   
-  funcs <- sample(1:ncol(fsim), sample_funcs[i])
+  funcs <- sample(1:ncol(fsim[[2]]), sample_funcs[i])
   
-  x <- lm(apply(fsim[,funcs], 1, mean) ~ div)
+  x <- lm(apply(fsim[[2]][,funcs], 1, mean) ~ fsim[[1]]$div)
   y <- summary(x)
   samp_B[i] <- y$coefficients[2,][["Estimate"]]
   samp_SE[i] <- y$coefficients[2,][["Std. Error"]]
@@ -129,7 +120,7 @@ samp_df <- dplyr::tibble(id = 1:length(samp_B),
                          slope_SE = samp_SE
                          )
 
-# add some random noise to the n_funcs variable
+# add some random noise to the n_funcs variable for plotting
 samp_df$n_funcs_dodge <- samp_df$n_funcs + rnorm(n = nrow(samp_df), 0, 0.2)
 
 # pull the true effect into a data.frame
@@ -157,11 +148,14 @@ p3 <-
   scale_x_continuous(limits = c(0, 21), breaks = c(unique(sample_funcs), 20) ) +
   xlab("Number of functions measured") +
   ylab("Slope est. (+-SE)") +
-  theme_test() +
-  theme(axis.text = element_text(colour = "black"))
+  theme_meta() +
+  theme(axis.text.x = element_text(colour = "black", size = 9.5),
+        axis.text.y = element_text(colour = "black", size = 9.5),
+        axis.title.x = element_text(size = 10.5),
+        axis.title.y = element_text(size = 10.5))
 plot(p3)
 
-ggsave(filename = "figures-paper-2/fig_y.svg", p3,
+ggsave(filename = "figures-paper-2/fig_4.svg", p3,
        units = "cm", width = 7.5, height = 7.5)
 
 ### END

@@ -34,7 +34,7 @@ fsim_list <-
     
     fsim <- sim_funcs(n_func = 9, n = 100, 
                       lambda = 10, 
-                      mu_est = 0.25, sd_est = 0.5, 
+                      mu_est = 0.1, sd_est = 0.1, 
                       error_sd = 0.5)
     
     # convert to adf_dat
