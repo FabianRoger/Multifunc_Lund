@@ -35,7 +35,7 @@ jena_dat[,jena_sp] <- vegan::decostand(jena_dat[,jena_sp], method = "pa")
 
 
 # set the number of randomisations to do for the null expectation
-n_null <- 10
+n_null <- 100
 
 # get the observed proportion of the species pool
 aic_obs <- 
@@ -153,7 +153,7 @@ p <-
                      label_size = 11, label_fontface = "plain")
 plot(p)
 
-ggplot2::ggsave(filename = "figures-paper-1/fig_4.svg", p,
+ggplot2::ggsave(filename = "figures-paper-1/fig_4.png", p,
                 units = "cm", width = 18, height = 8)
 
 ### END
