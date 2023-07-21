@@ -88,6 +88,9 @@ aic_dat <-
 # set set the names of the datasets
 names(aic_dat) <- c("jena", "swe", "prt")
 
+# save as an RDS file
+saveRDS(object = aic_dat, file = "code/02-paper-2/AIC_output.rds")
+
 # run the SES-based turnover approach
 ses_dat <- 
   
@@ -112,6 +115,9 @@ ses_dat <-
 
 # set set the names of the datasets
 names(ses_dat) <- c("jena", "swe", "prt")
+
+# save as an RDS file
+saveRDS(object = ses_dat, file = "code/03-paper-2/SES_output.rds")
 
 # plot the results
 
