@@ -13,8 +13,8 @@ library(tidyr)
 library(ggplot2)
 
 # load relevant functions
-source("code/03-paper-2/02-helper-simulate-functions.R")
-source("code/03-paper-2/03-helper-slope-estimate-slope-n-functions.R")
+source("code/03-paper-2/03-helper-simulate-functions.R")
+source("code/03-paper-2/04-helper-slope-estimate-slope-n-functions.R")
 source("code/helper-plotting-theme.R")
 source("code/helper-univariate-mf-functions.R")
 
@@ -28,22 +28,56 @@ ylabs <- c("Slope est. (+-SE)", NA, "Slope est. (+-SE)", NA, "Slope est. (+-SE)"
 # set the number of simulations
 n_sim <- 100
 
-# simulate the datasets
-fsim_list <- 
-  lapply(1:n_sim, function(x) {
-    
-    fsim <- sim_funcs(n_func = 9, n = 100, 
-                      lambda = 10, 
-                      mu_est = 0.1, sd_est = 0.1, 
-                      error_sd = 0.5)
-    
-    # convert to adf_dat
-    fsim[[2]] <- dplyr::as_tibble(fsim[[2]])
-    names(fsim[[2]]) <- paste0("F", 1:ncol(fsim[[2]]))
-    
-    return(fsim)
-    
-  })
+# random functions or linked functions
+random <- FALSE
+
+if(random) {
+  
+  # simulate the datasets
+  fsim_list <- 
+    lapply(1:n_sim, function(x) {
+      
+      fsim <- sim_funcs(n_func = 9, n = 100, 
+                        lambda = 10, 
+                        mu_est = 0.1, sd_est = 0.1, 
+                        error_sd = 0.5)
+      
+      # convert to adf_dat
+      fsim[[2]] <- dplyr::as_tibble(fsim[[2]])
+      names(fsim[[2]]) <- paste0("F", 1:ncol(fsim[[2]]))
+      
+      return(fsim)
+      
+    })
+  
+} else {
+  
+  # random functions
+  fsim_list <- 
+    lapply(1:n_sim, function(x) {
+      
+      fsim <- sim_funcs(n_func = 3, n = 100, 
+                        lambda = 10, 
+                        mu_est = 0.1, sd_est = 0.1, 
+                        error_sd = 0.5)
+      
+      fsim2 <- apply(fsim[[2]], 2, function(x) { 
+        
+        y <- (x*rnorm(n = 1, mean = 0.1, 0.1)) + rnorm(n = length(x), 0, 0.01)
+        z <- y + abs( min(y) )
+        z/max(z)
+        
+      } )
+      
+      # convert to adf_dat
+      fsim[[2]] <- dplyr::as_tibble( cbind( fsim[[2]], fsim2) )
+      names(fsim[[2]]) <- paste0("F", 1:ncol(fsim[[2]]))
+      
+      return(fsim)
+      
+    })
+  
+}
 
 plot_list <- vector("list", length = length(metrics))
 for(i in 1:length(metrics)){
@@ -144,11 +178,16 @@ p <-
                      rel_widths = c(1.085, 1, 1),
                      align = "h")
 
-ggsave("figures-paper-2/fig_2.svg", p,
-       units = "cm", height = 18, width = 23)
+if(random) {
+  
+  ggsave("figures-paper-2/fig_2.svg", p,
+         units = "cm", height = 18, width = 23)
+  
+} else {
+  
+  ggsave("figures-paper-2/fig_S1.svg", p,
+         units = "cm", height = 18, width = 23)
+  
+}
 
-# add a few non-linear functions
-
-
-
-
+### END
