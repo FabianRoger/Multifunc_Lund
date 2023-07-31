@@ -104,6 +104,6 @@ f1 <-
                      label_size = 11, label_fontface = "plain")
 
 ggplot2::ggsave(filename = "figures-paper-1/fig_4.svg", f1,
-                units = "cm", width = 14, height = 7)
+                units = "cm", width = 17, height = 8.5)
 
 ### END
