@@ -74,6 +74,6 @@ ses_ran <-
 ses_dat <- list( list(obs = ses_obs, null = ses_ran) )
 
 # save as an RDS file
-saveRDS(object = aic_dat, file = "code/02-paper-1/02-turnover-approaches/SES_output.rds")
+saveRDS(object = ses_dat, file = "code/02-paper-1/02-turnover-approaches/SES_output.rds")
 
 ### END
