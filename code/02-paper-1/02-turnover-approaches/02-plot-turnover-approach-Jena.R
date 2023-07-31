@@ -15,8 +15,8 @@ library(cowplot)
 library(ggbeeswarm)
 
 # read the output files
-aic_dat <- readRDS("code/02-paper-1/AIC_output.rds")
-ses_dat <- readRDS("code/02-paper-1/SES_output.rds")
+aic_dat <- readRDS("code/02-paper-1/02-turnover-approaches/AIC_output.rds")
+ses_dat <- readRDS("code/02-paper-1/02-turnover-approaches/SES_output.rds")
 
 # combine the AIC and SES lists
 df_list <- c(aic_dat, ses_dat)
@@ -87,14 +87,14 @@ for(i in 1:length(df_list)) {
     theme(legend.position = "bottom",
           strip.background = element_blank(),
           strip.text = element_text(size = 11),
-          plot.title = element_text(vjust = -1))
+          plot.title = element_text(vjust = -1, hjust = 0.5))
   
   plot_list[[i]] <- p1
   
 }
 
 # check a plot
-plot_list[[1]]
+plot_list[[2]]
 
 # combine into a single plot
 f1 <- 
@@ -106,6 +106,4 @@ f1 <-
 ggplot2::ggsave(filename = "figures-paper-1/fig_4.svg", f1,
                 units = "cm", width = 14, height = 7)
 
-
-
-
+### END
