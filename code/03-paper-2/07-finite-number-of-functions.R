@@ -14,7 +14,7 @@ library(ggplot2)
 
 # load relevant scripts
 source("code/helper-plotting-theme.R")
-source("code/03-paper-2/02-helper-simulate-functions.R")
+source("code/03-paper-2/03-helper-simulate-functions.R")
 
 # set a seed for reproducibility
 set.seed(54807)

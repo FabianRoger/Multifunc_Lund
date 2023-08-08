@@ -10,7 +10,8 @@
 #' @param vars - character vector with the names of the chosen ecosystem functions 
 #' corresponding to the column names in adf
 #' @param div - vector of biodiversity values
-#' @param metric - EMF metric: "ave", "thresh_30", "thresh_70", "ENFQ1", "inv-Simpson", "sd"
+#' @param metric - EMF metric: "ave", "thresh_30", "thresh_70", "ENFQ1", "ENFQ2", "inv-Simpson"
+#' 
 
 n_func_est <- function(adf, vars, div, metric = "ave") {
   
@@ -53,15 +54,16 @@ n_func_est <- function(adf, vars, div, metric = "ave") {
         } else if(metric == "ENFQ1") {
           
           multifunc::getMF_eff(data = adf, vars = func_vec, q = 1,
-                               standardized = TRUE)
+                               standardized = TRUE) 
+          
+        } else if(metric == "ENFQ2") {
+          
+          multifunc::getMF_eff(data = adf, vars = func_vec, q = 2,
+                               standardized = TRUE) 
           
         } else if(metric == "inv-Simpson") {
           
           MF_inv_simpson(adf = adf, vars = func_vec, stand_method = "none")
-          
-        } else if(metric == "sd") {
-          
-          apply(adf[, names(adf) %in% func_vec], 1, sd)
           
         } else {
           

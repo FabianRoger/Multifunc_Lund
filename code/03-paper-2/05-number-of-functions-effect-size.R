@@ -19,9 +19,9 @@ source("code/helper-plotting-theme.R")
 source("code/helper-univariate-mf-functions.R")
 
 # set the number of simulations to do
-metrics <- c("ave", "sd", "thresh_30", "thresh_70", "inv-Simpson", "ENFQ1")
-title <- c("Average EMF", "SD EMF", "Thresh 30% EMF",  "Thresh 70% EMF",
-           "Inv-Simpson EMF", "ENF-Q1 EMF")
+metrics <- c("ave", "inv-Simpson", "thresh_30", "thresh_70", "ENFQ1", "ENFQ2")
+title <- c("Average EMF", "Inv-Simpson EMF", "Thresh 30% EMF",  "Thresh 70% EMF",
+           "ENF-Q1 EMF", "ENF-Q2 EMF")
 xlabs <- c(NA, NA, NA, NA, "Number of functions", "Number of functions")
 ylabs <- c("Slope est. (+-SE)", NA, "Slope est. (+-SE)", NA, "Slope est. (+-SE)")
 
@@ -177,6 +177,7 @@ p <-
                      rel_heights = c(1, 1, 1.075),
                      rel_widths = c(1.085, 1, 1),
                      align = "h")
+plot(p)
 
 if(random) {
   
