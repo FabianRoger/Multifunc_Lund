@@ -23,7 +23,9 @@ n <- 250
 # how many functions?
 n_func <- 9
 
-# simulate a set of 20 functions
+# simulate a set of N functions
+# mu_est and sd_est are the mean and sd of the normal distribution 
+# from which slopes between biodiversity and each function are drawn
 fsim <- sim_funcs(n_func = n_func, n = n, 
                   lambda = 10, 
                   mu_est = 0.1, sd_est = 0.1, 
@@ -130,6 +132,17 @@ RES_func |>
   ylab("EFN range") +
   scale_x_continuous(breaks = c(1:9)) +
   theme_meta()
+
+RES_func |>
+  dplyr::group_by(nfunc, func_comb) |>
+  dplyr::summarise(min_EffN_Q1 = min(EffN_Q1),
+                   max_EffN_Q1 = max(EffN_Q1), .groups = "drop") |>
+  ggplot(mapping = aes(x = nfunc, y = (max_EffN_Q1 - min_EffN_Q1 ))) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  ylab("EFN range") +
+  scale_x_continuous(breaks = c(1:9)) +
+  theme_meta()
   
 # plot the range of the average
 RES_func |>
@@ -140,6 +153,17 @@ RES_func |>
   geom_segment(mapping = aes(x = nfunc, xend = nfunc, y = min_AV, yend = max_AV,
                              group = func_comb),
                position = position_jitter(width = 0.3), alpha = 0.1) +
+  ylab("Average range") +
+  scale_x_continuous(breaks = c(1:9)) +
+  theme_meta()
+
+RES_func |>
+  dplyr::group_by(nfunc, func_comb) |>
+  dplyr::summarise(min_AV = min(AV),
+                   max_AV = max(AV), .groups = "drop") |>
+  ggplot(mapping = aes(x = nfunc, y = (max_AV - min_AV ))) +
+  geom_point() +
+  geom_smooth(method = "lm") +
   ylab("Average range") +
   scale_x_continuous(breaks = c(1:9)) +
   theme_meta()
