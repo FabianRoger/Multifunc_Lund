@@ -6,8 +6,6 @@
 #' publication: Gamfeldt and Roger (2017, Nat Eco Evo): 
 #'
 
-
-
 PossibleCombinations  <- function(specnum, maxrep) {
   # Calculates all possible combinations at each richness level 
   # from 1 to spec.num
@@ -40,8 +38,6 @@ PossibleCombinations  <- function(specnum, maxrep) {
   
 }
 
-########################################################################################
-
 SpeciesList <- function(specnum) {
   # creates character vector with specnum species names. If specnum ≤ 26 Species are 
   # named as A - Z, if specnum > 26, species are named as follows: 
@@ -66,8 +62,6 @@ SpeciesList <- function(specnum) {
   
 }
 
-########################################################################################
-
 FunctionList <- function(funcnum) {
   # creates character vector with funcnam function names. Function are named as 
   # follows: F 1, F 2 (...) 
@@ -82,8 +76,6 @@ FunctionList <- function(funcnum) {
   return(func.list)
   
 }
-
-########################################################################################
 
 SpeciesMatrix <- function(specnum, maxrep = 50) {
   # creates a species matrix with specnum species.
@@ -154,8 +146,6 @@ SpeciesMatrix <- function(specnum, maxrep = 50) {
   
 }
 
-##################################################
-
 FunctionValue <- function(specnum = NULL, funcnum = NULL, 
                           distribution = NULL, ...) {
   # function that assigns N species function values for M functions
@@ -202,9 +192,6 @@ FunctionValue <- function(specnum = NULL, funcnum = NULL,
   return(SpecFunc)
   
 }
-
-
-##################################################
 
 AverageFunction <- function(SPM, FUNC, method = "average", selfunc = "F 1", selfac = 1,
                             compfunc = "all", CF = 2, r = 0.25) {
@@ -305,11 +292,6 @@ AverageFunction <- function(SPM, FUNC, method = "average", selfunc = "F 1", self
   
 }
 
-
-##################################################
-
-
-
 SlopeSummary <- function(MT) {
   # function to find at which threshold the estimated slope
   # reaches it's minimum
@@ -369,15 +351,13 @@ SlopeSummary <- function(MT) {
   return(Signchange.R)
 }
 
-########### function taken form the multifunc package ###################
-
 # The functions below are taken from the multifunc package and written by Jarret Byrnes (https://github.com/jebyrnes/multifunc)
 
 # They are included here in a modified form as 
 # 1) the package is not available on CRAN for the moment
 # 2) the package loads plyr which conflicts with dplyr if loaded afterwards
 
-#full citation:
+# full citation:
 
 # Byrnes, J. E. K., Gamfeldt, L., Isbell, F., Lefcheck, J. S.,
 # Griffin, J. N., Hector, A., Cardinale, B. J., Hooper, D. U., Dee, L. E.,
@@ -387,9 +367,6 @@ SlopeSummary <- function(MT) {
 # Methods in Ecology and Evolution, 5: 111–124. doi: 10.1111/2041-210X.12143
 
 # note that I re-wrote the functions below in order to not rely on plyr
-
-#getFuncsMaxed
-############################################
 
 getFuncsMaxed<-function(adf, vars=NA, threshmin=0.05, threshmax=0.99, threshstep=0.01, proportion=F, prepend="Diversity", maxN=1) {
   
@@ -417,10 +394,6 @@ getFuncsMaxed<-function(adf, vars=NA, threshmin=0.05, threshmax=0.99, threshstep
   
 }
 
-
-
-#getFuncMaxed
-################
 getFuncMaxed<-function(adf, vars=NA, thresh=0.7, prepend="Diversity", maxN=1){
   if(is.na(vars)[1]) stop("You need to specify some response variable names")
   
@@ -443,12 +416,7 @@ getFuncMaxed<-function(adf, vars=NA, thresh=0.7, prepend="Diversity", maxN=1){
   
   ret
 }
-############################################
 
-
-
-# getCoefTab
-############################################
 getCoefTab<-function(eqn, fun=glm, data, groupVar="thresholds", coefVar, ...){
   
   getCoef <- function(adf, ...) {
@@ -494,11 +462,6 @@ getCoefTab<-function(eqn, fun=glm, data, groupVar="thresholds", coefVar, ...){
   return(ret)
   
 }
-############################################
-
-
-
-########### function taken form the MASS package ###################
 
 # The function below is taken from the MASS package 
 
@@ -535,5 +498,3 @@ mvrnorm <- function (n = 1, mu, Sigma, tol = 1e-06, empirical = FALSE, EISPACK =
     drop(X)
   else t(X)
 }
-
-
