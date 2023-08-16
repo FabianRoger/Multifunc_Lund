@@ -12,34 +12,46 @@ library(ggplot2)
 
 # load relevant scripts
 source("code/helper-plotting-theme.R")
-source("code/03-paper-2/03-helper-simulate-functions.R")
+source("code/03-paper-2/06-helper-gamfeldt-roger-functions.R")
 
 # set a seed for reproducibility
 set.seed(54807)
 
-# how many plots?
-n <- 250
+# set the number of species and the number of functions
+specnum <- 15
+funcnum <- 9
 
-# how many functions?
-n_func <- 9
+# specify the distribution used to draw species' traits
+distribution = "runif"
 
-# simulate a set of N functions
-# mu_est and sd_est are the mean and sd of the normal distribution 
-# from which slopes between biodiversity and each function are drawn
-fsim <- sim_funcs(n_func = n_func, n = n, 
-                  lambda = 10, 
-                  mu_est = 0.1, sd_est = 0.1, 
-                  error_sd = 0.5)
+# get the species function matrix
+FuncMat <- FunctionValue(specnum, funcnum, distribution, min = 0, max = 1)
 
-# bind the simulation data for efficient plotting
-fsim_func <- dplyr::as_tibble(fsim[[2]])
+# get function name and species name vectors
+func_names <- as.character(unique(FuncMat$Functions))
+spec_names <- as.character(unique(FuncMat$Species))
 
-# rename the columns
-names(fsim_func) <- paste0("F", 1:n_func)
+# set the maximum number of replicates of N functions and species combinations
+maxrep <- 50
+
+# set up the species combination matrix with the maximum replications
+SpecMat <- SpeciesMatrix(specnum = specnum, maxrep = maxrep)
+
+# set the method to calculate the function values in a plot based on species traits
+method = "av"
+
+# get the values of different functions for each species combination
+AvFunc <- AverageFunction(SpecMat, FuncMat,
+                          method = method,
+                          CF = CF, 
+                          compfunc = compfunc,
+                          r = r)
+
+# check the summary of the different variables
+summary(AvFunc)
 
 # empty dataframe to store results
-RES_func <- tibble(plot = numeric(),
-                   div = numeric(),
+RES_func <- tibble(div = numeric(),
                    MF_eff_Q1 = numeric(), 
                    MF_eff_Q2 = numeric(), 
                    EffN_Q1 = numeric(),
@@ -47,9 +59,6 @@ RES_func <- tibble(plot = numeric(),
                    AV = numeric(),
                    nfunc = numeric(),
                    func_comb = numeric())
-
-# get a vector of function names
-func_names <- names(fsim_func)
 
 # loop over chosen subsets of all function of varying size
 for (i in 2:9) { 
@@ -66,22 +75,21 @@ for (i in 2:9) {
   for ( k  in seq_len(ncol(func_comb))) { 
     
     # effective number of functions of q = 1 EMF metric
-    MF_eff_Q1 <- multifunc::getMF_eff(fsim_func, func_comb[ ,k], q = 1)
+    MF_eff_Q1 <- multifunc::getMF_eff(AvFunc, func_comb[ ,k], q = 1)
     
     # effective number of functions of q = 1 EMF metric
-    MF_eff_Q2 <- multifunc::getMF_eff(fsim_func, func_comb[ ,k], q = 2)
+    MF_eff_Q2 <- multifunc::getMF_eff(AvFunc, func_comb[ ,k], q = 2)
     
     # get effective number of functions q = 1
-    EffN_Q1 <- multifunc::eff_num_func(fsim_func, func_comb[ ,k], q = 1, standardized = FALSE)
+    EffN_Q1 <- multifunc::eff_num_func(AvFunc, func_comb[ ,k], q = 1, standardized = FALSE)
     
     # get effective number of functions q = 2
-    EffN_Q2 <- multifunc::eff_num_func(fsim_func, func_comb[ ,k], q = 2, standardized = FALSE)
+    EffN_Q2 <- multifunc::eff_num_func(AvFunc, func_comb[ ,k], q = 2, standardized = FALSE)
     
     # get average MF
-    AV <- multifunc::getStdAndMeanFunctions(fsim_func, func_comb[ ,k])
+    AV <- multifunc::getStdAndMeanFunctions(AvFunc, func_comb[ ,k])
     
-    temp <- tibble(plot = fsim[[1]]$plot,
-                   div = fsim[[1]]$div,
+    temp <- tibble(div = AvFunc$Richness,
                    MF_eff_Q1 = MF_eff_Q1, 
                    MF_eff_Q2 = MF_eff_Q2, 
                    EffN_Q1 = EffN_Q1,
@@ -99,6 +107,16 @@ for (i in 2:9) {
 # check the results
 head(RES_func)
 
+RES_func %>% 
+  mutate(EffN_Q1_st = EffN_Q1 / nfunc) %>% 
+  pivot_longer(one_of(c("MF_eff_Q1", "EffN_Q1", "AV"))) %>% 
+  ggplot(aes(x = div, y = value))+
+  geom_point(size = 0.1, colour = "grey")+
+  geom_smooth(method = "lm", se = F, size = 0.8, colour = "red")+
+  # geom_smooth(se = F, size = 0.8, colour = "blue")+
+  facet_grid(name~nfunc, scales = "free_y")+
+  theme_bw()
+
 # standardise the effective number of functions
 RES_func <- 
   RES_func |>
@@ -107,10 +125,10 @@ RES_func <-
   
 # plot the raw relationships  
 RES_func |>
-  tidyr::pivot_longer(one_of(c("MF_eff_Q1", "EffN_Q1", "AV"))) |>
-  ggplot(aes(x = div, y = value, group = func_comb)) +
+  ggplot(aes(x = div, y = AV, group = func_comb)) +
+  geom_point(shape = 1, alpha = 0.1, colour = "grey") +
   geom_smooth(method = "lm", se = F, size = 0.1, colour = "red")+
-  facet_grid(name~nfunc, scales = "free_y")+
+  facet_wrap(~nfunc, nrow = 1, ncol = 8) +
   theme_meta()
 
 RES_func |>
