@@ -12,7 +12,7 @@ library(ggplot2)
 
 # load relevant scripts
 source("code/helper-plotting-theme.R")
-source("code/03-paper-2/06-helper-gamfeldt-roger-functions.R")
+source("code/03-paper-2/helper-gamfeldt-roger-functions.R")
 
 # set a seed for reproducibility
 set.seed(777)
