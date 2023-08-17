@@ -15,7 +15,7 @@ source("code/helper-plotting-theme.R")
 source("code/03-paper-2/06-helper-gamfeldt-roger-functions.R")
 
 # set a seed for reproducibility
-set.seed(54807)
+set.seed(777)
 
 # set the number of species and the number of functions
 specnum <- 15
@@ -61,14 +61,14 @@ RES_func <- tibble(div = numeric(),
                    func_comb = numeric())
 
 # loop over chosen subsets of all function of varying size
-for (i in 2:9) { 
+for (i in 2:funcnum) { 
   
   # all possible combination of i out of funcnum functions
   func_comb <- combn(func_names, i)
   
   # sample 50 random function combinations if more than 50 possible combinations
-  if(ncol(func_comb) > 50) {
-    func_comb <- func_comb[, sample(c(1:ncol(func_comb)), 50)]
+  if(ncol(func_comb) > maxrep) {
+    func_comb <- func_comb[, sample(c(1:ncol(func_comb)), maxrep)]
   }
   
   # loop over all function combinations of size i
@@ -107,96 +107,114 @@ for (i in 2:9) {
 # check the results
 head(RES_func)
 
-RES_func %>% 
-  mutate(EffN_Q1_st = EffN_Q1 / nfunc) %>% 
-  pivot_longer(one_of(c("MF_eff_Q1", "EffN_Q1", "AV"))) %>% 
-  ggplot(aes(x = div, y = value))+
-  geom_point(size = 0.1, colour = "grey")+
-  geom_smooth(method = "lm", se = F, size = 0.8, colour = "red")+
-  # geom_smooth(se = F, size = 0.8, colour = "blue")+
-  facet_grid(name~nfunc, scales = "free_y")+
-  theme_bw()
-
 # standardise the effective number of functions
 RES_func <- 
   RES_func |>
   dplyr::mutate(EffN_Q1_st = EffN_Q1 / nfunc,
                 EffN_Q2_st = EffN_Q2 / nfunc)
+
+# set-up the plotting options for the three plots
+vars <- c("AV", "EffN_Q2", "MF_eff_Q2")
+ylabs <- c("Average EMF", "Inv. Simpson EMF", "ENF-Q2 EMF")
+xlabs <- c(NA, NA, "Species richness")
+cols <- c("black", "white", "white")
+sizes <- c(11, 2, 2)
+
+# make an output list
+plot_list <- vector("list", length = length(vars))
+
+# loop over the different variables
+for(i in 1:length(vars)) {
   
-# plot the raw relationships  
-RES_func |>
-  ggplot(aes(x = div, y = AV, group = func_comb)) +
-  geom_point(shape = 1, alpha = 0.1, colour = "grey") +
-  geom_smooth(method = "lm", se = F, size = 0.1, colour = "red")+
-  facet_wrap(~nfunc, nrow = 1, ncol = 8) +
-  theme_meta()
-
-RES_func |>
-  tidyr::pivot_longer(one_of(c("MF_eff_Q2", "EffN_Q2", "AV"))) |>
-  ggplot(aes(x = div, y = value, group = func_comb)) +
-  geom_smooth(method = "lm", se = F, size = 0.1, colour = "red")+
-  facet_grid(name~nfunc, scales = "free_y")+
-  theme_meta()
-
-# plot the range of evenness
-RES_func |>
-  dplyr::group_by(nfunc, func_comb) |>
-  dplyr::summarise(min_EffN_Q1 = min(EffN_Q1),
-                   max_EffN_Q1 = max(EffN_Q1), .groups = "drop") |>
-  ggplot() +
-  geom_segment(mapping = aes(x = nfunc, xend = nfunc, y = min_EffN_Q1, yend = max_EffN_Q1,
-                             group = func_comb),
-             position = position_jitter(width = 0.3), alpha = 0.1) +
-  ylab("EFN range") +
-  scale_x_continuous(breaks = c(1:9)) +
-  theme_meta()
-
-RES_func |>
-  dplyr::group_by(nfunc, func_comb) |>
-  dplyr::summarise(min_EffN_Q1 = min(EffN_Q1),
-                   max_EffN_Q1 = max(EffN_Q1), .groups = "drop") |>
-  ggplot(mapping = aes(x = nfunc, y = (max_EffN_Q1 - min_EffN_Q1 ))) +
-  geom_point() +
-  geom_smooth(method = "lm") +
-  ylab("EFN range") +
-  scale_x_continuous(breaks = c(1:9)) +
-  theme_meta()
+  p <- 
+    ggplot(data = RES_func) +
+    geom_jitter(mapping = aes_string(x = "div", y = vars[i]), 
+                size = 0.5, colour = "grey", width = 0.1, shape = 1) +
+    geom_smooth(mapping = aes_string(x = "div", y = vars[i], group = "func_comb"), 
+                method = "lm", se = F, linewidth = 0.05, colour = "red", alpha = 0.1) +
+    geom_smooth(mapping = aes_string(x = "div", y = vars[i]),
+                method = "lm", se = F, size = 1, colour = "black") +
+    xlab(if(is.na(xlabs[i])) { NULL } else { xlabs[i] } ) +
+    ylab(ylabs[i]) +
+    facet_wrap(~nfunc, nrow = 1, ncol = 8) +
+    theme_meta() +
+    theme(strip.background = element_blank(),
+          strip.text = element_text(size = sizes[i], colour = cols[i]))
   
-# plot the range of the average
-RES_func |>
-  dplyr::group_by(nfunc, func_comb) |>
-  dplyr::summarise(min_AV = min(AV),
-                   max_AV = max(AV), .groups = "drop") |>
-  ggplot() +
-  geom_segment(mapping = aes(x = nfunc, xend = nfunc, y = min_AV, yend = max_AV,
-                             group = func_comb),
-               position = position_jitter(width = 0.3), alpha = 0.1) +
-  ylab("Average range") +
-  scale_x_continuous(breaks = c(1:9)) +
-  theme_meta()
+  plot_list[[i]] <- p
+  
+}
 
-RES_func |>
-  dplyr::group_by(nfunc, func_comb) |>
-  dplyr::summarise(min_AV = min(AV),
-                   max_AV = max(AV), .groups = "drop") |>
-  ggplot(mapping = aes(x = nfunc, y = (max_AV - min_AV ))) +
-  geom_point() +
-  geom_smooth(method = "lm") +
-  ylab("Average range") +
-  scale_x_continuous(breaks = c(1:9)) +
-  theme_meta()
+# combine the plots
+p1 <- 
+  cowplot::plot_grid(plotlist = plot_list,
+                     nrow = 3, ncol = 1, align = "v",
+                     labels = c("a", "b", "c"), label_fontface = "plain", 
+                     label_size = 10)
+plot(p1)
 
-# plot the range of the ENF-Q1 EMF
-RES_func |>
-  dplyr::group_by(nfunc, func_comb) |>
-  dplyr::summarise(min_MF_Q1 = min(MF_eff_Q1),
-                   max_MF_Q1 = max(MF_eff_Q1), .groups = "drop") |>
-  ggplot() +
-  geom_segment(mapping = aes(x = nfunc, xend = nfunc, y = min_MF_Q1, yend = max_MF_Q1,
-                             group = func_comb),
-               position = position_jitter(width = 0.3), alpha = 0.1) +
-  ylab("ENF-Q1 EMF range") +
-  scale_x_continuous(breaks = c(1:9)) +
-  theme_meta()
+# calculate the slope of the relationship
+RES_est <- 
+  RES_func |>
+  tidyr::pivot_longer(dplyr::one_of(c("AV", "EffN_Q2", "MF_eff_Q2")), names_to = "metric", values_to = "value") |> 
+  dplyr::group_by(nfunc, func_comb, metric) |> 
+  tidyr::nest() |>
+  dplyr::mutate(
+    model = purrr::map(data,  ~ lm(value ~ div, data = .)) 
+  ) |> 
+  dplyr::mutate(
+    tidy_summary = purrr::map(model, broom::tidy)
+  ) |> 
+  tidyr::unnest(tidy_summary)
+
+# get the div slope
+RES_est <- dplyr::filter(RES_est, term == "div")
+
+# set-up the plotting options for the three plots
+vars <- c("AV", "EffN_Q2", "MF_eff_Q2")
+ylabs <- c("Average EMF ~ Species richness (Est.)", 
+           "Inv. Simpson EMF ~ Species richness (Est.)", 
+           "ENF-Q2 EMF ~ Species richness (Est.)")
+xlabs <- c(NA, "Number of functions", NA)
+
+# make an output list
+plot_list <- vector("list", length = length(vars))
+
+# loop over the different variables
+for(i in 1:length(vars)) {
+  
+  # subset the correct data
+  data <- dplyr::filter(RES_est, metric == vars[i])
+  
+  # convert the number of functions to a character variable
+  data$est_id <- with(data, paste(nfunc, func_comb, sep = "_"))
+  
+  p <- 
+    ggplot(data = data) +
+    geom_point(mapping = aes(x = nfunc, y = estimate, group = est_id), 
+               shape = 1, alpha = 0.5, position = position_dodge(width = 0.5)) +
+    geom_errorbar(mapping = aes(x = nfunc, 
+                                ymin = estimate-std.error, ymax = estimate+std.error,
+                                group = est_id),
+                  width = 0, position = position_dodge(width = 0.5),
+                  alpha = 0.2) +
+    scale_x_continuous(breaks = c(2:9)) +
+    geom_smooth(mapping = aes(x = nfunc, y = estimate),
+                method = "lm", se = F, size = 0.5,colour = "red") +
+    xlab(if(is.na(xlabs[i])) { "" } else { xlabs[i] } ) +
+    ylab(ylabs[i]) +
+    theme_meta()
+  
+  plot_list[[i]] <- p
+  
+}
+
+# combine the plots
+p1 <- 
+  cowplot::plot_grid(plotlist = plot_list,
+                     nrow = 1, ncol = 3, align = "v",
+                     labels = c("a", "b", "c"), label_fontface = "plain", 
+                     label_size = 10)
+plot(p1)
 
 ### END
