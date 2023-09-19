@@ -213,7 +213,7 @@ AIC_sp <- function(data, func_names, sp_names, k = 2) {
 #' to estimate the number of species required to support a set of functions
 #'
 
-SES_sp <- function(data, func_names, sp_names, n_ran = 100) {
+SES_sp <- function(data, func_names, sp_names, crit = 2, n_ran = 100) {
   
   assertthat::assert_that(
     is.vector(func_names) && is.vector(sp_names),
@@ -249,7 +249,7 @@ SES_sp <- function(data, func_names, sp_names, n_ran = 100) {
         ran_D <- vector("double", length = n_ran)
         for (i in 1:n_ran) {
           
-          z <- sample(x, size = length(x), replace = TRUE)
+          z <- sample(x, size = length(x), replace = FALSE)
           ran_D[i] <- mean(z[y == 1]) - mean(z[y == 0])
           
         }
@@ -257,17 +257,15 @@ SES_sp <- function(data, func_names, sp_names, n_ran = 100) {
         SES_i <- (obs_D - mean(ran_D) )/sd(ran_D)
         
         # assign positive or negative effects depending on the effect size (>2 or <-2)
-        if (SES_i > 2) {
+        if (SES_i > crit) {
           
           SES_i <- 1
           
-        } else if (SES_i < -2) {
+        } else if (SES_i < -crit) {
           
           SES_i <- -1 
           
-        } 
-        
-        else { SES_i <- 0 }
+        } else { SES_i <- 0 }
         
       }
       
@@ -301,7 +299,7 @@ SES_sp <- function(data, func_names, sp_names, n_ran = 100) {
 #' dataset
 #'
 
-prop_species_pool <- function(data, func_names, sp_names, method = "AIC", k = 2, n_ran = 100) {
+prop_species_pool <- function(data, func_names, sp_names, method = "AIC", k = 2, n_ran = 100, crit = 2) {
   
   if (method == "AIC") {
     
@@ -309,7 +307,7 @@ prop_species_pool <- function(data, func_names, sp_names, method = "AIC", k = 2,
     
   } else if (method == "SES") {
     
-    df_in <- SES_sp(data = data, func_names = func_names, sp_names = sp_names, n_ran = n_ran)
+    df_in <- SES_sp(data = data, func_names = func_names, sp_names = sp_names, n_ran = n_ran, crit = crit)
     
   } else { 
     
@@ -401,7 +399,7 @@ prop_species_pool <- function(data, func_names, sp_names, method = "AIC", k = 2,
 #' @param n - number of random datasets to create
 #'
 
-prop_species_pool_random <- function(data, func_names, sp_names, method = "AIC", k, n_ran = 100, n = 10) {
+prop_species_pool_random <- function(data, func_names, sp_names, method = "AIC", k, n_ran = 100, crit = 2, n = 10) {
   
   # create n random datasets in a list
   random_rows <- vector("list", length = n)
@@ -416,7 +414,7 @@ prop_species_pool_random <- function(data, func_names, sp_names, method = "AIC",
     lapply(random_rows, function(x) {
       
       prop_species_pool(data = x, func_names = func_names,
-                        sp_names = sp_names, method = method, k = k, n_ran = n_ran)
+                        sp_names = sp_names, method = method, k = k, n_ran = n_ran, crit = crit)
       
     })
   
