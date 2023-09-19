@@ -58,6 +58,12 @@ dat_list <-
   return(D)
 }, dat_list, dat_sp)
 
+# test the new aic code
+aic_obs <- 
+  prop_species_pool(data = dat_list[[1]], 
+                    func_names = dat_funcs[[1]], 
+                    sp_names = dat_sp[[1]], method = "AIC", aic_thresh = 2)
+
 # set the number of randomisations to do for the null expectation
 n_null <- 999
 

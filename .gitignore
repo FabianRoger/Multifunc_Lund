@@ -6,3 +6,4 @@
 *.csv
 *.rds
 .Rproj.user
+*.DS_Store

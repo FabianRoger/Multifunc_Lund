@@ -157,7 +157,10 @@ get_function_combinations <- function(func_names){
 #' support a set of functions
 #'
 
-AIC_sp <- function(data, func_names, sp_names) {
+AIC_sp <- function(data, func_names, sp_names, aic_thresh = 2) {
+  
+  # load the custom multifunc functions
+  source("code/helper-multifunc-aic-funcs.R")
   
   assertthat::assert_that(
     is.vector(func_names) && is.vector(sp_names),
@@ -174,11 +177,6 @@ AIC_sp <- function(data, func_names, sp_names) {
     msg = "not all function names nor all species names are present in the input data"
   )
   
-  # make sure the multifunc package is installed
-  if(! "multifunc" %in% installed.packages()[,1]) stop(
-    "this function requires the multifunc package to be installed"
-  )
-  
   # make sure the dplyr package is installed
   if(! "dplyr" %in% installed.packages()[,1]) stop(
     "this function requires the dplyr package to be installed"
@@ -189,7 +187,7 @@ AIC_sp <- function(data, func_names, sp_names) {
     
     # get species effect on each function using abundances
     # this outputs a vector of species effects (-1, 0 or 1) on the function i
-    redun_out <- multifunc::getRedundancy(vars = func_names[i], species = sp_names, data = data)
+    redun_out <- getRedundancy(vars = func_names[i], species = sp_names, data = data, aic_thresh = aic_thresh)
     sp_effect_aic[[i]] <- sapply(redun_out, function(x)(x))
     
   }
@@ -295,6 +293,7 @@ SES_sp <- function(data, func_names, sp_names, n_ran = 100) {
 #' @param func_names - vector of function names
 #' @param sp_names - vector of species names
 #' @param method - AIC or SES to implement the different types of turnover approaches
+#' @param aic_thresh - threshold of AIC to determine the best model (default = 2)
 #' @param n_ran - number of randomisations if SES is chosen
 #'
 #' @description calculates the proportion of the species pool that contributes
@@ -302,11 +301,11 @@ SES_sp <- function(data, func_names, sp_names, n_ran = 100) {
 #' dataset
 #'
 
-prop_species_pool <- function(data, func_names, sp_names, method = "AIC", n_ran = 100) {
+prop_species_pool <- function(data, func_names, sp_names, method = "AIC", aic_thresh = 2, n_ran = 100) {
   
   if (method == "AIC") {
     
-    df_in <- AIC_sp(data = data, func_names = func_names, sp_names = sp_names)
+    df_in <- AIC_sp(data = data, func_names = func_names, sp_names = sp_names, aic_thresh = aic_thresh)
     
   } else if (method == "SES") {
     
