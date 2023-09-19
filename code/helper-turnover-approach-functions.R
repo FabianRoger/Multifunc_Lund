@@ -157,7 +157,7 @@ get_function_combinations <- function(func_names){
 #' support a set of functions
 #'
 
-AIC_sp <- function(data, func_names, sp_names, aic_thresh = 2) {
+AIC_sp <- function(data, func_names, sp_names, k = 2) {
   
   # load the custom multifunc functions
   source("code/helper-multifunc-aic-funcs.R")
@@ -187,7 +187,7 @@ AIC_sp <- function(data, func_names, sp_names, aic_thresh = 2) {
     
     # get species effect on each function using abundances
     # this outputs a vector of species effects (-1, 0 or 1) on the function i
-    redun_out <- getRedundancy(vars = func_names[i], species = sp_names, data = data, aic_thresh = aic_thresh)
+    redun_out <- getRedundancy2(vars = func_names[i], species = sp_names, data = data, k = k)
     sp_effect_aic[[i]] <- sapply(redun_out, function(x)(x))
     
   }
@@ -301,11 +301,11 @@ SES_sp <- function(data, func_names, sp_names, n_ran = 100) {
 #' dataset
 #'
 
-prop_species_pool <- function(data, func_names, sp_names, method = "AIC", aic_thresh = 2, n_ran = 100) {
+prop_species_pool <- function(data, func_names, sp_names, method = "AIC", k = 2, n_ran = 100) {
   
   if (method == "AIC") {
     
-    df_in <- AIC_sp(data = data, func_names = func_names, sp_names = sp_names, aic_thresh = aic_thresh)
+    df_in <- AIC_sp(data = data, func_names = func_names, sp_names = sp_names, k = k)
     
   } else if (method == "SES") {
     
@@ -401,7 +401,7 @@ prop_species_pool <- function(data, func_names, sp_names, method = "AIC", aic_th
 #' @param n - number of random datasets to create
 #'
 
-prop_species_pool_random <- function(data, func_names, sp_names, method = "AIC", n_ran = 100, n = 10) {
+prop_species_pool_random <- function(data, func_names, sp_names, method = "AIC", k, n_ran = 100, n = 10) {
   
   # create n random datasets in a list
   random_rows <- vector("list", length = n)
@@ -416,7 +416,7 @@ prop_species_pool_random <- function(data, func_names, sp_names, method = "AIC",
     lapply(random_rows, function(x) {
       
       prop_species_pool(data = x, func_names = func_names,
-                        sp_names = sp_names, method = method, n_ran = n_ran)
+                        sp_names = sp_names, method = method, k = k, n_ran = n_ran)
       
     })
   

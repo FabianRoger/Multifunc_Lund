@@ -58,14 +58,11 @@ dat_list <-
   return(D)
 }, dat_list, dat_sp)
 
-# test the new aic code
-aic_obs <- 
-  prop_species_pool(data = dat_list[[1]], 
-                    func_names = dat_funcs[[1]], 
-                    sp_names = dat_sp[[1]], method = "AIC", aic_thresh = 2)
-
 # set the number of randomisations to do for the null expectation
-n_null <- 999
+n_null <- 10
+
+# set the penalty term
+pen <- 4
 
 # run the AIC turnover approach on these datasets
 aic_dat <- 
@@ -76,13 +73,13 @@ aic_dat <-
   aic_obs <- 
     prop_species_pool(data = D, 
                       func_names = Func, 
-                      sp_names = S, method = "AIC")
+                      sp_names = S, method = "AIC", k = pen)
   
   # get the null proportion of the species pool
   aic_ran <- 
     prop_species_pool_random(data = D,
                              func_names = Func,
-                             sp_names = S, method = "AIC", n = n_null)
+                             sp_names = S, method = "AIC", k = pen, n = n_null)
   
   return( list(obs = aic_obs, null = aic_ran) )
   
@@ -92,7 +89,7 @@ aic_dat <-
 names(aic_dat) <- c("jena", "swe", "prt")
 
 # save as an RDS file
-saveRDS(object = aic_dat, file = "code/02-paper-2/AIC_output.rds")
+saveRDS(object = aic_dat, file = "code/03-paper-2/AIC_output.rds")
 
 # run the SES-based turnover approach
 ses_dat <- 

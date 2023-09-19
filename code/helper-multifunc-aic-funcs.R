@@ -2,10 +2,11 @@
 #' @title Modified functions from the multifunc package
 #' 
 #' @description Script to hold the AIC-based turnover approach functions from
-#' the multifunc package which we modified to have a stronger AIC threshold. In
-#' the standard implementation of the AIC-approach in the multifunc package,
-#' models with the lowest AIC value were chosen even if the difference was only
-#' for example, 0.1.
+#' the multifunc package which we modified to have a stronger AIC penalty term. In
+#' the standard implementation of the AIC-approach in the multifunc package, only 
+#' the standard AIC is allowed but Meyer et al. (2018) extended this approach
+#' to allow more stringent penalty terms. We borrow this approach from
+#' Meyer et al. (2018)
 #'
 #'
 #' @title getRedundancy
@@ -61,13 +62,15 @@
 #' # or a coefficient table, if asked for.  Arugments can take the form of the fitting function
 #' # how variables are combined, and additional arguments to the fitting function
 #' #########
-getRedundancy <- function(vars, species, data, negVars = NA, method = "lm", combine = "+", output = "effect", aic_thresh = 2, ...) {
+getRedundancy2 <- function (vars, species, data, negVars = NA, method = "lm", combine = "+", k, output = "effect", ...) {
   res.list <- lapply(vars, function(x) {
-    positive.desired <- TRUE
-    if (x %in% negVars) positive.desired <- F
-    sAICfun(response = x, species = species, data = data, positive.desired, method = method, combine = combine, aic_thresh = aic_thresh, ...) # used to be method[idx]
+    positive.desired <- T
+    if (x %in% negVars) 
+      positive.desired <- F
+    sAICfun2(response = x, species = species, data = data, 
+             positive.desired, method = method, combine = combine, k=k,
+             ...)
   })
-  
   # what if they want the coefficients
   if (output == "coef") {
     # ret<-plyr::ldply(res.list, function(x) x$coefs)
@@ -84,62 +87,65 @@ getRedundancy <- function(vars, species, data, negVars = NA, method = "lm", comb
   return(ret)
 }
 
+filterOverData2 <- function (overData, type = "positive") 
+{
+  neg <- which(overData < 0, arr.ind = T)
+  pos <- which(overData > 0, arr.ind = T)
+  if (type == "positive" & nrow(neg)>0) 
+    apply(neg, 1, function(x) overData[x[1], x[2]] <<- 0)
+  if (type == "negative" & nrow(pos)>0) 
+    apply(pos, 1, function(x) overData[x[1], x[2]] <<- 0)
+  if (type == "negative" & nrow(neg)>0) 
+    apply(neg, 1, function(x) overData[x[1], x[2]] <<- 1)
+  if (type == "all" & nrow(neg)>0) 
+    apply(neg, 1, function(x) overData[x[1], x[2]] <<- 1)
+  overData
+}
+
 #########
-# sAICfun takes a dataset, response, and function, and then uses a stepAIC approach
+# sAICfun2 takes a dataset, response, and function, and then uses a stepAIC approach
 # to determine the best model.  From that it extracts the species with a positive,
 # negative, and neutral effect on that function
 #########
-sAICfun <- function(response, species, data, positive.desired = TRUE, 
-                    method = "lm", combine = "+", aic_thresh = 2, ...) {
+sAICfun2 <- function(response, species, data, positive.desired=T, method="lm", combine="+", k=2, ...){
   # first fit the model
-  obj <- sAICFit(response, species, data, method, combine, aic_thresh = aic_thresh, ...)
+  obj<-sAICFit2(response, species, data, method, combine, k=k, ...)
   
   # now extract the important information about positive, negative, etc.
   
   # return that info in a list
-  if (positive.desired) {
-    pos.sp <- names(summary(obj)[[4]][, 4][(summary(obj)[[4]][, 1] > 0) & names(summary(obj)[[4]][, 4]) != "(Intercept)"])
-    neg.sp <- names(summary(obj)[[4]][, 4][(summary(obj)[[4]][, 1] < 0) & names(summary(obj)[[4]][, 4]) != "(Intercept)"])
-  } else {
-    pos.sp <- names(summary(obj)[[4]][, 4][(summary(obj)[[4]][, 1] < 0) & names(summary(obj)[[4]][, 4]) != "(Intercept)"])
-    neg.sp <- names(summary(obj)[[4]][, 4][(summary(obj)[[4]][, 1] > 0) & names(summary(obj)[[4]][, 4]) != "(Intercept)"])
+  if(positive.desired) {
+    pos.sp <- names(summary(obj)[[4]][,4][(summary(obj)[[4]][,1]>0) & names(summary(obj)[[4]][,4])!="(Intercept)"])
+    neg.sp <- names(summary(obj)[[4]][,4][(summary(obj)[[4]][,1]<0) & names(summary(obj)[[4]][,4])!="(Intercept)"])
+  }else{
+    pos.sp <- names(summary(obj)[[4]][,4][(summary(obj)[[4]][,1]<0) & names(summary(obj)[[4]][,4])!="(Intercept)"])
+    neg.sp <- names(summary(obj)[[4]][,4][(summary(obj)[[4]][,1]>0) & names(summary(obj)[[4]][,4])!="(Intercept)"])
   }
   neu.sp <- species[!(species %in% pos.sp) & !(species %in% neg.sp)]
   
   # make a vector of 1s and 0s
-  effects <- rep(0, length(species))
-  names(effects) <- species
-  effects[which(names(effects) %in% pos.sp)] <- 1
-  effects[which(names(effects) %in% neg.sp)] <- -1
+  effects<-rep(0, length(species))
+  names(effects)<-species  
+  effects[which(names(effects) %in% pos.sp)]<-1
+  effects[which(names(effects) %in% neg.sp)]<- -1
   
-  coefs <- c(effects, 0)
-  names(coefs)[length(coefs)] <- "(Intercept)"
-  coefs[match(names(coef(obj)), names(coefs))] <- coef(obj)
+  coefs<-c(effects,0)
+  names(coefs)[length(coefs)]<-"(Intercept)"
+  coefs[ match(names(coef(obj)), names(coefs)) ]<-coef(obj)
   
-  return(list(pos.sp = pos.sp, neg.sp = neg.sp, neu.sp = neu.sp, functions = response, coefs = coefs, effects = effects))
+  return(list(pos.sp=pos.sp,neg.sp=neg.sp,neu.sp=neu.sp, functions=response, coefs=coefs, effects=effects))
 }
 
 #########
-# sAICFit does the business of fitting a model using a stepAIC approach
+# sAICFit2 does the business of fitting a model using a stepAIC approach
 #########
-sAICFit <- function(response, species, data, method = "lm", combine = "+", aic_thresh = 2, ...) {
-  f <- as.formula(paste(response, "~", paste(species, collapse = "+")))
-  fit <- eval(substitute(lm(f, data = data, ...)))
-  mod_list <- MASS::stepAIC(fit, trace = 0, keep = function(model, aic) list(model = model, aic = aic))
-  # extract the models
-  k <- mod_list$keep
-  # extract the AIC values
-  aic_vals <- vector(length = ncol(k))
-  for(i in 1:ncol(k)) {
-    aic_vals[i] <- k[, i]$aic
-  }
-  # extract the difference from the best model
-  aic_dif <- aic_vals - (min(aic_vals))
-  # check which model AIC is the best balance
-  max_aic <- max(aic_vals[which(aic_dif < aic_thresh)])
-  # choose the model
-  m <- which(aic_vals == max_aic)
-  # export the model
-  obj <- k[, m]$model
+sAICFit2 <- function(response, species, data, method="lm", combine="+", k, ...){
+  # make sure the dplyr package is installed
+  if(! "dplyr" %in% installed.packages()[,1]) stop(
+    "this function requires the dplyr package to be installed"
+  )
+  f <- as.formula(paste(response, "~" , paste(species, collapse="+")))
+  fit <- eval(substitute(lm(f, data=data, ...)))
+  obj <- MASS::stepAIC(fit, trace=0, k=k)
   obj
 }
