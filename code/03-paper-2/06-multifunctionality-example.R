@@ -78,6 +78,9 @@ mf_df <-
 # check the raw relationships again
 pairs(mf_df[,-c(1, 2, 3) ])
 
+# how many samples do we have?
+nrow(mf_df)
+
 # draw the DAG
 dag1 <- dagitty::downloadGraph("dagitty.net/mpkrtMC")
 plot(dag1)
