@@ -110,12 +110,19 @@ p2 <- ci2$`Pr(>Chisq)`[2]
 p_vals <- p.adjust(p = c(p1, p2), method = "bonferroni")
 print(p_vals)
 
+# set-up plotting colours
+cols <- wesanderson::wes_palette(name = "Darjeeling2", n = 5)
+print(cols)
+
+# select the relevant colours
+cols <- cols[2:5]
+
 # set-up axis labels
 S <- "Tree species richness"
 SC <- expression("ln[ Soil carbon"~(kg~m^{2})~"]")
 SC_res <- expression("ln[ Soil carbon"~(kg~m^{2})~"] *")
-B <- "logit[ Proportion cover ]"
-B_res <- "logit[ Proportion cover ] *"
+B <- "logit[ Bilberry cover ]"
+B_res <- "logit[ Bilberry cover ] *"
 P <- expression(sqrt("Tree production"~(kg~m^{2}~year^{-1})))
 P_res <- expression(sqrt("Tree production"~(kg~m^{2}~year^{-1}))~"*")
 
@@ -135,10 +142,12 @@ pred1 <- dplyr::bind_cols(pred1, predict(lm1, pred1, interval = "confidence"))
 
 q1 <- 
   ggplot() +
-  geom_jitter(data = mf_df, mapping = aes(x = S, y = production), width = 0.1) +
-  geom_line(data = pred1, mapping = aes(x = S, y = fit)) +
+  geom_jitter(data = mf_df, mapping = aes(x = S, y = production), width = 0.1,
+              colour = cols[1]) +
+  geom_line(data = pred1, mapping = aes(x = S, y = fit),
+            colour = cols[1]) +
   geom_ribbon(data = pred1, mapping = aes(x = S, ymin = lwr, ymax = upr), 
-              alpha = 0.1) +
+              alpha = 0.1, fill = cols[1]) +
   ylab(P) +
   xlab(S) +
   annotate("text", x = Inf, y = -Inf, hjust = 1.3, vjust = -1.4,
@@ -158,10 +167,12 @@ pred2 <- dplyr::bind_cols(pred2, predict(lm2, pred2, interval = "confidence"))
 
 q2 <- 
   ggplot() +
-  geom_point(data = mf_df, mapping = aes(x = production, y = Cstock),) +
-  geom_line(data = pred2, mapping = aes(x = production, y = fit)) +
+  geom_point(data = mf_df, mapping = aes(x = production, y = Cstock),
+             colour = cols[2]) +
+  geom_line(data = pred2, mapping = aes(x = production, y = fit),
+            colour = cols[2]) +
   geom_ribbon(data = pred2, mapping = aes(x = production, ymin = lwr, ymax = upr), 
-              alpha = 0.1) +
+              alpha = 0.1, fill = cols[2]) +
   ylab(SC) +
   xlab(P) +
   annotate("text", x = Inf, y = -Inf, hjust = 1.3, vjust = -1.4,
@@ -183,8 +194,8 @@ summary(lm3b)
 
 # fit a model of the residuals on production on Cstock
 lm3c_df <- data.frame(production_res = residuals(lm3b),
-                      Cstock_res = residuals(lm3a))
-lm3c <- lm(Cstock_res ~ production_res, data = lm3c_df)
+                      bilberries_res = residuals(lm3a))
+lm3c <- lm(bilberries_res ~ production_res, data = lm3c_df)
 summary(lm3c)
 
 # get predictive distribution
@@ -193,11 +204,14 @@ pred3 <- dplyr::bind_cols(pred3, predict(lm3c, pred3, interval = "confidence"))
 
 q3 <-
   ggplot() +
-  geom_point(data = lm3c_df, mapping = aes(x = production_res, y = Cstock_res),) +
-  geom_line(data = pred3, mapping = aes(x = production_res, y = fit)) +
+  geom_point(data = lm3c_df, mapping = aes(x = production_res, y = bilberries_res),
+             colour = cols[3]) +
+  geom_line(data = pred3, mapping = aes(x = production_res, y = fit),
+            colour = cols[3]) +
   geom_ribbon(data = pred3, mapping = aes(x = production_res, ymin = lwr, ymax = upr), 
-              alpha = 0.1) +
-  ylab(SC_res) +
+              alpha = 0.2, 
+              fill = cols[3]) +
+  ylab(B_res) +
   xlab(P_res) +
   annotate("text", x = Inf, y = -Inf, hjust = 1.3, vjust = -1.4,
            label = lm_eqn(lm3c), parse = TRUE) +
@@ -228,10 +242,13 @@ pred4 <- dplyr::bind_cols(pred4, predict(lm4c, pred4, interval = "confidence"))
 
 q4 <- 
   ggplot() +
-  geom_point(data = lm4c_df, mapping = aes(x = Cstock_res, y = bilberries_res),) +
-  geom_line(data = pred4, mapping = aes(x = Cstock_res, y = fit)) +
+  geom_point(data = lm4c_df, mapping = aes(x = Cstock_res, y = bilberries_res),
+             colour = cols[4]) +
+  geom_line(data = pred4, mapping = aes(x = Cstock_res, y = fit),
+            colour = cols[4]) +
   geom_ribbon(data = pred4, mapping = aes(x = Cstock_res, ymin = lwr, ymax = upr), 
-              alpha = 0.1) +
+              alpha = 0.1,
+              fill = cols[4]) +
   ylab(B_res) +
   xlab(SC_res) +
   annotate("text", x = Inf, y = -Inf, hjust = 1.3, vjust = -1.4,
@@ -240,10 +257,19 @@ q4 <-
 
 # output these plots
 q_list <- list(q1, q2, q3, q4)
+
+# combine into a single plot
+q14 <- 
+  cowplot::plot_grid(plotlist = q_list, align = "hv", ncol = 4, nrow = 1)
+
+ggsave("figures-paper-2/fig_4.pdf", q14,
+       units = "cm", width = 21, height = 7)
+
+# output these plots
 for(i in 1:length(q_list)) {
   
-  ggsave(filename = paste0("figures-paper-2/fig_3_", i, ".pdf"), plot = q_list[[i]],
-         unit = "cm", width = 8, height = 8)
+  ggsave(paste0("figures-paper-2/fig_4_", i, ".pdf"), q_list[[i]],
+         units = "cm", width = 8, height = 8)
   
 }
 
