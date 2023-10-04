@@ -133,13 +133,16 @@ summary(lm1)
 pred1 <- data.frame(S = seq(1, 6, 0.1))
 pred1 <- dplyr::bind_cols(pred1, predict(lm1, pred1, interval = "confidence"))
 
-ggplot() +
+q1 <- 
+  ggplot() +
   geom_jitter(data = mf_df, mapping = aes(x = S, y = production), width = 0.1) +
   geom_line(data = pred1, mapping = aes(x = S, y = fit)) +
   geom_ribbon(data = pred1, mapping = aes(x = S, ymin = lwr, ymax = upr), 
               alpha = 0.1) +
   ylab(P) +
   xlab(S) +
+  annotate("text", x = Inf, y = -Inf, hjust = 1.3, vjust = -1.4,
+           label = lm_eqn(lm1), parse = TRUE) +
   theme_meta()
 
 # adjustment set required for the effect of TreeProd on SoilC
@@ -153,13 +156,16 @@ summary(lm2)
 pred2 <- data.frame(production = seq(0.01, 1.3, 0.02))
 pred2 <- dplyr::bind_cols(pred2, predict(lm2, pred2, interval = "confidence"))
 
-ggplot() +
+q2 <- 
+  ggplot() +
   geom_point(data = mf_df, mapping = aes(x = production, y = Cstock),) +
   geom_line(data = pred2, mapping = aes(x = production, y = fit)) +
   geom_ribbon(data = pred2, mapping = aes(x = production, ymin = lwr, ymax = upr), 
               alpha = 0.1) +
   ylab(SC) +
   xlab(P) +
+  annotate("text", x = Inf, y = -Inf, hjust = 1.3, vjust = -1.4,
+           label = lm_eqn(lm2), parse = TRUE) +
   theme_meta()
 
 # adjustment set required for the effect of TreeProd on Bilberries
@@ -185,13 +191,16 @@ summary(lm3c)
 pred3 <- data.frame(production_res = seq(-0.6, 0.71, 0.02))
 pred3 <- dplyr::bind_cols(pred3, predict(lm3c, pred3, interval = "confidence"))
 
-ggplot() +
+q3 <-
+  ggplot() +
   geom_point(data = lm3c_df, mapping = aes(x = production_res, y = Cstock_res),) +
   geom_line(data = pred3, mapping = aes(x = production_res, y = fit)) +
   geom_ribbon(data = pred3, mapping = aes(x = production_res, ymin = lwr, ymax = upr), 
               alpha = 0.1) +
   ylab(SC_res) +
   xlab(P_res) +
+  annotate("text", x = Inf, y = -Inf, hjust = 1.3, vjust = -1.4,
+           label = lm_eqn(lm3c), parse = TRUE) +
   theme_meta()
 
 # adjustment set required for the effect of SoilC on Bilberries
@@ -217,14 +226,26 @@ summary(lm4c)
 pred4 <- data.frame(Cstock_res = seq(-1.81, 2.1, 0.02))
 pred4 <- dplyr::bind_cols(pred4, predict(lm4c, pred4, interval = "confidence"))
 
-ggplot() +
+q4 <- 
+  ggplot() +
   geom_point(data = lm4c_df, mapping = aes(x = Cstock_res, y = bilberries_res),) +
   geom_line(data = pred4, mapping = aes(x = Cstock_res, y = fit)) +
   geom_ribbon(data = pred4, mapping = aes(x = Cstock_res, ymin = lwr, ymax = upr), 
               alpha = 0.1) +
   ylab(B_res) +
   xlab(SC_res) +
+  annotate("text", x = Inf, y = -Inf, hjust = 1.3, vjust = -1.4,
+           label = lm_eqn(lm4c), parse = TRUE) +
   theme_meta()
+
+# output these plots
+q_list <- list(q1, q2, q3, q4)
+for(i in 1:length(q_list)) {
+  
+  ggsave(filename = paste0("figures-paper-2/fig_3_", i, ".pdf"), plot = q_list[[i]],
+         unit = "cm", width = 8, height = 8)
+  
+}
 
 # test the effect of tree species richness on average multifunctionality
 
@@ -276,5 +297,7 @@ ggplot() +
               alpha = 0.1) +
   ylab("ENF-Q1 multifunctionality") +
   xlab(S) +
+  annotate("text", x = Inf, y = -Inf, hjust = 1.1, vjust = -1.4,
+           label = lm_eqn(lm1), parse = TRUE) +
   theme_meta()
 
