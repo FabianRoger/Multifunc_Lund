@@ -19,7 +19,7 @@ mf_df <- readr::read_delim("data/gamfeldt_2013_forest_data.txt", delim = "\t")
 head(mf_df)
 
 # check the data
-View(mf_df)
+# View(mf_df)
 
 # subset out the relevant columns
 mf_df <-
@@ -27,7 +27,7 @@ mf_df <-
   dplyr::select(year, trakt, plot, S, production, Cstock, bilberries)
 
 # check the initial relationships among the data
-pairs(mf_df[,-c(1, 2, 3) ])
+# pairs(mf_df[,-c(1, 2, 3) ])
 
 # get only complete cases
 mf_df <- mf_df[complete.cases(mf_df),]
@@ -76,7 +76,7 @@ mf_df <-
   dplyr::mutate(production = sqrt(production))
 
 # check the raw relationships again
-pairs(mf_df[,-c(1, 2, 3) ])
+# pairs(mf_df[,-c(1, 2, 3) ])
 
 # how many samples do we have?
 nrow(mf_df)
@@ -97,6 +97,7 @@ lm2 <- lm(bilberries ~ production + S, data = mf_df)
 # get the likelihood ratio test
 ci1 <- lmtest::lrtest(lm2, lm1)
 p1 <- ci1$`Pr(>Chisq)`[2]
+print(ci1)
 
 # SolC _||_ TrSR | TrPr
 lm1 <- lm(Cstock ~ production, data = mf_df)
@@ -105,9 +106,10 @@ lm2 <- lm(Cstock ~ production + S, data = mf_df)
 # get the likelihood ratio test
 ci2 <- lmtest::lrtest(lm2, lm1)
 p2 <- ci2$`Pr(>Chisq)`[2]
+print(ci2)
 
 # conduct p-value correction
-p_vals <- p.adjust(p = c(p1, p2), method = "bonferroni")
+p_vals <- p.adjust(p = c(p1, p2), method = "holm")
 print(p_vals)
 
 # set-up plotting colours
@@ -260,18 +262,11 @@ q_list <- list(q1, q2, q3, q4)
 
 # combine into a single plot
 q14 <- 
-  cowplot::plot_grid(plotlist = q_list, align = "hv", ncol = 4, nrow = 1)
+  cowplot::plot_grid(plotlist = q_list, align = "hv", ncol = 2, nrow = 2)
+plot(q14)
 
 ggsave("figures-paper-2/fig_4.pdf", q14,
-       units = "cm", width = 21, height = 7)
-
-# output these plots
-for(i in 1:length(q_list)) {
-  
-  ggsave(paste0("figures-paper-2/fig_4_", i, ".pdf"), q_list[[i]],
-         units = "cm", width = 8, height = 8)
-  
-}
+       units = "cm", width = 14, height = 14)
 
 # test the effect of tree species richness on average multifunctionality
 
@@ -298,14 +293,18 @@ pred5 <- data.frame(S = seq(1, 6, 0.1))
 pred5 <- dplyr::bind_cols(pred5, predict(lm5, pred5, interval = "confidence"))
 
 # plot the results
-ggplot() +
+r1 <- 
+  ggplot() +
   geom_jitter(data = mf_df, mapping = aes(x = S, y = mf_ENFQ1), width = 0.1) +
   geom_line(data = pred5, mapping = aes(x = S, y = fit)) +
   geom_ribbon(data = pred5, mapping = aes(x = S, ymin = lwr, ymax = upr), 
               alpha = 0.1) +
   ylab("ENF-Q1 multifunctionality") +
   xlab(S) +
+  annotate("text", x = Inf, y = -Inf, hjust = 1.3, vjust = -1.4,
+           label = lm_eqn(lm5), parse = TRUE) +
   theme_meta()
+plot(r1)
 
 # is there an effect of biodiversity on ENF-Q2 multifunctionality?
 lm6 <- lm(mf_ENFQ2 ~ S, data = mf_df)
@@ -316,14 +315,24 @@ pred6 <- data.frame(S = seq(1, 6, 0.1))
 pred6 <- dplyr::bind_cols(pred6, predict(lm6, pred6, interval = "confidence"))
 
 # plot the results
-ggplot() +
+r2 <- 
+  ggplot() +
   geom_jitter(data = mf_df, mapping = aes(x = S, y = mf_ENFQ2), width = 0.1) +
   geom_line(data = pred6, mapping = aes(x = S, y = fit)) +
   geom_ribbon(data = pred6, mapping = aes(x = S, ymin = lwr, ymax = upr), 
               alpha = 0.1) +
-  ylab("ENF-Q1 multifunctionality") +
+  ylab("ENF-Q2 multifunctionality") +
   xlab(S) +
   annotate("text", x = Inf, y = -Inf, hjust = 1.1, vjust = -1.4,
-           label = lm_eqn(lm1), parse = TRUE) +
+           label = lm_eqn(lm6), parse = TRUE) +
   theme_meta()
+plot(r2)
+
+# combine the plots
+r12 <- cowplot::plot_grid(r1, r2, align = "hv", ncol = 2, nrow = 1,
+                          labels = c("a", "b"), label_fontface = "plain", label_size = 11)
+plot(r12)
+
+ggsave("figures-paper-2/fig_5.pdf", r12,
+       units = "cm", width = 16, height = 8)
 
