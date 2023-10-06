@@ -99,6 +99,12 @@ ci1 <- lmtest::lrtest(lm2, lm1)
 p1 <- ci1$`Pr(>Chisq)`[2]
 print(ci1)
 
+# try different conditional independence testing
+bnlearn::ci.test("S", "bilberries", "production", data = mf_df, test = "cor")
+with(mf_df, {
+  GeneralisedCovarianceMeasure::gcm.test(X = S, Y = bilberries, Z = production, alpha = 0.05, regr.method = "xgboost")
+})
+
 # SolC _||_ TrSR | TrPr
 lm1 <- lm(Cstock ~ production, data = mf_df)
 lm2 <- lm(Cstock ~ production + S, data = mf_df)
@@ -108,6 +114,12 @@ ci2 <- lmtest::lrtest(lm2, lm1)
 p2 <- ci2$`Pr(>Chisq)`[2]
 print(ci2)
 
+# try different conditional independence testing
+bnlearn::ci.test("S", "Cstock", "production", data = mf_df, test = "cor")
+with(mf_df, {
+  GeneralisedCovarianceMeasure::gcm.test(X = S, Y = Cstock, Z = production, alpha = 0.05, regr.method = "xgboost")
+  })
+  
 # conduct p-value correction
 p_vals <- p.adjust(p = c(p1, p2), method = "holm")
 print(p_vals)

@@ -20,8 +20,8 @@ source("code/helper-univariate-mf-functions.R")
 
 # set the number of simulations to do
 metrics <- c("ave", "inv-Simpson", "thresh_30", "thresh_70", "ENFQ1", "ENFQ2")
-title <- c("Average EMF", "Inv-Simpson EMF", "Thresh 30% EMF",  "Thresh 70% EMF",
-           "ENF-Q1 EMF", "ENF-Q2 EMF")
+title <- c("Average MF", "Inv-Simpson MF", "Thresh 30% MF",  "Thresh 70% MF",
+           "ENF-Q1 MF", "ENF-Q2 MF")
 xlabs <- c(NA, NA, NA, NA, "Number of functions", "Number of functions")
 ylabs <- c("Slope est. (+-SE)", NA, "Slope est. (+-SE)", NA, "Slope est. (+-SE)")
 
