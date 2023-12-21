@@ -5,15 +5,6 @@
 #' operationalise some of the steps recommended
 #' 
 
-# load relevant libraries
-library(dplyr)
-library(tidyr)
-library(readr)
-library(ggplot2)
-
-# load plotting theme
-source("code/helper-plotting-theme.R")
-
 # load the data
 mf_df <- readr::read_delim("data/gamfeldt_2013_forest_data.txt", delim = "\t")
 head(mf_df)
