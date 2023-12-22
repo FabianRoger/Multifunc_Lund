@@ -13,8 +13,8 @@ library(tidyr)
 library(ggplot2)
 
 # load relevant functions
-source("code/03-paper-2/03-helper-simulate-functions.R")
-source("code/03-paper-2/04-helper-slope-estimate-slope-n-functions.R")
+source("code/03-paper-2/helper-simulate-functions.R")
+source("code/03-paper-2/helper-slope-estimate-slope-n-functions.R")
 source("code/helper-plotting-theme.R")
 source("code/helper-univariate-mf-functions.R")
 
